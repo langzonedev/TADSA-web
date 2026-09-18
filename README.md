@@ -26,7 +26,7 @@ Device menu deletion requires confirmation. Linked people cannot be deleted. Pro
 
 ## Verification
 
-Run node --test tests/device-qa.test.mjs, node tests/browser-device-qa.mjs and node tests/browser-parity.mjs. Browser scripts accept PLAYWRIGHT_MODULE_PATH and BROWSER_EXECUTABLE_PATH.
+Run `node --test tests/*.test.mjs`, `node tests/browser-device-qa.mjs` and `node tests/browser-parity.mjs`. Browser scripts accept PLAYWRIGHT_MODULE_PATH and BROWSER_EXECUTABLE_PATH.
 
 Local Edge evidence covers migration retention, injected quota rollback, concurrent stale writers, reload persistence, shared register/client/project/operations/document routes under /TADSA-web/, creation, calendar, PDF upload, SVG rejection, offline persisted records and file downloads. Independent evidence is separated in device-qa scripts. Real-device install/update tests remain outstanding.
 
