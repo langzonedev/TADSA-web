@@ -1,7 +1,7 @@
 import {renderAccounts} from './accounts.js';
 import {renderReports} from './reports.js';
 import {renderSettings,configureSettings} from './settings.js';
-import {requireLocalSession,sessionEnded} from './local-login.js';
+import {requireLocalSession,sessionEnded,showAuthFailure} from './local-login.js';
 import {configureOperations,renderOperations,operationsHaveDrafts,renderNotes} from './operations.js';
 import {configureCare,careHasDrafts,renderProjectCare} from './project-care.js';
 import {renderAvailability} from './availability.js';
@@ -214,7 +214,7 @@ async function entity(view, type, id) {
 async function render() {
   if (saving) { announce('Please wait for the save to finish.'); return; }
   const ticket=++renderVersion;
-  try{if(!await requireLocalSession(main,render,()=>ticket===renderVersion,()=>Boolean(drafts.size||workflowHasDrafts()||operationsHaveDrafts()||careHasDrafts()||clientDetailsHasDrafts()||saving)))return;if(ticket!==renderVersion)return;}catch{if(ticket!==renderVersion)return;main.replaceChildren(message('Unable to check sign-in. Check the local service and try again.',true),button('Try again',render));return;}
+  try{if(!await requireLocalSession(main,render,()=>ticket===renderVersion,()=>Boolean(drafts.size||workflowHasDrafts()||operationsHaveDrafts()||careHasDrafts()||clientDetailsHasDrafts()||saving)))return;if(ticket!==renderVersion)return;}catch{if(ticket!==renderVersion)return;showAuthFailure(render);return;}
   const [route = 'projects', raw = ''] = (location.hash.slice(1) || 'projects').split('/'); const view = el('div');
   main.replaceChildren(el('p', 'Loading workspace…', 'loading')); main.setAttribute('aria-busy', 'true');
   const active = ({ project: 'projects', client: 'clients', person: 'people', organisation: 'organisations', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'clients', 'new-project': 'projects', coordination: 'projects', operations:'projects',documents:'projects','client-details':'clients' })[route] ?? route;
@@ -251,7 +251,7 @@ searchForm.addEventListener('focusout',()=>setTimeout(()=>{if(!searchForm.contai
 
 document.querySelector('#global-search').addEventListener('submit', event => { event.preventDefault(); closeSearchPreview(); if (saving) { announce('Please wait for the save to finish.'); return; } const target = `#search/${encodeURIComponent(globalInput.value.trim())}`; if (location.hash === target) render(); else location.hash = target; });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); main.focus(); });
-window.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if(drawerOpen)setDrawer(false,false);globalInput.focus(); globalInput.select(); } });
+window.addEventListener('keydown', event => { if (document.documentElement.dataset.authState==='ready' && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if(drawerOpen)setDrawer(false,false);globalInput.focus(); globalInput.select(); } });
 window.addEventListener('hashchange', event => { if (saving) { history.replaceState(null, '', new URL(event.oldURL).hash || '#projects'); announce('Your changes are saving. Please wait before leaving this record.'); const pending = main.querySelector('.message'); if (pending) pending.textContent = 'Your changes are saving. Please wait before leaving this record.'; return; } render(); });
 window.addEventListener('beforeunload', event => { if(sessionEnded||workspaceRestored)return; if (drafts.size || workflowHasDrafts() || operationsHaveDrafts() || careHasDrafts() || clientDetailsHasDrafts() || saving) { event.preventDefault(); event.returnValue = ''; } });
 render();// The desktop rail becomes a focus-contained navigation drawer on small screens.
@@ -261,3 +261,4 @@ function setDrawer(open,restoreFocus=true){drawerOpen=open&&mobileMedia.matches;
 drawerToggle.addEventListener('click',()=>setDrawer(!drawerOpen));drawerClose.addEventListener('click',()=>setDrawer(false));backdrop.addEventListener('click',()=>setDrawer(false));drawer.addEventListener('click',e=>{const anchor=e.target.closest('a');if(anchor){const sameRoute=anchor.hash===(location.hash||'#projects');setDrawer(false,false);if(sameRoute)main.focus({preventScroll:true});}});mobileMedia.addEventListener('change',()=>setDrawer(false,false));
 document.addEventListener('keydown',e=>{if(!drawerOpen)return;if(e.key==='Escape'){e.preventDefault();setDrawer(false);return;}if(e.key==='Tab'){const stops=[...drawer.querySelectorAll('a[href],button:not([disabled]),[tabindex="0"]')].filter(n=>n.getClientRects().length);const first=stops[0],last=stops.at(-1);if(e.shiftKey&&(document.activeElement===first||!drawer.contains(document.activeElement))){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
 setDrawer(false,false);
+window.addEventListener('tadsa-auth-locked',()=>setDrawer(false,false));

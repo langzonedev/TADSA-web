@@ -38,4 +38,4 @@ See PARITY.md. Production identity/permissions, cross-device sync, official invo
 
 ## Demo profiles
 
-Choose **Enter as demo administrator** to explore; no credentials need to be shared. Open **Accounts** to create additional named demo profiles linked to fictional people. New notes and audit entries show the selected profile. Demo profiles are not secure authentication: anyone using the browser can select them. Never enter real personal information or real passwords. Profiles and operational data stay on that device; changing devices does not synchronise them.
+Choose **Login**, then **Enter as demo administrator** to explore; no credentials need to be shared. Open **Accounts** to create additional named demo profiles, independent of client or professional records. New notes and audit entries show the selected profile. Demo profiles are not secure authentication: anyone using the browser can select them. Never enter real personal information or real passwords. Profiles and operational data stay on that device; changing devices does not synchronise them.
