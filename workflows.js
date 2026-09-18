@@ -119,7 +119,7 @@ function coordinationFields(form, d, directories) {
 }
 async function directories() {
   const [technicians, people, organisations] = await Promise.all([request('technicians'),request('people'),request('organisations')]);
-  return { technicians: technicians.items, skills: technicians.skills, people: people.items, organisations: organisations.items };
+  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU');return { technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort(), people: [...people.items].sort(byName), organisations: [...organisations.items].sort(byName) };
 }
 function allocationValid(form, d, notice) { if (!valid(form)) return false; if (d.needsAcknowledgement && !d.assignmentAcknowledged) { notice.replaceChildren(note('Review the technician warning and tick the acknowledgement, or leave the request unassigned.', true)); notice.scrollIntoView({block:'nearest'}); return false; } return true; }
 function reviewList(items) { const dl = el('dl', null, 'review-list'); for (const [label,value] of items) { dl.append(el('dt',label),el('dd',value)); } return dl; }
@@ -137,7 +137,7 @@ async function newProject(view, clientId) {
     if (d.step === 1) {
       const q = el('input'); q.type = 'search'; q.setAttribute('aria-label','Find client'); q.placeholder = 'Name, phone or email'; const label = el('label'); label.append(el('span','Find an existing client','field-label'),q); form.append(label);
       const matches = el('div', null, 'client-matches');
-      function results() { matches.replaceChildren(); const term = q.value.toLowerCase().trim(); const found = clients.items.filter(c => [c.person.name,c.person.email,c.person.phone].join(' ').toLowerCase().includes(term));
+      function results() { matches.replaceChildren(); const term = q.value.toLowerCase().trim(); const found = [...clients.items].sort((a,b)=>a.person.name.localeCompare(b.person.name,'en-AU')).filter(c => [c.person.name,c.person.email,c.person.phone].join(' ').toLowerCase().includes(term));
         for (const c of found) { const l = el('label', null,'choice-card'); const radio = el('input'); radio.type='radio';radio.name='client';radio.value=c.id;radio.checked=d.clientId===c.id;radio.addEventListener('change',()=>{d.clientId=c.id;d.primaryRecordId='';selected=c;touch(d);}); const text=el('span');text.append(el('strong',c.person.name),el('small',`${c.person.phone || 'No phone'} · ${c.person.email || 'No email'}`));l.append(radio,text);matches.append(l); }
         if (!found.length) matches.append(el('p','No matching client. Check the spelling, or create a new client.'));
       }
@@ -182,7 +182,7 @@ async function linkContact(view,id) {
   const box=panel('Contact details');const form=el('form',null,'form-grid');selectField(form,'Relationship to client',d,'role',[['Occupational therapist','Occupational therapist (OT)'],['Carer','Carer'],['Referrer','Referrer']]);
   const mode=el('div',null,'actions');const slot=el('div');
   mode.append(button('Choose existing person',()=>{d.mode='existing';drawPerson();}),button('Create new contact',()=>{d.mode='new';d.personId='';drawPerson();}));form.append(mode,slot);
-  function drawPerson(){slot.replaceChildren();if(d.mode==='new'&&!d.personId){field(slot,'Full name',d,'name',{required:true});field(slot,'Phone number',d,'phone',{type:'tel',max:40});field(slot,'Email address',d,'email',{type:'email',max:200});slot.append(el('p','A person record will be created, then linked to this client. It will not create a sign-in account.','field-help'));}else{const picker=selectField(slot,'Existing person',d,'personId',[['','Choose a person'],...people.items.map(p=>[p.id,`${p.name} — ${p.role}`])]);picker.required=true;if(d.personId&&!people.items.some(p=>p.id===d.personId)){picker.append(...options([[d.personId,d.name]],d.personId));picker.value=d.personId;}slot.append(el('p','People can have different relationships to different clients. Select the role for this client above.','field-help'));}}
+  function drawPerson(){slot.replaceChildren();if(d.mode==='new'&&!d.personId){field(slot,'Full name',d,'name',{required:true});field(slot,'Phone number',d,'phone',{type:'tel',max:40});field(slot,'Email address',d,'email',{type:'email',max:200});slot.append(el('p','A person record will be created, then linked to this client. It will not create a sign-in account.','field-help'));}else{const picker=selectField(slot,'Existing person',d,'personId',[['','Choose a person'],...[...people.items].sort((a,b)=>a.name.localeCompare(b.name,'en-AU')).map(p=>[p.id,`${p.name} — ${p.role}`])]);picker.required=true;if(d.personId&&!people.items.some(p=>p.id===d.personId)){picker.append(...options([[d.personId,d.name]],d.personId));picker.value=d.personId;}slot.append(el('p','People can have different relationships to different clients. Select the role for this client above.','field-help'));}}
   drawPerson();const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Link contact');actions.append(submit,cancel(form,d,key,'client/'+id));form.append(notice,actions);box.append(form);view.append(box);
   form.addEventListener('submit',async e=>{e.preventDefault();if(!valid(form)||host.isSaving())return;
     if(d.mode==='new'&&!d.personId){host.setSaving(true);lock(form,true);notice.replaceChildren(note('Saving the contact…'));

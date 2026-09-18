@@ -7,5 +7,12 @@ try{
  document.querySelector('.environment summary span:last-child').textContent='Device demo';
  document.querySelector('.environment-strip').textContent='Fictional data only · Saved on this device · No server synchronisation';
  await import('./app.js');
- if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{});
+ if('serviceWorker'in navigator){
+  let requestedUpdate=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(requestedUpdate)location.reload();});
+  navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(registration=>{
+   const offer=()=>{if(!registration.waiting||document.querySelector('#apply-update'))return;const button=document.createElement('button');button.id='apply-update';button.className='secondary';button.textContent='Update ready — reload app';button.onclick=()=>{requestedUpdate=true;registration.waiting?.postMessage('ACTIVATE_UPDATE');};info?.append(button);document.querySelector('.environment summary span:last-child').textContent='Update ready';};
+   offer();registration.addEventListener('updatefound',()=>{const worker=registration.installing;worker?.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)offer();});});
+  }).catch(()=>{});
+ }
 }catch(e){const main=document.querySelector('#content');main.replaceChildren();const h=document.createElement('h1');h.textContent='Device storage could not open';const p=document.createElement('p');p.textContent='Your saved data has not been erased. Close other TADSA tabs and try again. Storage must be enabled for this demonstration.';main.append(h,p);console.error('Device storage initialization failed:',e.name);}

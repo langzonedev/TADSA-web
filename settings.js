@@ -1,0 +1,18 @@
+import {node,request,field,editor} from './project-care.js';
+const preferenceKey='tadsa-preferences-v1';
+const money=cents=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(cents/100);
+export async function renderSettings(view){
+ view.append(node('h1','Settings'),node('p','Manage the workspace rate and make this device comfortable to use.','subtitle'));
+ const appearance=node('section',null,'panel workflow-panel');appearance.append(node('h2','Appearance'),node('p','These preferences apply only to this browser. Changes take effect immediately.','field-help'));const form=node('div',null,'form-grid');appearance.append(form);view.append(appearance);
+ let saved={};try{saved=JSON.parse(localStorage.getItem(preferenceKey)||'{}')||{};}catch{}
+ const preferences={theme:['system','light','dark'].includes(saved.theme)?saved.theme:'system',motion:['system','reduced'].includes(saved.motion)?saved.motion:'system'};
+ const theme=field(form,'Colour theme',preferences,'theme','text',[['system','Use device setting'],['light','Light'],['dark','Dark']]);
+ const motion=field(form,'Animations',preferences,'motion','text',[['system','Respect device preference'],['reduced','Reduce motion']]);
+ const feedback=node('p',null,'field-help');feedback.setAttribute('role','status');form.append(feedback);
+ const apply=()=>{try{localStorage.setItem(preferenceKey,JSON.stringify(preferences));window.dispatchEvent(new Event('tadsa-preferences'));feedback.textContent='Appearance saved on this device.';}catch{document.documentElement.dataset.theme=preferences.theme==='dark'||preferences.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.motion=preferences.motion==='reduced'||matchMedia('(prefers-reduced-motion: reduce)').matches?'reduced':'standard';feedback.textContent='Appearance changed for this visit. Browser storage could not save the preference.';}};
+ theme.addEventListener('change',apply);motion.addEventListener('change',apply);
+ const settings=await request('settings');
+ const {form:rateForm}=editor(view,'application-settings',{version:settings.version,rate:(settings.labourRateCents/100).toFixed(2)},'Labour rate',(form,d)=>{form.append(node('strong',money(settings.labourRateCents)+' per hour'),node('p','The default is copied to new projects. Existing projects keep their saved rate; previous invoices remain unchanged. Assessments are free.','field-help'));const rate=field(form,'Hourly labour rate ($ AUD)',d,'rate');rate.inputMode='decimal';rate.required=true;rate.maxLength=9;form.append(node('p','This changes the workspace default for all administrators. It does not reprice existing work.','field-help'));},'settings','PUT',d=>{if(!/^\d+(\.\d{1,2})?$/.test(d.rate))throw Error('Enter a positive dollar amount with up to two decimal places.');const labourRateCents=Math.round(Number(d.rate)*100);if(!Number.isSafeInteger(labourRateCents)||labourRateCents<1||labourRateCents>10000000)throw Error('Enter a rate between $0.01 and $100,000.00.');return {requestId:d.requestId,version:d.version,labourRateCents};});
+ const saveButton=rateForm.querySelector('button[type=submit]');saveButton.dataset.label='Save hourly rate';if(!saveButton.textContent.startsWith('Retry'))saveButton.textContent='Save hourly rate';
+ if(settings.audit.length){const history=node('details',null,'care-details');history.append(node('summary','Rate change history'));for(const entry of settings.audit){history.append(node('p',`${money(entry.fromRateCents)} → ${money(entry.toRateCents)} · ${new Date(entry.at).toLocaleString('en-AU')} · ${entry.actor}`));}view.append(history);}
+}

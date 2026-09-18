@@ -9,7 +9,8 @@ Shared UI files are byte-identical; index entry is explicitly transformed. Conte
 | Contacts/coordination | OT/carer replacement, open-project links, advisory skills, payer | No qualification approval |
 | Notes/operations | Audit, approval/hold/resume, review queue | Unauthenticated device operator |
 | Invoices/payments | Snapshots, contribution limits, receipt caps | Drafts and manually recorded receipts; no money moves |
-| NDIS/labour | Client number, project approval, free assessments, technical $50/hour | No NDIS integration; approval/payment gates enforced |
+| NDIS/labour | Client number, project approval, free assessments, captured project labour rate | No NDIS integration; approval/payment gates enforced |
+| Settings | Versioned default rate, project snapshots, light/dark/system appearance | Rate changes affect new projects; appearance is per device |
 | Calendar | Dated availability, overlap rejection, service areas | Unknown dates are unknown; human assignment |
 | Files | PNG/JPEG/PDF/DOCX checks, persistence/download/removal | No malware scanner or cloud store |
 | Documents | Shared print/save-PDF | Official template/tax/seller details provisional |

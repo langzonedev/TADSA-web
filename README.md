@@ -1,5 +1,9 @@
 # TADSA device demonstration
 
+**[Open the TADSA app →](https://langzonedev.github.io/TADSA-web/)**
+
+Works on phone, tablet and desktop. Open online once before using offline.
+
 The shared TADSA workspace interface runs against a device-local IndexedDB adapter. Use fictional information only. No records go to the private TADSA database, another device, an email service, NDIS, a bank or payment processor. There is no staff authentication in this public demonstration.
 
 Projects, clients, people, contacts, coordination, intake details, notes, draft invoices, manually recorded receipts, NDIS approval, dated technician availability and files persist in this browser. Changes and audit events commit together. Stale versions are rejected; retries do not duplicate creation. Browser storage can be cleared or exhausted. Export a backup from the Device demo menu first. Backup restore is not yet exposed.
@@ -9,6 +13,8 @@ Existing tadsa-web-v1 localStorage records are copied into IndexedDB on upgrade.
 Offline operation starts after the first successful online load and service-worker activation. Close all tabs and reopen to activate an update. Cache identity includes every shell file and device adapter. GitHub Pages subpaths are supported. Real iOS/Android installation and operating-system storage eviction are unverified.
 
 ## Shared source
+
+Settings contains the default hourly rate for new projects and device appearance preferences (Light, Dark, device setting and reduced motion). Existing projects retain their captured rate. Live search previews and project sections use the same source as the main application. When an update is ready, the Device demo menu offers a reload; finish or save your current work first.
 
 Run: node tools/sync-from-main.mjs ../TADSA
 

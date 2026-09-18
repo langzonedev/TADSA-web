@@ -1,20 +1,30 @@
 {
-  "sourceRevision": "87528a10c5b473508f099dfde5201d1fc0fc5aaf",
+  "sourceRevision": "182e054b61e2667c8879cf0b9b82aea72115dc06",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "app.js": {
       "source": "public/app.js",
-      "sha256": "25c4b6c6b67767bc714d835995a154d837f29592abeadbe6a1feff173f6f37ea",
+      "sha256": "5c89466471510d86dd1adde5cd0e7d2556bab9ae2a0c59f46f213e8620c24cf8",
+      "transform": null
+    },
+    "settings.js": {
+      "source": "public/settings.js",
+      "sha256": "30590d59ed6f84035e4a0cbc5a7ce4efa8e7a0951cb3eb235d14faf068a2d6c7",
+      "transform": null
+    },
+    "appearance.js": {
+      "source": "public/appearance.js",
+      "sha256": "c836b30d332a898bd27ed7ecd1685add5f9f7949bbc2d968a0147913c0b8aa17",
       "transform": null
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "377ce1c239788ee84b52fa5525b61660651f0bd1720ace034b7a4690f138430e",
+      "sha256": "72642956590bc4363fcf144f105ffe437ef467b065260061626f979b9c6772c5",
       "transform": null
     },
     "operations.js": {
       "source": "public/operations.js",
-      "sha256": "3f85accfa4c840a36c76c1669885c0f79cfacd262f02a9604f3929afd8f38bdd",
+      "sha256": "ac44fb78db1033fd79d8735fced9b660a1b0685d4038d897d51b6056ee1b68f9",
       "transform": null
     },
     "client-details.js": {
@@ -34,12 +44,12 @@
     },
     "project-care.js": {
       "source": "public/project-care.js",
-      "sha256": "266f4a8a9a4aaff36803948542fa6c3caf9b36e17d975c457e7c44010df0058b",
+      "sha256": "fd894a6aff9a29a803bc8cf626e0c5cc558c5ba98e1ab166e1760c4e3dbe52ad",
       "transform": null
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "626d92e65cc743cd6dfafe0aa5264fcb1eb3c5d201cee78dc30e670e88094e36",
+      "sha256": "81ee0477196b6bc88cf68a383aa6bc40725c990c87803a5349fe52c91079ae73",
       "transform": null
     },
     "boot.js": {
@@ -59,10 +69,10 @@
     },
     "index.html": {
       "source": "public/index.html",
-      "sourceSha256": "27acdc4c4711bf3042318dba0fc835e520dcbafde3adcc7f176d501d589dde23",
-      "sha256": "1516927ed595c6fbc075c971f8460003c09afed529887ba5f4ffd3a63631fcbf",
+      "sourceSha256": "2474726e21c749511b2a21b12e563b4214ff87c3bfb6e91ab98c7dc32daebdc8",
+      "sha256": "fec00559ac8293acb61099c7ec0fa42702ef2ad1e7f8b28bfe36a923bf53312c",
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "d14c1ba186fb96675e783f5c5f7c902fd1037ea9247e151856c9305b1392da6e"
+  "shellHash": "822bbba9c3d0719564f94d37f2a27149ae76cbbdc27b997146e9a6d05b7310c1"
 }

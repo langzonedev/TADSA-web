@@ -1,3 +1,4 @@
+import {renderSettings} from './settings.js';
 import {requireLocalSession,sessionEnded} from './local-login.js';
 import {configureOperations,renderOperations,operationsHaveDrafts,renderNotes} from './operations.js';
 import {configureCare,careHasDrafts,renderProjectCare} from './project-care.js';
@@ -9,6 +10,7 @@ const globalInput = document.querySelector('#global-query');
 const announcement = document.querySelector('#announcement');
 const drafts = new Map();
 const registers = new Map();
+const projectTabs = new Map();
 let renderVersion = 0;
 let saving = false;
 let returnRoute = 'projects';
@@ -143,17 +145,20 @@ function auditPanel(p) {
   return box;
 }
 async function project(view, id) {
-  let p = await api(`projects/${id}`); let tab = 'Overview'; let editMode = drafts.has(id); let success = '';
+  let p = await api(`projects/${id}`); let tab = projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
   view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); const header = recordHeader(view, p.reference, p.title, meta); const tabs = el('div', undefined, 'record-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Project detail'); const content = el('div'); view.append(tabs, content);
-  const phoneNotes=el('div');view.insertBefore(phoneNotes,tabs);renderNotes(phoneNotes,id,await api(`projects/${id}/operations`),true);
-  const care=el('div');view.append(care);await renderProjectCare(care,id,phoneNotes);
+  const phoneNotes=el('div',undefined,'phone-notes');view.insertBefore(phoneNotes,tabs);renderNotes(phoneNotes,id,await api(`projects/${id}/operations`),true);
+  const care=el('div',undefined,'project-care-pane');care.hidden=true;care.id='project-care-content';view.append(care);await renderProjectCare(care,id,phoneNotes);
   function draw() {
+    projectTabs.set(id,tab);
     header.querySelector('h1').textContent = p.title; header.querySelector('button')?.remove(); meta.replaceChildren(status(p.status), link(p.clientName, `client/${p.clientId}`), el('span', p.kind || 'Project'));
     if (!editMode) header.append(button('Edit project', () => { editMode = true; tab = 'Overview'; draw(); content.querySelector('input')?.focus(); }, 'primary'));
     tabs.replaceChildren();
-    for (const name of ['Overview', 'Activity']) { const b = button(name, () => { tab = name; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); }, ''); b.setAttribute('role', 'tab'); b.tabIndex = tab === name ? 0 : -1; b.setAttribute('aria-selected', String(tab === name)); b.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); tab = event.key === 'Home' ? 'Overview' : event.key === 'End' ? 'Activity' : tab === 'Overview' ? 'Activity' : 'Overview'; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); } }); b.id = `tab-${name.toLowerCase()}`; b.setAttribute('aria-controls', 'project-tab-content'); tabs.append(b); }
-    content.id = 'project-tab-content'; content.setAttribute('role', 'tabpanel'); content.setAttribute('aria-labelledby', `tab-${tab.toLowerCase()}`); content.replaceChildren();
+    const tabNames=['Overview','Details & files','Activity'];
+    for (const name of tabNames) { const b = button(name, () => { tab = name; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); }, ''); b.setAttribute('role', 'tab'); b.tabIndex = tab === name ? 0 : -1; b.setAttribute('aria-selected', String(tab === name)); b.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); tab = event.key === 'Home' ? tabNames[0] : event.key === 'End' ? tabNames.at(-1) : tabNames[(tabNames.indexOf(tab)+(event.key==='ArrowRight'?1:tabNames.length-1))%tabNames.length]; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); } }); b.id = `tab-${name.toLowerCase().replaceAll(' ','-')}`; b.setAttribute('aria-controls', name==='Details & files'?'project-care-content':'project-tab-content'); tabs.append(b); }
+    content.id = 'project-tab-content'; content.setAttribute('role', 'tabpanel'); content.setAttribute('aria-labelledby', `tab-${tab.toLowerCase().replaceAll(' ','-')}`); content.replaceChildren();
+    care.hidden=tab!=='Details & files';content.hidden=tab==='Details & files';care.setAttribute('role','tabpanel');care.setAttribute('aria-labelledby','tab-details-&-files');if(tab==='Details & files')return;
     if (success) content.append(message(success));
     if (tab === 'Activity') { content.append(auditPanel(p)); return; }
     const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const box = panel(editMode ? 'Edit project' : 'The request');
@@ -207,7 +212,8 @@ async function render() {
   document.querySelectorAll('[data-nav]').forEach(a => { if (a.dataset.nav === active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   try {
     const arg = decodeURIComponent(raw);
-    if (route==='client-details') await renderClientDetails(view,arg,{announce,setSaving:value=>{saving=value;},request:async(path,method='GET',body)=>{const response=await fetch('/api/'+path,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await response.json();if(!response.ok){const e=Error(data.error);e.status=response.status;throw e;}return data;}});
+    if(route==='settings') await renderSettings(view);
+    else if (route==='client-details') await renderClientDetails(view,arg,{announce,setSaving:value=>{saving=value;},request:async(path,method='GET',body)=>{const response=await fetch('/api/'+path,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await response.json();if(!response.ok){const e=Error(data.error);e.status=response.status;throw e;}return data;}});
     else if(route==='availability') await renderAvailability(view);
     else if(await renderOperations(view,route,arg)) { /* Case workspace supplied. */ }
     else if (await renderWorkflow(view, route, arg)) { /* Workflow view supplied. */ }
@@ -221,7 +227,18 @@ async function render() {
   } catch (error) { view.replaceChildren(heading('Unable to load this view', 'Your unsaved project drafts are retained in this browser tab.'), message(error.status ? error.message : 'Check that the local application and database are running, then try again.', true), button('Try again', render, 'primary'), link('Back to projects', 'projects', 'text-button')); }
   if (ticket === renderVersion) { main.replaceChildren(view); main.removeAttribute('aria-busy'); main.focus({ preventScroll: true }); window.scrollTo(0, 0); document.title = `TADSA · ${view.querySelector('h1')?.textContent ?? 'Workspace'}`; }
 }
-document.querySelector('#global-search').addEventListener('submit', event => { event.preventDefault(); if (saving) { announce('Please wait for the save to finish.'); return; } const target = `#search/${encodeURIComponent(globalInput.value.trim())}`; if (location.hash === target) render(); else location.hash = target; });
+// Debounced live suggestions keep focus in the field and reject stale responses.
+const searchForm=document.querySelector('#global-search');
+const preview=el('div',undefined,'search-preview');preview.id='global-results';preview.hidden=true;preview.setAttribute('role','listbox');preview.setAttribute('aria-label','Search suggestions');searchForm.append(preview);
+globalInput.setAttribute('role','combobox');globalInput.setAttribute('aria-autocomplete','list');globalInput.setAttribute('aria-controls',preview.id);globalInput.setAttribute('aria-expanded','false');
+let searchTimer,searchTicket=0,searchController,selectedSuggestion=-1;
+function closeSearchPreview(){clearTimeout(searchTimer);searchTicket++;searchController?.abort();preview.hidden=true;globalInput.setAttribute('aria-expanded','false');globalInput.removeAttribute('aria-activedescendant');selectedSuggestion=-1;}
+function selectSuggestion(index){const items=[...preview.querySelectorAll('[role=option]')];if(!items.length)return;selectedSuggestion=(index+items.length)%items.length;items.forEach((item,i)=>item.setAttribute('aria-selected',String(i===selectedSuggestion)));globalInput.setAttribute('aria-activedescendant',items[selectedSuggestion].id);items[selectedSuggestion].scrollIntoView({block:'nearest'});}
+globalInput.addEventListener('input',()=>{closeSearchPreview();const q=globalInput.value.trim();if(!q)return;const ticket=searchTicket;searchTimer=setTimeout(async()=>{searchController=new AbortController();preview.replaceChildren(el('p','Searching…','search-preview-state'));preview.hidden=false;globalInput.setAttribute('aria-expanded','true');try{const response=await fetch('/api/search?q='+encodeURIComponent(q),{signal:searchController.signal});if(!response.ok)throw Error('Search unavailable');const data=await response.json();if(ticket!==searchTicket||globalInput.value.trim()!==q)return;preview.replaceChildren();for(const [i,result]of data.results.slice(0,7).entries()){const a=link('',result.type+'/'+result.id,'search-suggestion');a.id='search-suggestion-'+i;a.setAttribute('role','option');a.setAttribute('aria-selected','false');a.tabIndex=-1;const text=el('span');text.append(el('strong',result.label),el('small',result.description));a.append(text,el('span',cap(result.type),'result-type'));a.addEventListener('click',e=>{if(saving){e.preventDefault();announce('Please wait for the save to finish.');}closeSearchPreview();});preview.append(a);}if(!data.results.length)preview.append(el('p','No matching records. Try a name or reference.','search-preview-state'));const all=el('p',data.results.length+' matches · Enter for all results','search-preview-footer');preview.append(all);}catch(e){if(e.name==='AbortError'||ticket!==searchTicket)return;preview.replaceChildren(el('p','Search unavailable. Press Enter to try the full search.','search-preview-state'));}},180);});
+globalInput.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSearchPreview();return;}if(!preview.hidden&&['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();selectSuggestion(selectedSuggestion<0?(e.key==='ArrowDown'?0:preview.querySelectorAll('[role=option]').length-1):selectedSuggestion+(e.key==='ArrowDown'?1:-1));}if(e.key==='Enter'&&!preview.hidden&&selectedSuggestion>=0){e.preventDefault();preview.querySelectorAll('[role=option]')[selectedSuggestion]?.click();}});
+searchForm.addEventListener('focusout',()=>setTimeout(()=>{if(!searchForm.contains(document.activeElement))closeSearchPreview();},0));document.addEventListener('pointerdown',e=>{if(!searchForm.contains(e.target))closeSearchPreview();});window.addEventListener('hashchange',closeSearchPreview);
+
+document.querySelector('#global-search').addEventListener('submit', event => { event.preventDefault(); closeSearchPreview(); if (saving) { announce('Please wait for the save to finish.'); return; } const target = `#search/${encodeURIComponent(globalInput.value.trim())}`; if (location.hash === target) render(); else location.hash = target; });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); main.focus(); });
 window.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); globalInput.focus(); globalInput.select(); } });
 window.addEventListener('hashchange', event => { if (saving) { history.replaceState(null, '', new URL(event.oldURL).hash || '#projects'); announce('Your changes are saving. Please wait before leaving this record.'); const pending = main.querySelector('.message'); if (pending) pending.textContent = 'Your changes are saving. Please wait before leaving this record.'; return; } render(); });
