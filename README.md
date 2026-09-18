@@ -4,7 +4,7 @@
 
 Works on phone, tablet and desktop. Open online once before using offline.
 
-The shared TADSA workspace interface runs against a device-local IndexedDB adapter. Use fictional information only. No records go to the private TADSA database, another device, an email service, NDIS, a bank or payment processor. There is no staff authentication in this public demonstration.
+The shared TADSA workspace interface runs against a device-local IndexedDB adapter. Use fictional information only. No records go to the private TADSA database, another device, an email service, NDIS, a bank or payment processor. Named demo profiles show who made a change, but do not provide secure staff authentication.
 
 Projects, clients, people, contacts, coordination, intake details, notes, draft invoices, manually recorded receipts, NDIS approval, dated technician availability and files persist in this browser. Changes and audit events commit together. Stale versions are rejected; retries do not duplicate creation. Browser storage can be cleared or exhausted. Use Settings → Backup and restore to create/download backups, import a device backup, preview its contents and explicitly restore it. Replacement retains a before-restore backup atomically. Other tabs must reload afterwards.
 
@@ -35,3 +35,7 @@ Run `node --test tests/*.test.mjs`, `node tests/browser-device-qa.mjs` and `node
 Local Edge evidence covers migration retention, injected quota rollback, concurrent stale writers, reload persistence, shared register/client/project/operations/document routes under /TADSA-web/, creation, calendar, PDF upload, SVG rejection, offline persisted records and file downloads. Independent evidence is separated in device-qa scripts. Real-device install/update tests remain outstanding.
 
 See PARITY.md. Production identity/permissions, cross-device sync, official invoices, live payments/email, Access migration and real client use remain outside this demo.
+
+## Demo profiles
+
+Choose **Enter as demo administrator** to explore; no credentials need to be shared. Open **Accounts** to create additional named demo profiles linked to fictional people. New notes and audit entries show the selected profile. Demo profiles are not secure authentication: anyone using the browser can select them. Never enter real personal information or real passwords. Profiles and operational data stay on that device; changing devices does not synchronise them.

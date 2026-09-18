@@ -1,3 +1,4 @@
+import {renderAccounts} from './accounts.js';
 import {renderReports} from './reports.js';
 import {renderSettings,configureSettings} from './settings.js';
 import {requireLocalSession,sessionEnded} from './local-login.js';
@@ -213,14 +214,15 @@ async function entity(view, type, id) {
 async function render() {
   if (saving) { announce('Please wait for the save to finish.'); return; }
   const ticket=++renderVersion;
-  try{if(!await requireLocalSession(main,render,()=>ticket===renderVersion))return;if(ticket!==renderVersion)return;}catch{if(ticket!==renderVersion)return;main.replaceChildren(message('Unable to check sign-in. Check the local service and try again.',true),button('Try again',render));return;}
+  try{if(!await requireLocalSession(main,render,()=>ticket===renderVersion,()=>Boolean(drafts.size||workflowHasDrafts()||operationsHaveDrafts()||careHasDrafts()||clientDetailsHasDrafts()||saving)))return;if(ticket!==renderVersion)return;}catch{if(ticket!==renderVersion)return;main.replaceChildren(message('Unable to check sign-in. Check the local service and try again.',true),button('Try again',render));return;}
   const [route = 'projects', raw = ''] = (location.hash.slice(1) || 'projects').split('/'); const view = el('div');
   main.replaceChildren(el('p', 'Loading workspace…', 'loading')); main.setAttribute('aria-busy', 'true');
   const active = ({ project: 'projects', client: 'clients', person: 'people', organisation: 'organisations', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'clients', 'new-project': 'projects', coordination: 'projects', operations:'projects',documents:'projects','client-details':'clients' })[route] ?? route;
   document.querySelectorAll('[data-nav]').forEach(a => { if (a.dataset.nav === active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   try {
     const arg = decodeURIComponent(raw);
-    if(route==='reports') await renderReports(view);
+    if(route==='accounts') await renderAccounts(view);
+    else if(route==='reports') await renderReports(view);
     else if(route==='settings') await renderSettings(view);
     else if (route==='client-details') await renderClientDetails(view,arg,{announce,setSaving:value=>{saving=value;},request:async(path,method='GET',body)=>{const response=await fetch('/api/'+path,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await response.json();if(!response.ok){const e=Error(data.error);e.status=response.status;throw e;}return data;}});
     else if(route==='availability') await renderAvailability(view);
