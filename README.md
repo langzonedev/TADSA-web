@@ -6,11 +6,15 @@ Works on phone, tablet and desktop. Open online once before using offline.
 
 The shared TADSA workspace interface runs against a device-local IndexedDB adapter. Use fictional information only. No records go to the private TADSA database, another device, an email service, NDIS, a bank or payment processor. There is no staff authentication in this public demonstration.
 
-Projects, clients, people, contacts, coordination, intake details, notes, draft invoices, manually recorded receipts, NDIS approval, dated technician availability and files persist in this browser. Changes and audit events commit together. Stale versions are rejected; retries do not duplicate creation. Browser storage can be cleared or exhausted. Export a backup from the Device demo menu first. Backup restore is not yet exposed.
+Projects, clients, people, contacts, coordination, intake details, notes, draft invoices, manually recorded receipts, NDIS approval, dated technician availability and files persist in this browser. Changes and audit events commit together. Stale versions are rejected; retries do not duplicate creation. Browser storage can be cleared or exhausted. Use Settings → Backup and restore to create/download backups, import a device backup, preview its contents and explicitly restore it. Replacement retains a before-restore backup atomically. Other tabs must reload afterwards.
 
 Existing tadsa-web-v1 localStorage records are copied into IndexedDB on upgrade. The original value remains a recovery copy and is not reimported after later saves. Unreadable data blocks startup instead of being silently erased. Legacy UUID record IDs survive.
 
-Offline operation starts after the first successful online load and service-worker activation. Close all tabs and reopen to activate an update. Cache identity includes every shell file and device adapter. GitHub Pages subpaths are supported. Real iOS/Android installation and operating-system storage eviction are unverified.
+Offline operation starts after the first successful online load and service-worker activation. Use Update ready in the Device demo menu after saving your work, or close all tabs and reopen. Cache identity includes every shell file and device adapter. GitHub Pages subpaths are supported. Real iOS/Android installation and operating-system storage eviction are unverified.
+
+## Mobile and administration update
+
+Phones use a hamburger menu and grouped project sections. Client, OT and other profile types are separate; only Technician + Administrator can combine. Technician selection filters skills, postcode and service area independently of NDIS. Reports summarise monthly case events and recorded billing, with unknown historical dates disclosed. Invoice drafts use branded multiline layouts and configurable issuer/tax/payment settings. All business/customer records remain fictional demonstration data; no money moves.
 
 ## Shared source
 

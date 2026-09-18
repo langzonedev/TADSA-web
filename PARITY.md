@@ -7,16 +7,19 @@ Shared UI files are byte-identical; index entry is explicitly transformed. Conte
 | Registers/search | Shared UI; identities, references, email/phone/address | Fictional/device-only records |
 | Create/edit | Clients, people, projects, intake, relationships, versions/retries | No Access import |
 | Contacts/coordination | OT/carer replacement, open-project links, advisory skills, payer | No qualification approval |
-| Notes/operations | Audit, approval/hold/resume, review queue | Unauthenticated device operator |
+| Notes/operations | Audit, recorded-person approval/hold/resume and immediate notes | Unauthenticated device operator |
 | Invoices/payments | Snapshots, contribution limits, receipt caps | Drafts and manually recorded receipts; no money moves |
 | NDIS/labour | Client number, project approval, free assessments, captured project labour rate | No NDIS integration; approval/payment gates enforced |
-| Settings | Versioned default rate, project snapshots, light/dark/system appearance | Rate changes affect new projects; appearance is per device |
+| Settings | Versioned rate/issuer/tax settings, project snapshots, appearance and backups | Rate changes affect new projects; appearance is per device |
 | Calendar | Dated availability, overlap rejection, service areas | Unknown dates are unknown; human assignment |
 | Files | PNG/JPEG/PDF/DOCX checks, persistence/download/removal | No malware scanner or cloud store |
 | Documents | Shared print/save-PDF | Official template/tax/seller details provisional |
 | Authentication | Explicitly unconfigured | No private accounts copied |
 | Storage | Atomic IndexedDB, version conflicts, legacy migration | Browser/device only |
-| Device tools | Export, reset and protected deletion | No restore UI yet |
+| Device tools | Export/import/preview/confirmed restore, rollback backup, reset and protected deletion | Device JSON only; no PostgreSQL/native archive import |
+| Reports | Monthly creations/closures/reopens, draft totals/receipts and current workload | Unknown historical dates disclosed; not bank reconciliation |
+| Location | Separate project location, technician base and skills/area/postcode filters | No automatic geocoding or exact distance |
+| Profiles | One type; Technician + Administrator exception; recorded approver selection | Existing incompatible profiles preserved for correction |
 | Offline | Scoped cached shell and local file downloads | Real mobile installation/eviction untested |
 
 Future main API changes require adapter contract review and both model/browser suites. Endpoint coverage does not claim every failure path is identical.

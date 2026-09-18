@@ -1,13 +1,15 @@
+import {validJpeg} from './jpeg.js';
 import {fail} from './device-model.mjs';
-const invalid=()=>fail('The file is unsupported, damaged or contains unsupported active Word content.');
+const invalid=()=>fail('The file format is unsupported or damaged. Choose a JPEG, PNG, PDF or a DOCX without active content.');
 const crc32=bytes=>{let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;};
 async function inflate(bytes,limit){const reader=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader(),chunks=[];let size=0;try{for(;;){const {value,done}=await reader.read();if(done)break;size+=value.length;if(size>limit){await reader.cancel();invalid();}chunks.push(value);}}catch{invalid();}const result=new Uint8Array(size);let at=0;for(const chunk of chunks){result.set(chunk,at);at+=chunk.length;}return result;}
 export async function validateDeviceFile(input){
+ if(input.mime==='image/jpg')input.mime='image/jpeg';
  if(typeof input.name!=='string'||!input.name.trim()||input.name.length>180||/[\\/<>:"|?*\u0000-\u001f\u007f]/.test(input.name)||/[. ]$/.test(input.name)||input.name.startsWith('.'))invalid();
  const types={'image/png':['png'],'image/jpeg':['jpg','jpeg'],'application/pdf':['pdf'],'application/vnd.openxmlformats-officedocument.wordprocessingml.document':['docx']};if(!types[input.mime]?.includes(input.name.split('.').pop().toLowerCase()))invalid();
  if(typeof input.dataBase64!=='string'||input.dataBase64.length>13981016||!input.dataBase64.length||input.dataBase64.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(input.dataBase64))invalid();let raw;try{raw=atob(input.dataBase64);}catch{invalid();}if(!raw.length||raw.length>10485760||btoa(raw)!==input.dataBase64)invalid();const data=Uint8Array.from(raw,c=>c.charCodeAt(0));
  if(input.mime==='image/png'&&(raw.length<45||!raw.startsWith('\x89PNG\r\n\x1a\n')||raw.slice(12,16)!=='IHDR'||raw.slice(-8,-4)!=='IEND'))invalid();
- if(input.mime==='image/jpeg'&&(raw.length<10||!raw.startsWith('\xff\xd8')||!raw.endsWith('\xff\xd9')||!raw.includes('\xff\xda')))invalid();
+ if(input.mime==='image/jpeg'&&!validJpeg(data))invalid();
  if(input.mime==='application/pdf'&&(!raw.startsWith('%PDF-')||!raw.slice(-1024).includes('%%EOF')))invalid();
  if(input.mime.endsWith('wordprocessingml.document')){
   const view=new DataView(data.buffer),u16=i=>view.getUint16(i,true),u32=i=>view.getUint32(i,true),decode=(a,b)=>new TextDecoder().decode(data.subarray(a,b));let end=-1;for(let i=data.length-22;i>=Math.max(0,data.length-65557);i--)if(u32(i)===0x06054b50){end=i;break;}

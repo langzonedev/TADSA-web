@@ -97,29 +97,30 @@ function coordinationFields(form, d, directories) {
   for (const skill of directories.skills) check(skills, skill, d.requiredSkills.includes(skill), on => { d.requiredSkills = on ? [...d.requiredSkills,skill] : d.requiredSkills.filter(s => s !== skill); d.assignmentAcknowledged = false; touch(d); drawTechnicians(); });
   assignment.append(el('h3', 'Skills needed (optional)'), skills);
   check(assignment, 'Show technicians who do not match all selected skills', d.showAll ?? false, on => { d.showAll = on; drawTechnicians(); });
+  const areaFilter=selectField(assignment,'Technician service area filter',d,'filterArea',[['','Any service area'],...directories.serviceAreas.map(a=>[a.id,a.label])]);const postcodeFilter=field(assignment,'Technician postcode filter',d,'filterPostcode',{max:4,help:'Exact postcode or recorded service area only; no travel distance is inferred.'});postcodeFilter.inputMode='numeric';areaFilter.addEventListener('change',()=>{d.assignmentAcknowledged=false;drawTechnicians();});postcodeFilter.addEventListener('input',()=>{d.assignmentAcknowledged=false;drawTechnicians();});
   assignment.append(link('View all technician calendars and service areas','availability'),technicians); form.append(assignment);
   function drawTechnicians() {
     technicians.replaceChildren();
     if(d.technicianId&&!directories.technicians.some(t=>t.id===d.technicianId)) technicians.append(note('The previously assigned person is no longer listed as a technician. Their saved assignment remains in the project history. Choose an active technician or Not assigned yet before saving this allocation.',true));
-    const visible = directories.technicians.filter(t => d.showAll || t.id === d.technicianId || d.requiredSkills.every(s => t.skills.includes(s)));
+    const locationMatches=t=>(!d.filterArea||(t.serviceAreas||[]).includes(d.filterArea))&&(!d.filterPostcode||t.postcode===d.filterPostcode);const visible = directories.technicians.filter(t => t.id === d.technicianId || ((d.showAll || d.requiredSkills.every(s => t.skills.includes(s)))&&locationMatches(t)));
     const rows = [{ id:'',name:'Not assigned yet',skills:[],availability:'',openCount:0 }, ...visible];
     for (const t of rows) {
       const l = el('label', null, 'choice-card'); const radio = el('input'); radio.type = 'radio'; radio.name = 'technician'; radio.value = t.id; radio.checked = d.technicianId === t.id;
       const text = el('span'); text.append(el('strong', t.name));
-      if (t.id) text.append(el('small', `${t.skills.join(' · ')}. ${t.openCount} open projects. ${Math.round((t.remainingMinutes??0)/60*100)/100} hours remaining. General availability: ${t.availability}. Service areas: ${(t.serviceAreas||[]).map(a=>({western:'Western suburbs',southern:'Southern suburbs',northern:'Northern suburbs',eastern:'Eastern suburbs','adelaide-hills':'Adelaide Hills',metro:'Metropolitan Adelaide',regional:'Regional South Australia'}[a]||a)).join(', ')||'Not recorded'}.`));
+      if (t.id) text.append(el('small', `${t.skills.join(' · ')}. ${t.openCount} open projects. ${Math.round((t.remainingMinutes??0)/60*100)/100} hours remaining. General availability: ${t.availability}. Base: ${[t.suburb,t.postcode].filter(Boolean).join(' ')||'Not recorded'}. Service areas: ${(t.serviceAreas||[]).map(a=>({western:'Western suburbs',southern:'Southern suburbs',northern:'Northern suburbs',eastern:'Eastern suburbs','adelaide-hills':'Adelaide Hills',metro:'Metropolitan Adelaide',regional:'Regional South Australia'}[a]||a)).join(', ')||'Not recorded'}.`));
       else text.append(el('small', 'Save the request now and allocate someone later.'));
       radio.addEventListener('change', () => { d.technicianId = t.id; d.assignmentAcknowledged = false; touch(d); drawTechnicians(); technicians.querySelector('input:checked')?.focus({preventScroll:true}); }); l.append(radio,text); technicians.append(l);
     }
     if (!visible.length) technicians.append(note('No technicians match every selected skill. Save unassigned, or show other technicians to review their skills.'));
     const selected = directories.technicians.find(t => t.id === d.technicianId);
-    d.needsAcknowledgement = Boolean(selected && (selected.availability !== 'available' || !d.requiredSkills.every(s => selected.skills.includes(s))));
-    if (d.needsAcknowledgement) { technicians.append(note('Check this allocation: the recorded skills or availability need a conversation. This is not an eligibility or safety assessment.')); check(technicians, 'I have reviewed the skill / availability warning', d.assignmentAcknowledged ?? false, on => { d.assignmentAcknowledged = on; touch(d); }); }
+    d.needsAcknowledgement = Boolean(selected && (selected.availability !== 'available' || !d.requiredSkills.every(s => selected.skills.includes(s))||!locationMatches(selected)));
+    if (d.needsAcknowledgement) { technicians.append(note('Check this allocation: the recorded skills, availability or location need a conversation. This is not an eligibility or safety assessment.')); check(technicians, 'I have reviewed the skill / availability / location warning', d.assignmentAcknowledged ?? false, on => { d.assignmentAcknowledged = on; touch(d); }); }
   }
   drawTechnicians();
 }
 async function directories() {
-  const [technicians, people, organisations] = await Promise.all([request('technicians'),request('people'),request('organisations')]);
-  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU');return { technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort(), people: [...people.items].sort(byName), organisations: [...organisations.items].sort(byName) };
+  const [technicians, people, organisations,areas] = await Promise.all([request('technicians'),request('people'),request('organisations'),request('availability-options')]);
+  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU');return { serviceAreas:[...areas.serviceAreas].sort((a,b)=>a.label.localeCompare(b.label,'en-AU')),technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort(), people: [...people.items].sort(byName), organisations: [...organisations.items].sort(byName) };
 }
 function allocationValid(form, d, notice) { if (!valid(form)) return false; if (d.needsAcknowledgement && !d.assignmentAcknowledged) { notice.replaceChildren(note('Review the technician warning and tick the acknowledgement, or leave the request unassigned.', true)); notice.scrollIntoView({block:'nearest'}); return false; } return true; }
 function reviewList(items) { const dl = el('dl', null, 'review-list'); for (const [label,value] of items) { dl.append(el('dt',label),el('dd',value)); } return dl; }
@@ -150,7 +151,7 @@ async function newProject(view, clientId) {
       form.append(el('p','Recording a request does not authorise fabrication, spending or release. An assessment is separate from making equipment.','field-help'));
       selectField(form,'Which request does this project belong to?',d,'primaryRecordId',[['','Create a new request'],...(selected?.primaryRecords??[]).map(r=>[r.id,`${r.reference} — ${r.summary}`])]);
       form.append(el('p','Use an existing request only when this is another piece of work for that same need. Ask the coordinator if unsure.','field-help'));
-    } else if (d.step === 3) coordinationFields(form,d,dirs);
+    } else if (d.step === 3) {form.append(note('Client work location: '+(selected?.details?.workAddress||selected?.details?.residentialAddress||'Not recorded. Open the client record to add an address.')));coordinationFields(form,d,dirs);}
     else {
       const payer = d.fundingStatus==='unknown' ? 'Not known yet — follow up' : d.fundingStatus==='self' ? `Client: ${selected?.person.name}` : (d.fundingStatus==='organisation'?dirs.organisations:dirs.people).find(p=>p.id===d.payerId)?.name;
       form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Type',d.kind],['Request',d.primaryRecordId ? selected.primaryRecords.find(r=>r.id===d.primaryRecordId)?.reference : 'New request'],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technician',dirs.technicians.find(t=>t.id===d.technicianId)?.name||'Not assigned yet']]));
@@ -168,9 +169,9 @@ async function newProject(view, clientId) {
   draw();
 }
 async function editCoordination(view,id) {
-  const [project,dirs]=await Promise.all([request('projects/'+id),directories()]);const key='coordination/'+id;
-  const d=getDraft(key,{...project.coordination,technicianId:project.coordination.technicianId||'',payerId:project.coordination.payerId||'',version:project.version});
-  title(view,'Funding & technician',project.title,'project/'+id); const box=panel('Review the allocation');const form=el('form',null,'form-grid');coordinationFields(form,d,dirs);const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save allocation');actions.append(submit,cancel(form,d,key,'project/'+id));form.append(notice,actions);box.append(form);view.append(box);
+  const [project,dirs,projectLocation]=await Promise.all([request('projects/'+id),directories(),request('projects/'+id+'/location')]);const key='coordination/'+id;
+  const d=getDraft(key,{...project.coordination,technicianId:project.coordination.technicianId||'',payerId:project.coordination.payerId||'',version:project.version,filterArea:projectLocation.serviceArea,filterPostcode:projectLocation.postcode});
+  title(view,'Funding & technician',project.title,'project/'+id);view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location from the project’s Details & files tab.'))); const box=panel('Review the allocation');const form=el('form',null,'form-grid');coordinationFields(form,d,dirs);const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save allocation');actions.append(submit,cancel(form,d,key,'project/'+id));form.append(notice,actions);box.append(form);view.append(box);
   form.addEventListener('submit',e=>{e.preventDefault();if(!allocationValid(form,d,notice))return;save(form,d,notice,submit,'projects/'+id+'/coordination','PUT',{version:d.version,...coordinationValues(d)},()=>{drafts.delete(key);host.announce('Allocation saved.');location.hash='project/'+id;});});
   if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';}
   if(d.version!==project.version){notice.append(note('This project changed since you started. Your draft is kept. Compare the latest saved allocation before continuing.',true),reviewList([['Latest version',String(project.version)],['Funding',project.coordination.fundingStatus],['Funding notes',project.coordination.fundingNotes||'None'],['Technician',dirs.technicians.find(t=>t.id===project.coordination.technicianId)?.name||'Unassigned'],['Skills',project.coordination.requiredSkills.join(', ')||'None']]));notice.append(button('Use latest version with my draft',()=>{d.version=project.version;notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));}
@@ -214,20 +215,25 @@ async function personProfile(view, id) {
   const [catalogue, person] = await Promise.all([request('person-options'), id ? request('people/' + id) : null]);
   const key = id ? 'person/' + id : 'new-person';
   const d = getDraft(key, { name:person?.name ?? '', email:person?.email ?? '', phone:person?.phone ?? '', roles:person?.roles ?? [], skills:person?.technician?.skills ?? [], availability:person?.technician?.availability ?? 'unavailable', version:person?.version, allowDuplicate:false });
-  title(view, id ? 'Edit person' : 'New person', 'One profile for each person. Choose all the roles that apply.');
+  title(view, id ? 'Edit person' : 'New person', 'Choose one profile type. A technician may also be an administrator; other types use separate profiles.');
   view.append(link('← Back to people', 'people', 'breadcrumb'));
   const box = panel('Person details'), form = el('form', null, 'form-grid');
   field(form,'Full name',d,'name',{required:true}); field(form,'Phone number',d,'phone',{type:'tel',max:40}); field(form,'Email address',d,'email',{type:'email',max:200});
-  const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Roles'),el('p','Choose at least one. A person may have several roles.','field-help'));
+  const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Profile type'),el('p','Choose one type. Client and occupational therapist records stay separate from technician profiles.','field-help'));
   const tech = el('fieldset'); tech.append(el('legend','Technician details'),el('p','Record skills and current availability to help allocate projects. These details do not establish clearance or permission to start work.','field-help'));
   const skills = el('div',null,'skill-options');
   for (const skill of catalogue.skills) check(skills,skill,d.skills.includes(skill),on=>{d.skills=on?[...d.skills,skill]:d.skills.filter(s=>s!==skill);touch(d);});
   tech.append(el('span','Skills','field-label'),skills);
   selectField(tech,'Availability',d,'availability',catalogue.availability.map(v=>[v,v==='unavailable'?'Not available / not confirmed':v==='limited'?'Limited availability':'Available']));
-  for (const role of catalogue.roles) {
-    const control=check(roles,role,d.roles.includes(role),on=>{d.roles=on?[...d.roles,role]:d.roles.filter(r=>r!==role);touch(d);tech.hidden=!d.roles.includes('Technician');if(notice.textContent==='Choose at least one role for this person.')notice.replaceChildren();});
-    if(role==='Client'&&person?.clientId) { control.disabled=true; control.dataset.keepDisabled='true'; roles.append(el('small','The client role is retained to protect the linked client record.','field-help')); }
-  }
+  const compatible=d.roles.length===1||(d.roles.length===2&&d.roles.includes('Technician')&&d.roles.includes('Administrator'));
+  d.profileType??=compatible?(d.roles.includes('Technician')?'Technician':d.roles[0]):'';
+  if(!compatible&&d.roles.length)roles.append(note('This existing profile combines '+d.roles.join(', ')+'. Select its correct type before saving. Linked projects and history remain recorded; reassign current technician work before removing that role.',true));
+  const typePicker=selectField(roles,'Profile type',d,'profileType',[['','Choose a profile type'],...catalogue.roles.map(r=>[r,r])]);typePicker.required=true;
+  if(person&&!person.clientId){for(const option of typePicker.options)if(option.value==='Client')option.disabled=true;roles.append(el('p','Create a separate Client profile instead of converting this professional or support profile.','field-help'),link('Create a separate client','new-client'));}
+  if(person?.clientId){for(const option of typePicker.options)if(option.value&&option.value!=='Client')option.disabled=true;roles.append(el('p','This profile has a linked client record. Retain Client here; create a separate profile for another type.','field-help'));}
+  const alsoAdmin=el('div');const adminCheck=check(alsoAdmin,'Also an administrator',d.roles.includes('Administrator')&&d.roles.includes('Technician'),on=>{d.roles=on?['Technician','Administrator']:['Technician'];touch(d);});roles.append(alsoAdmin);
+  const chooseType=()=>{d.roles=d.profileType==='Technician'?(adminCheck.checked?['Technician','Administrator']:['Technician']):d.profileType?[d.profileType]:[];tech.hidden=d.profileType!=='Technician';alsoAdmin.hidden=d.profileType!=='Technician';touch(d);};
+  typePicker.addEventListener('change',chooseType);alsoAdmin.hidden=d.profileType!=='Technician';
   tech.hidden=!d.roles.includes('Technician');
   form.append(roles,tech,el('p','Administrator is a recorded role only. It does not create a login or grant access to this application.','field-help'));
   const notice=el('div'), actions=el('div',null,'actions'), submit=saveButton(id?'Save profile':'Save person');

@@ -24,14 +24,14 @@ test('independent: note replay across serialised reload remains once and detects
  assert.throws(()=>dispatch(d,'projects/project-1/notes','POST',{...input,text:'Changed message'}),e=>e.status===409);
  assert.equal(dispatch(d,'projects/project-1/operations').notes.length,1);
 });
-const operations=(d,id,patch={})=>{const {projectId,notes,invoices,...body}=dispatch(d,`projects/${id}/operations`);return {...body,requestId:randomUUID(),...patch};};
+const operations=(d,id,patch={})=>{const {projectId,notes,invoices,approvedByName,approvalLegacy,...body}=dispatch(d,`projects/${id}/operations`);return {...body,requestId:randomUUID(),...patch};};
 test('independent: technical unpaid time denied, full receipt unlocks approved time at fixed rate',()=>{
- const d=normalise(seed()),id='project-1';
+ const d=normalise(seed()),id='project-1';const approver=dispatch(d,'people','POST',{requestId:randomUUID(),name:'Cameron Irving',email:'cameron.irving@example.invalid',phone:'',roles:['Administrator'],technician:null,allowDuplicate:false});
  assert.throws(()=>dispatch(d,`projects/${id}/operations`,'PUT',operations(d,id,{actualMinutes:1})),e=>e.status===422);
  const p=dispatch(d,`projects/${id}`),o=dispatch(d,`projects/${id}/invoices`,'POST',{requestId:randomUUID(),version:p.version,milestone:'deposit',billingMode:'nominated',payerType:'client',payerId:'client-1',lines:[{description:'Preparation',amountCents:5000}],milestoneReached:true});
  const i=o.invoices[0];let plan=dispatch(d,`projects/${id}/invoices/${i.id}/payments`,'POST',{requestId:randomUUID(),version:o.version,amountCents:4999,receivedOn:'2026-09-18',reference:'Partial receipt'});assert.equal(plan.workGate.allowed,false);
  plan=dispatch(d,`projects/${id}/invoices/${i.id}/payments`,'POST',{requestId:randomUUID(),version:plan.version,amountCents:1,receivedOn:'2026-09-18',reference:'Balance'});assert.equal(plan.workGate.allowed,true);
- dispatch(d,`projects/${id}/operations`,'PUT',operations(d,id,{actualMinutes:1,remainingMinutes:2,assessmentComplete:true,workApproved:true,approvedBy:'Morgan Ellis',approvedOn:'2026-09-18'}));
+ dispatch(d,`projects/${id}/operations`,'PUT',operations(d,id,{actualMinutes:1,remainingMinutes:2,assessmentComplete:true,workApproved:true,approvedBy:approver.id,approvedOn:'2026-09-18'}));
  plan=dispatch(d,`projects/${id}/work-plan`);assert.equal(plan.actualLabourCents,83);assert.equal(plan.remainingLabourCents,167);assert.equal(plan.estimatedTotalLabourCents,250);
 });
 test('independent: assessment free and approval date is validated',()=>{

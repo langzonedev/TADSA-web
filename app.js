@@ -1,4 +1,5 @@
-import {renderSettings} from './settings.js';
+import {renderReports} from './reports.js';
+import {renderSettings,configureSettings} from './settings.js';
 import {requireLocalSession,sessionEnded} from './local-login.js';
 import {configureOperations,renderOperations,operationsHaveDrafts,renderNotes} from './operations.js';
 import {configureCare,careHasDrafts,renderProjectCare} from './project-care.js';
@@ -11,9 +12,13 @@ const announcement = document.querySelector('#announcement');
 const drafts = new Map();
 const registers = new Map();
 const projectTabs = new Map();
+const projectSections=new Map();
 let renderVersion = 0;
 let saving = false;
 let returnRoute = 'projects';
+let workspaceRestored=false;
+configureSettings({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>render()});
+window.addEventListener('tadsa-workspace-restored',()=>{workspaceRestored=true;renderVersion++;main.replaceChildren(el('p','Opening the restored workspace…','loading'));});
 configureWorkflows({ isSaving: () => saving, setSaving: value => { saving = value; }, announce: text => announce(text), refresh: () => render() });
 configureOperations({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>render()});
 configureCare({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>render()});
@@ -28,7 +33,8 @@ const status = value => el('span', cap(value), `badge ${value}`);
 const nameOf = item => item.person?.name ?? item.name ?? item.title;
 const typeOf = kind => ({ projects: 'project', clients: 'client', people: 'person', organisations: 'organisation' })[kind];
 const pathOf = type => ({ project: 'projects', client: 'clients', person: 'people', organisation: 'organisations' })[type];
-function announce(text) { announcement.textContent = text; }
+let toastTimer;function announce(text) { announcement.textContent = text;if(/\b(saved|created|linked|removed)\b/i.test(text)){document.querySelector('.save-toast')?.remove();const toast=el('div',text,'save-toast');toast.setAttribute('aria-hidden','true');document.body.append(toast);clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.remove(),2800);} }
+window.addEventListener('tadsa-saved',()=>announce('Changes saved.'));
 async function api(path, body) {
   const response = await fetch(`/api/${path}`, { ...(body ? { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(10000) });
   const data = await response.json();
@@ -148,12 +154,14 @@ async function project(view, id) {
   let p = await api(`projects/${id}`); let tab = projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
   view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); const header = recordHeader(view, p.reference, p.title, meta); const tabs = el('div', undefined, 'record-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Project detail'); const content = el('div'); view.append(tabs, content);
+  const headerActions=el('div',undefined,'actions record-header-actions');headerActions.append(link('Documents & invoices','documents/'+id,'button secondary'));header.append(headerActions);
+  function foldPanel(box,label){const section=el('details',undefined,'care-details overview-section'),key=id+'/'+label;section.append(el('summary',label));box.querySelector('h2')?.remove();section.append(box);section.open=projectSections.get(key)??!matchMedia('(max-width:800px)').matches;section.addEventListener('toggle',()=>{projectSections.set(key,section.open);if(section.open&&matchMedia('(max-width:800px)').matches)for(const other of view.querySelectorAll('.overview-section'))if(other!==section)other.open=false;});return section;}
   const phoneNotes=el('div',undefined,'phone-notes');view.insertBefore(phoneNotes,tabs);renderNotes(phoneNotes,id,await api(`projects/${id}/operations`),true);
   const care=el('div',undefined,'project-care-pane');care.hidden=true;care.id='project-care-content';view.append(care);await renderProjectCare(care,id,phoneNotes);
   function draw() {
     projectTabs.set(id,tab);
-    header.querySelector('h1').textContent = p.title; header.querySelector('button')?.remove(); meta.replaceChildren(status(p.status), link(p.clientName, `client/${p.clientId}`), el('span', p.kind || 'Project'));
-    if (!editMode) header.append(button('Edit project', () => { editMode = true; tab = 'Overview'; draw(); content.querySelector('input')?.focus(); }, 'primary'));
+    header.querySelector('h1').textContent = p.title; header.querySelector('button')?.remove(); meta.replaceChildren(status(p.status), link(p.clientName, `client/${p.clientId}`), el('span', p.kind || 'Project'),el('span','Request '+p.primaryReference));
+    if (!editMode) headerActions.append(button('Edit project', () => { editMode = true; tab = 'Overview'; draw(); content.querySelector('input')?.focus(); }, 'primary'));
     tabs.replaceChildren();
     const tabNames=['Overview','Details & files','Activity'];
     for (const name of tabNames) { const b = button(name, () => { tab = name; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); }, ''); b.setAttribute('role', 'tab'); b.tabIndex = tab === name ? 0 : -1; b.setAttribute('aria-selected', String(tab === name)); b.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); tab = event.key === 'Home' ? tabNames[0] : event.key === 'End' ? tabNames.at(-1) : tabNames[(tabNames.indexOf(tab)+(event.key==='ArrowRight'?1:tabNames.length-1))%tabNames.length]; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); } }); b.id = `tab-${name.toLowerCase().replaceAll(' ','-')}`; b.setAttribute('aria-controls', name==='Details & files'?'project-care-content':'project-tab-content'); tabs.append(b); }
@@ -163,8 +171,8 @@ async function project(view, id) {
     if (tab === 'Activity') { content.append(auditPanel(p)); return; }
     const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const box = panel(editMode ? 'Edit project' : 'The request');
     if (editMode) editForm(box); else { box.append(el('p', p.summary, 'record-summary'), details([['Primary reference', p.primaryReference], ['Target date', date(p.dueDate)], ['Opened', date(p.openedAt)], ['Type', p.kind], ['Feedback', p.feedbackRequired ? 'Required' : 'Not required'], ['Invoice', p.invoiceRequired ? 'Required' : 'Not required']])); if (p.kind === 'Assessment') box.append(el('p', 'An assessment request does not authorise making equipment.', 'muted')); }
-    left.append(box); if(!editMode) {const actions=panel('Case workspace');actions.append(link('Notes, hours & funding','operations/'+p.id,'button primary'),link('Documents & draft invoices','documents/'+p.id,'button secondary'));left.append(actions);} if (!editMode) { const context = panel('Client'); context.append(link(p.clientName, `client/${p.clientId}`, 'row-title'), el('p', 'Open the client record to see their primary requests and all linked projects.', 'muted')); left.append(context); }
-    if (!editMode && p.coordination) { const allocation = panel('Funding & technician'); const c = p.coordination; const payer = c.fundingStatus === 'unknown' ? 'Not known yet — follow up' : c.fundingStatus === 'self' ? p.clientName : p.relationships.find(r => r.id === c.payerId)?.name ?? 'Selected payer'; allocation.append(details([['Expected payer', payer], ['Funding notes', c.fundingNotes || 'None recorded'], ['Skills needed', c.requiredSkills.join(', ') || 'Not specified'], ['Technician', p.relationships.find(r => r.id === c.technicianId)?.name || 'Not assigned yet']]), link('Update funding or technician', `coordination/${p.id}`, 'button secondary'), el('p', 'Funding and allocation are recorded plans. They do not authorise work or spending.', 'muted')); left.append(allocation); } grid.append(left, relationships(p.relationships)); content.append(grid);
+    left.append(editMode?box:foldPanel(box,'Request details'));
+    if (!editMode && p.coordination) { const allocation = panel('Funding & technician'); const c = p.coordination; const payer = c.fundingStatus === 'unknown' ? 'Not known yet — follow up' : c.fundingStatus === 'self' ? p.clientName : p.relationships.find(r => r.id === c.payerId)?.name ?? 'Selected payer'; allocation.append(details([['Expected payer', payer], ['Funding notes', c.fundingNotes || 'None recorded'], ['Skills needed', c.requiredSkills.join(', ') || 'Not specified'], ['Technician', p.relationships.find(r => r.id === c.technicianId)?.name || 'Not assigned yet']]), link('Update funding or technician', `coordination/${p.id}`, 'button secondary'), el('p', 'Funding and allocation are recorded plans. They do not authorise work or spending.', 'muted')); left.append(foldPanel(allocation,'Funding & technician')); } grid.append(left,editMode?relationships(p.relationships):foldPanel(relationships(p.relationships),'People & organisations')); content.append(grid);
   }
   function editForm(box) {
     const draft = drafts.get(id) ?? { version: p.version, title: p.title, status: p.status, feedbackRequired: p.feedbackRequired, invoiceRequired: p.invoiceRequired };
@@ -212,7 +220,8 @@ async function render() {
   document.querySelectorAll('[data-nav]').forEach(a => { if (a.dataset.nav === active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   try {
     const arg = decodeURIComponent(raw);
-    if(route==='settings') await renderSettings(view);
+    if(route==='reports') await renderReports(view);
+    else if(route==='settings') await renderSettings(view);
     else if (route==='client-details') await renderClientDetails(view,arg,{announce,setSaving:value=>{saving=value;},request:async(path,method='GET',body)=>{const response=await fetch('/api/'+path,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await response.json();if(!response.ok){const e=Error(data.error);e.status=response.status;throw e;}return data;}});
     else if(route==='availability') await renderAvailability(view);
     else if(await renderOperations(view,route,arg)) { /* Case workspace supplied. */ }
@@ -240,7 +249,13 @@ searchForm.addEventListener('focusout',()=>setTimeout(()=>{if(!searchForm.contai
 
 document.querySelector('#global-search').addEventListener('submit', event => { event.preventDefault(); closeSearchPreview(); if (saving) { announce('Please wait for the save to finish.'); return; } const target = `#search/${encodeURIComponent(globalInput.value.trim())}`; if (location.hash === target) render(); else location.hash = target; });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); main.focus(); });
-window.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); globalInput.focus(); globalInput.select(); } });
+window.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if(drawerOpen)setDrawer(false,false);globalInput.focus(); globalInput.select(); } });
 window.addEventListener('hashchange', event => { if (saving) { history.replaceState(null, '', new URL(event.oldURL).hash || '#projects'); announce('Your changes are saving. Please wait before leaving this record.'); const pending = main.querySelector('.message'); if (pending) pending.textContent = 'Your changes are saving. Please wait before leaving this record.'; return; } render(); });
-window.addEventListener('beforeunload', event => { if(sessionEnded)return; if (drafts.size || workflowHasDrafts() || operationsHaveDrafts() || careHasDrafts() || clientDetailsHasDrafts() || saving) { event.preventDefault(); event.returnValue = ''; } });
-render();
+window.addEventListener('beforeunload', event => { if(sessionEnded||workspaceRestored)return; if (drafts.size || workflowHasDrafts() || operationsHaveDrafts() || careHasDrafts() || clientDetailsHasDrafts() || saving) { event.preventDefault(); event.returnValue = ''; } });
+render();// The desktop rail becomes a focus-contained navigation drawer on small screens.
+const drawer=document.querySelector('#workspace-navigation'),drawerToggle=document.querySelector('#navigation-toggle'),drawerClose=document.querySelector('#navigation-close'),backdrop=document.querySelector('#navigation-backdrop'),mobileMedia=matchMedia('(max-width:800px)');
+let drawerOpen=false;
+function setDrawer(open,restoreFocus=true){drawerOpen=open&&mobileMedia.matches;document.body.classList.toggle('drawer-open',drawerOpen);drawerToggle.setAttribute('aria-expanded',String(drawerOpen));drawer.inert=mobileMedia.matches&&!drawerOpen;backdrop.hidden=!drawerOpen;document.querySelector('.workspace').inert=drawerOpen;document.querySelector('.mobile-navigation').inert=drawerOpen;if(drawerOpen){drawer.setAttribute('role','dialog');drawer.setAttribute('aria-modal','true');drawer.setAttribute('aria-label','Workspace navigation');drawerClose.focus();}else{drawer.removeAttribute('role');drawer.removeAttribute('aria-modal');drawer.removeAttribute('aria-label');if(restoreFocus&&mobileMedia.matches)drawerToggle.focus();}}
+drawerToggle.addEventListener('click',()=>setDrawer(!drawerOpen));drawerClose.addEventListener('click',()=>setDrawer(false));backdrop.addEventListener('click',()=>setDrawer(false));drawer.addEventListener('click',e=>{const anchor=e.target.closest('a');if(anchor){const sameRoute=anchor.hash===(location.hash||'#projects');setDrawer(false,false);if(sameRoute)main.focus({preventScroll:true});}});mobileMedia.addEventListener('change',()=>setDrawer(false,false));
+document.addEventListener('keydown',e=>{if(!drawerOpen)return;if(e.key==='Escape'){e.preventDefault();setDrawer(false);return;}if(e.key==='Tab'){const stops=[...drawer.querySelectorAll('a[href],button:not([disabled]),[tabindex="0"]')].filter(n=>n.getClientRects().length);const first=stops[0],last=stops.at(-1);if(e.shiftKey&&(document.activeElement===first||!drawer.contains(document.activeElement))){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
+setDrawer(false,false);
