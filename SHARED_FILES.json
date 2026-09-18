@@ -1,0 +1,18 @@
+{
+  "sourceRevision": "686583a21165906298a79498c832d4b743048dbb",
+  "sync": "manual allowlist review; not automatic",
+  "files": [
+    {
+      "path": "styles.css",
+      "sha256": "62b2aed3b90d6f182ff78e34eaeabc70d744c26dc94d98d86fb4dcc51ed5871a"
+    },
+    {
+      "path": "assets/tadsa-logo.png",
+      "sha256": "79304c0d2718a0a7d614809f4dfcc8c1ef0bc7b701805ea8295170b1a1e2caf4"
+    },
+    {
+      "path": "seed.mjs",
+      "sha256": "c3148e1f7d51df5d2f50bfc6ef23267d87797d5ef01953f4b17b861857ca9d26"
+    }
+  ]
+}
