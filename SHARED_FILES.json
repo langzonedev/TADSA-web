@@ -1,18 +1,68 @@
 {
-  "sourceRevision": "686583a21165906298a79498c832d4b743048dbb",
-  "sync": "manual allowlist review; not automatic",
-  "files": [
-    {
-      "path": "styles.css",
-      "sha256": "62b2aed3b90d6f182ff78e34eaeabc70d744c26dc94d98d86fb4dcc51ed5871a"
+  "sourceRevision": "87528a10c5b473508f099dfde5201d1fc0fc5aaf",
+  "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
+  "files": {
+    "app.js": {
+      "source": "public/app.js",
+      "sha256": "25c4b6c6b67767bc714d835995a154d837f29592abeadbe6a1feff173f6f37ea",
+      "transform": null
     },
-    {
-      "path": "assets/tadsa-logo.png",
-      "sha256": "79304c0d2718a0a7d614809f4dfcc8c1ef0bc7b701805ea8295170b1a1e2caf4"
+    "workflows.js": {
+      "source": "public/workflows.js",
+      "sha256": "377ce1c239788ee84b52fa5525b61660651f0bd1720ace034b7a4690f138430e",
+      "transform": null
     },
-    {
-      "path": "seed.mjs",
-      "sha256": "c3148e1f7d51df5d2f50bfc6ef23267d87797d5ef01953f4b17b861857ca9d26"
+    "operations.js": {
+      "source": "public/operations.js",
+      "sha256": "3f85accfa4c840a36c76c1669885c0f79cfacd262f02a9604f3929afd8f38bdd",
+      "transform": null
+    },
+    "client-details.js": {
+      "source": "public/client-details.js",
+      "sha256": "f24451c7c26d1d817d40f60789fb5f46b66b630c51bdabc765ab08605023ad3f",
+      "transform": null
+    },
+    "local-login.js": {
+      "source": "public/local-login.js",
+      "sha256": "b267ae0ce5059201913e370005b48d0d105448ca210090c9c2b10150d1b0ee9c",
+      "transform": null
+    },
+    "availability.js": {
+      "source": "public/availability.js",
+      "sha256": "613e6a4e8f87ddba59abdde389b1909a2c5102bc48157f258fd3b2023292d0e0",
+      "transform": null
+    },
+    "project-care.js": {
+      "source": "public/project-care.js",
+      "sha256": "266f4a8a9a4aaff36803948542fa6c3caf9b36e17d975c457e7c44010df0058b",
+      "transform": null
+    },
+    "styles.css": {
+      "source": "public/styles.css",
+      "sha256": "626d92e65cc743cd6dfafe0aa5264fcb1eb3c5d201cee78dc30e670e88094e36",
+      "transform": null
+    },
+    "boot.js": {
+      "source": "public/boot.js",
+      "sha256": "fc44fea27d921d1c0065065a91e1577ec48cffab5e932eca2fa8e9c831e86d36",
+      "transform": null
+    },
+    "assets/tadsa-logo.png": {
+      "source": "public/assets/tadsa-logo.png",
+      "sha256": "79304c0d2718a0a7d614809f4dfcc8c1ef0bc7b701805ea8295170b1a1e2caf4",
+      "transform": null
+    },
+    "seed.mjs": {
+      "source": "src/seed.mjs",
+      "sha256": "c3148e1f7d51df5d2f50bfc6ef23267d87797d5ef01953f4b17b861857ca9d26",
+      "transform": "Fictional authored fixture only"
+    },
+    "index.html": {
+      "source": "public/index.html",
+      "sourceSha256": "27acdc4c4711bf3042318dba0fc835e520dcbafde3adcc7f176d501d589dde23",
+      "sha256": "1516927ed595c6fbc075c971f8460003c09afed529887ba5f4ffd3a63631fcbf",
+      "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
-  ]
+  },
+  "shellHash": "d14c1ba186fb96675e783f5c5f7c902fd1037ea9247e151856c9305b1392da6e"
 }

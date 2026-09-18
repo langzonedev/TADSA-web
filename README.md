@@ -1,21 +1,27 @@
-# TADSA web prototype
+# TADSA device demonstration
 
-Public, synthetic, device-local workflow starter. No server/database credentials or real customer records are included.
+The shared TADSA workspace interface runs against a device-local IndexedDB adapter. Use fictional information only. No records go to the private TADSA database, another device, an email service, NDIS, a bank or payment processor. There is no staff authentication in this public demonstration.
 
-People support create/read/edit/delete; projects support create/read/edit/delete with client and technician links. Linked people cannot be deleted until project links are removed. Edits persist in this browser using localStorage (not PostgreSQL or cross-device sync). Reset requires confirmation. Use fictional entries only; browser storage is not a secure repository for personal data. Avoid simultaneous editing in multiple tabs.
+Projects, clients, people, contacts, coordination, intake details, notes, draft invoices, manually recorded receipts, NDIS approval, dated technician availability and files persist in this browser. Changes and audit events commit together. Stale versions are rejected; retries do not duplicate creation. Browser storage can be cleared or exhausted. Export a backup from the Device demo menu first. Backup restore is not yet exposed.
 
-The manifest and service worker provide an offline application shell after the first online load. Installation availability varies by browser; actual iOS/Android installation has not been verified. Open the Pages URL, then use the browser's Install/Add to Home Screen option where available.
+Existing tadsa-web-v1 localStorage records are copied into IndexedDB on upgrade. The original value remains a recovery copy and is not reimported after later saves. Unreadable data blocks startup instead of being silently erased. Legacy UUID record IDs survive.
 
-## Shared design boundary
+Offline operation starts after the first successful online load and service-worker activation. Close all tabs and reopen to activate an update. Cache identity includes every shell file and device adapter. GitHub Pages subpaths are supported. Real iOS/Android installation and operating-system storage eviction are unverified.
 
-Reused allowlisted files: styles.css, assets/tadsa-logo.png, seed.mjs. Source private TADSA revision686583a. No private history, attachments, business documents or operational configuration were copied. app.js is a small independent device-local adapter/UI, not a full transfer of the backend-dependent private frontend. Changes currently require explicit manual review in both repos; automatic synchronization and full contract parity remain future work. See SHARED_FILES.json for hashes of reused files.
+## Shared source
+
+Run: node tools/sync-from-main.mjs ../TADSA
+
+JavaScript, CSS and logo come from an explicit allowlist. HTML is transformed to install the device adapter before boot and disclose local storage. SHARED_FILES.json records source revision/content hashes and full shell hash. No private history, scans, real records, credentials, server configuration or operational documents are copied. Re-run sync LAST after any shell edit.
+
+Files support PNG, JPEG, PDF and bounded DOCX, 10 MB each and 20 active per project. DOCX compressed entries require browser DecompressionStream deflate-raw support. Files download without embedded execution. Format validation is not malware scanning.
+
+Device menu deletion requires confirmation. Linked people cannot be deleted. Project deletion removes its device notes, files, invoices and receipts; this does not add deletion to the main application.
 
 ## Verification
 
-Local Edge/Playwright at the /TADSA-web/ subpath passed: person create/edit/delete, reload persistence, project creation, offline reload with preserved project,375px reflow, and zero uncaught browser errors. Project edit/delete paths exist but were not separately exercised in that pass. Real-device install/update tests and independent review remain outstanding.
+Run node --test tests/device-qa.test.mjs, node tests/browser-device-qa.mjs and node tests/browser-parity.mjs. Browser scripts accept PLAYWRIGHT_MODULE_PATH and BROWSER_EXECUTABLE_PATH.
 
-## Limits
+Local Edge evidence covers migration retention, injected quota rollback, concurrent stale writers, reload persistence, shared register/client/project/operations/document routes under /TADSA-web/, creation, calendar, PDF upload, SVG rejection, offline persisted records and file downloads. Independent evidence is separated in device-qa scripts. Real-device install/update tests remain outstanding.
 
-This starter does not yet include private-app assessments/approval enforcement, client detail forms, case notes, invoice generation, funding, merging, authentication or specialist technician matching. It is a public interaction prototype, not production software. The initial implementation plan remains the broader roadmap.
-
-When changing shell files, bump CACHE in sw.js. Existing installations receive updates after the updated service worker activates; device data is kept separately. A controlled import/export feature and IndexedDB adapter remain planned.
+See PARITY.md. Production identity/permissions, cross-device sync, official invoices, live payments/email, Access migration and real client use remain outside this demo.

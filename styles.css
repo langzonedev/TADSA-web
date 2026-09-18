@@ -28,3 +28,19 @@ body{font-size:16px}.subtitle,.muted,.record-summary,.inspector p{font-size:14px
 .person-role-options{grid-template-columns:repeat(2,minmax(0,1fr))}.person-role-options>p,.person-role-options>small{grid-column:1/-1}@media(max-width:600px){.person-role-options{grid-template-columns:1fr}}
 
 .case-note{white-space:pre-wrap;border-left:3px solid var(--brand-green);padding:12px}.case-comparison{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}.print-document{margin-top:20px;break-inside:avoid}@media print{.sidebar,.topbar,.environment-strip,.breadcrumb,.skip,.launch-help,main>div>h1,main>div>.subtitle,main>div>.message,main>div>button,main>div>a{display:none!important}.app-shell{display:block}.workspace{width:100%}main{padding:0}.print-document{box-shadow:none;border:0;break-after:page;color:#000;background:white}.print-document:last-of-type{break-after:auto}body{background:white}}
+/* Project phone workflow and shared device-friendly scheduling. */
+.care-details { margin: 16px 0; padding: 16px; background: #fff; border: 1px solid var(--line, #d9deea); border-radius: 12px; }
+.care-details > summary, .file-row summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
+.care-summary { margin: 18px 0; }
+.calendar-days { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 8px; }
+.calendar-day { min-width: 0; min-height: 100px; display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 12px; white-space: normal; overflow-wrap: anywhere; }
+.calendar-day.available { border-left: 5px solid #488821; background: #f3faed; }
+.calendar-day.limited { border-left: 5px solid #966c14; background: #fff8e6; }
+.calendar-day.unavailable { border-left: 5px solid #b94654; background: #fff0f2; }
+.calendar-day.unknown { border-left: 5px solid #828899; }
+.technician-week { margin: 16px 0; }
+.file-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 0; border-bottom: 1px solid #e1e5ee; overflow-wrap: anywhere; }
+.file-row > span { flex: 1 1 180px; min-width: 0; }
+.workflow-panel input[type=file] { width: 100%; min-width: 0; }
+@media(max-width:1000px) { .calendar-days { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+@media(max-width:600px) { .calendar-days { grid-template-columns: 1fr; } .calendar-day { min-height: 70px; } .care-details { padding: 12px; } }

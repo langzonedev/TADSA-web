@@ -1,0 +1,8 @@
+# Preserve exact shell bytes: SHARED_FILES.json hashes must survive Git checkout.
+*.js -text
+*.mjs -text
+*.css -text
+*.html -text
+*.json -text
+*.webmanifest -text
+*.svg -text
