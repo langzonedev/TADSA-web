@@ -11,3 +11,9 @@ Review returned representative completeness, normalized phone matching, stale op
 Reviewer independently recomputed the hashes of all shared files and every service-worker shell member and confirmed that the current generated cache identity matches. Public adapter edits now change that identity. The current local synthetic candidate is acceptable for authorised publication after final source synchronization; deployed revision verification remains a separate check.
 
 File validation is bounded type/structure checking, not an antivirus service. No server synchronization, authenticated staff identity, real payment settlement or email delivery is provided by the device adapter. Browser storage can be cleared or become unavailable. Only fictional records are suitable for this demonstration.
+
+## Independent deployed check — 2026-09-18
+
+GitHub Pages commit `de2ff33587e3278089f10db21996ec7d4b2235e4` was built successfully. The reviewer independently checked [the deployed site](https://langzonedev.github.io/TADSA-web/): its shared manifest matches source revision `87528a10c5b473508f099dfde5201d1fc0fc5aaf`, and every manifested shared file matches its recorded SHA-256.
+
+Five deployed groups passed in fresh headless Edge at 375 × 812: source/manifest hashes; prominent project quick-note entry retained after reload with no horizontal overflow; all three technicians and a saved availability entry; offline navigation retaining the note and availability change; zero uncaught browser errors. Full phone record and calendar screenshots were visually inspected. All edits remained fictional and local to the fresh browser profile. Real-phone installation and all browser update/eviction paths remain unverified. This evidence binds the executable commit above, not arbitrary future changes.
