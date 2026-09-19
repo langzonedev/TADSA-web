@@ -76,7 +76,7 @@ async function newClient(view, arg) {
   }
   form.addEventListener('submit', e => { e.preventDefault(); if (!valid(form)) return; save(form, d, notice, submit, 'clients', 'POST', { requestId: d.requestId, name: d.name.trim(), email: d.email.trim(), phone: d.phone.trim(), allowDuplicate: d.allowDuplicate }, result => {
     drafts.delete(key); host.announce('Client saved.');
-    if (d.forProject) { const project = drafts.get('new-project'); if (project) { project.clientId = result.id; project.step = 2; project.primaryRecordId = ''; } location.hash = 'new-project/' + result.id; }
+    if (d.forProject) { const project = drafts.get('new-project'); if (project) { project.clientId = result.id; project.step = 2;  } location.hash = 'new-project/' + result.id; }
     else location.hash = 'client/' + result.id;
   }, duplicates); });
   if (d.pending) { notice.append(note('A previous save was not confirmed. Retry it safely.')); lock(form, true, submit); submit.textContent = 'Retry save safely'; }
@@ -125,21 +125,21 @@ async function directories() {
 function allocationValid(form, d, notice) { if (!valid(form)) return false; if (d.needsAcknowledgement && !d.assignmentAcknowledged) { notice.replaceChildren(note('Review the technician warning and tick the acknowledgement, or leave the request unassigned.', true)); notice.scrollIntoView({block:'nearest'}); return false; } return true; }
 function reviewList(items) { const dl = el('dl', null, 'review-list'); for (const [label,value] of items) { dl.append(el('dt',label),el('dd',value)); } return dl; }
 async function newProject(view, clientId) {
-  const key = 'new-project'; const d = getDraft(key, { step: clientId ? 2 : 1, clientId: clientId || '', primaryRecordId: '', title: '', summary: '', kind: 'Assessment', fundingStatus:'unknown',payerId:'',fundingNotes:'',requiredSkills:[],technicianId:'' });
+  const key = 'new-project'; const d = getDraft(key, { step: clientId ? 2 : 1, clientId: clientId || '', title: '', summary: '', kind: 'Assessment', fundingStatus:'unknown',payerId:'',fundingNotes:'',requiredSkills:[],technicianId:'' });
   const [clients, dirs] = await Promise.all([request('clients'),directories()]);
   if (clientId && !d.clientId) { d.clientId = clientId; d.step = 2; }
   let selected = clients.items.find(c => c.id === d.clientId);
   title(view, 'New project', 'Record the call in four short steps. You can leave funding and allocation for later.');
-  const steps = el('ol', null, 'workflow-steps'); for (const [i,label] of ['Client','Request','Funding & technician','Review'].entries()) { const n = el('li', `${i+1}. ${label}`); if (i+1 === d.step) n.setAttribute('aria-current','step'); steps.append(n); } view.append(steps);
+  const steps = el('ol', null, 'workflow-steps'); for (const [i,label] of ['Client','Project details','Funding & technician','Review'].entries()) { const n = el('li', `${i+1}. ${label}`); if (i+1 === d.step) n.setAttribute('aria-current','step'); steps.append(n); } view.append(steps);
   const slot = el('div'); view.append(slot);
   function draw() {
     slot.replaceChildren(); steps.querySelectorAll('li').forEach((n,i) => i+1 === d.step ? n.setAttribute('aria-current','step') : n.removeAttribute('aria-current'));
-    const box = panel(`Step ${d.step} of 4 — ${['Client','Request','Funding & technician','Review'][d.step-1]}`); const form = el('form', null, 'form-grid'); const notice = el('div');
+    const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technician','Review'][d.step-1]}`); const form = el('form', null, 'form-grid'); const notice = el('div');
     if (d.step === 1) {
       const q = el('input'); q.type = 'search'; q.setAttribute('aria-label','Find client'); q.placeholder = 'Name, phone or email'; const label = el('label'); label.append(el('span','Find an existing client','field-label'),q); form.append(label);
       const matches = el('div', null, 'client-matches');
       function results() { matches.replaceChildren(); const term = q.value.toLowerCase().trim(); const found = [...clients.items].sort((a,b)=>a.person.name.localeCompare(b.person.name,'en-AU')).filter(c => [c.person.name,c.person.email,c.person.phone].join(' ').toLowerCase().includes(term));
-        for (const c of found) { const l = el('label', null,'choice-card'); const radio = el('input'); radio.type='radio';radio.name='client';radio.value=c.id;radio.checked=d.clientId===c.id;radio.addEventListener('change',()=>{d.clientId=c.id;d.primaryRecordId='';selected=c;touch(d);}); const text=el('span');text.append(el('strong',c.person.name),el('small',`${c.person.phone || 'No phone'} · ${c.person.email || 'No email'}`));l.append(radio,text);matches.append(l); }
+        for (const c of found) { const l = el('label', null,'choice-card'); const radio = el('input'); radio.type='radio';radio.name='client';radio.value=c.id;radio.checked=d.clientId===c.id;radio.addEventListener('change',()=>{d.clientId=c.id;selected=c;touch(d);}); const text=el('span');text.append(el('strong',c.person.name),el('small',`${c.person.phone || 'No phone'} · ${c.person.email || 'No email'}`));l.append(radio,text);matches.append(l); }
         if (!found.length) matches.append(el('p','No matching client. Check the spelling, or create a new client.'));
       }
       q.addEventListener('input',results);results();form.append(matches,link('Create new client','new-client/project','button secondary'),el('p',`Showing up to ${clients.limit} clients. Confirm the person’s contact details before choosing.`, 'field-help'));
@@ -147,22 +147,20 @@ async function newProject(view, clientId) {
       form.append(note(`Client: ${selected?.person.name ?? 'Choose a client first'}`));
       field(form,'Project title',d,'title',{required:true,help:'A short description the client and team will recognise.'});
       field(form,'What does the client need?',d,'summary',{type:'textarea',required:true,max:2000,help:'Describe the goal in the client’s words. Avoid unnecessary sensitive information.'});
-      selectField(form,'Type of request',d,'kind',[['Assessment','Assessment — understand the need first'],['Technical','Technical — making or modifying equipment']]);
-      form.append(el('p','Recording a request does not authorise fabrication, spending or release. An assessment is separate from making equipment.','field-help'));
-      selectField(form,'Which request does this project belong to?',d,'primaryRecordId',[['','Create a new request'],...(selected?.primaryRecords??[]).map(r=>[r.id,`${r.reference} — ${r.summary}`])]);
-      form.append(el('p','Use an existing request only when this is another piece of work for that same need. Ask the coordinator if unsure.','field-help'));
+      selectField(form,'Project type',d,'kind',[['Assessment','Assessment — understand the need first'],['Technical','Technical — making or modifying equipment']]);
+      form.append(el('p','Creating a project does not authorise fabrication, spending or release. An assessment is separate from making equipment.','field-help'));
     } else if (d.step === 3) {form.append(note('Client work location: '+(selected?.details?.workAddress||selected?.details?.residentialAddress||'Not recorded. Open the client record to add an address.')));coordinationFields(form,d,dirs);}
     else {
       const payer = d.fundingStatus==='unknown' ? 'Not known yet — follow up' : d.fundingStatus==='self' ? `Client: ${selected?.person.name}` : (d.fundingStatus==='organisation'?dirs.organisations:dirs.people).find(p=>p.id===d.payerId)?.name;
-      form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Type',d.kind],['Request',d.primaryRecordId ? selected.primaryRecords.find(r=>r.id===d.primaryRecordId)?.reference : 'New request'],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technician',dirs.technicians.find(t=>t.id===d.technicianId)?.name||'Not assigned yet']]));
-      form.append(note('Check the client and request before saving. No emails, work instructions or invoices will be sent.'));
+      form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Type',d.kind],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technician',dirs.technicians.find(t=>t.id===d.technicianId)?.name||'Not assigned yet']]));
+      form.append(note('Check the client and project details before saving. No emails, work instructions or invoices will be sent.'));
     }
     const actions=el('div',null,'actions');const next=saveButton(d.step===4?'Create project':'Continue');
     if(d.step>1)actions.append(button('Back',()=>{d.step--;draw();slot.querySelector('h2').tabIndex=-1;slot.querySelector('h2').focus({preventScroll:true});window.scrollTo(0,0);}));
     actions.append(next,cancel(form,d,key,d.clientId?'client/'+d.clientId:'projects','Cancel new project'));form.append(notice,actions);box.append(form);slot.append(box);
     form.addEventListener('submit',e=>{e.preventDefault();if(d.step===1&&!d.clientId){notice.replaceChildren(note('Choose the existing client or create a new client to continue.',true));return;}if(!allocationValid(form,d,notice))return;
       if(d.step<4){d.step++;draw();slot.querySelector('h2').tabIndex=-1;slot.querySelector('h2').focus({preventScroll:true});window.scrollTo(0,0);return;}
-      save(form,d,notice,next,'projects','POST',{requestId:d.requestId,clientId:d.clientId,primaryRecordId:d.primaryRecordId||null,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,...coordinationValues(d)},result=>{drafts.delete(key);host.announce('Project created.');location.hash='project/'+result.id;});
+      save(form,d,notice,next,'projects','POST',{requestId:d.requestId,clientId:d.clientId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,...coordinationValues(d)},result=>{drafts.delete(key);host.announce('Project created.');location.hash='project/'+result.id;});
     });
     if(d.pending){notice.append(note('A previous save was not confirmed. Retry the same request safely.'));lock(form,true,next);next.textContent='Retry save safely';}
   }

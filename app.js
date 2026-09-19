@@ -56,7 +56,7 @@ function relationships(rows) {
 function projectLinks(projects) {
   const box = panel('Linked projects'); if (!projects.length) box.append(el('p', 'No linked projects recorded.', 'muted'));
   const list = el('div', undefined, 'project-links');
-  for (const p of projects) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference} · ${p.kind || 'Project'}`)); a.append(text, status(p.status)); list.append(a); }
+  for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference} · ${p.kind || 'Project'}`));const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, status(p.status)); list.append(a); }
   box.append(list); return box;
 }
 function inspect(item, kind, slot) {
@@ -65,7 +65,7 @@ function inspect(item, kind, slot) {
   if (!item) { body.append(empty('Select a record', 'Choose a row to see its details here.')); slot.append(body); return; }
   if (kind === 'projects') {
     body.append(el('span', item.reference, 'inspector-reference'), el('h2', item.title), status(item.status), el('p', item.summary));
-    const context = el('div', undefined, 'inspector-section'); context.append(el('h3', 'The request'), details([['Client', link(item.clientName, `client/${item.clientId}`)], ['Primary reference', item.primaryReference], ['Type', item.kind], ['Target date', date(item.dueDate)]])); body.append(context);
+    const context = el('div', undefined, 'inspector-section'); context.append(el('h3', 'Project details'), details([['Client', link(item.clientName, `client/${item.clientId}`)], ['Type', item.kind], ['Target date', date(item.dueDate)]])); body.append(context);
     const people = el('div', undefined, 'inspector-section'); people.append(el('h3', 'Working together'));
     for (const r of [...item.relationships].sort((a, b) => Number(b.role === 'Technician') - Number(a.role === 'Technician'))) { const a = link('', `${r.type}/${r.id}`, 'person-line'); const text = el('span'); text.append(el('strong', r.name), el('small', r.role)); a.append(avatar(r.name), text); people.append(a); }
     if (!item.relationships.length) people.append(el('p', 'No assignments recorded.'));
@@ -73,7 +73,7 @@ function inspect(item, kind, slot) {
   } else {
     const name = nameOf(item); body.append(avatar(name), el('h2', name), el('p', kind === 'clients' ? 'Client record' : item.role));
     const context = el('div', undefined, 'inspector-section');
-    if (kind === 'clients') context.append(details([['Email', item.person.email], ['Phone', item.person.phone], ['Primary requests', item.primaryRecords.length], ['Linked projects', item.projects.length]]));
+    if (kind === 'clients') context.append(details([['Email', item.person.email], ['Phone', item.person.phone], ['Linked projects', item.projects.length]]));
     else if (kind === 'people') context.append(details([['Email', item.email], ['Phone', item.phone], ['Linked projects', item.projects.length]]));
     else context.append(el('p', item.description), details([['Linked projects', item.projects.length]]));
     body.append(context);
@@ -85,7 +85,7 @@ async function register(view, kind) {
   const { items, limit } = await api(kind);
   const state = registers.get(kind) ?? { query: '', filter: 'all', sort: kind === 'projects' ? 'reference' : 'name', selected: null };
   registers.set(kind, state); returnRoute = kind;
-  const descriptions = { projects: 'Requests in progress, the people involved, and what needs attention.', clients: 'A connected view of each person and the work supporting them.', people: 'Clients, technical members and the people supporting each request.', organisations: 'The organisations connected to our work.' };
+  const descriptions = { projects: 'Projects in progress, the people involved, and the work to be done.', clients: 'A connected view of each person and the work supporting them.', people: 'Clients, technical members and the people supporting each request.', organisations: 'The organisations connected to our work.' };
   const head = heading(cap(kind), descriptions[kind], 'Administration'); head.append(el('span', `${items.length} ${kind === 'people' ? 'people' : kind}`, 'meta-note')); if (kind === 'projects') head.append(link('New project', 'new-project', 'button primary')); if (kind === 'people') head.append(link('New person', 'new-person', 'button primary')); if (kind === 'clients') head.append(link('New client', 'new-client', 'button primary')); view.append(head);
   const tabs = el('div', undefined, 'filter-tabs'); tabs.setAttribute('aria-label', `Filter ${kind}`);
   const filters = kind === 'projects' ? [['all', 'All projects', () => true], ['open', 'Open', p => p.status === 'open'], ['review', 'Review', p => p.status === 'review'], ['closed', 'Closed', p => p.status === 'closed'], ['feedback', 'Feedback', p => p.feedbackRequired], ['invoice', 'Invoice', p => p.invoiceRequired]] : [['all', `All ${kind}`, () => true], ...(kind === 'people' ? [...new Set(items.flatMap(p => p.roles ?? [p.role]))].sort().map(role => [role, role, p => (p.roles ?? [p.role]).includes(role)]) : [])];
@@ -100,13 +100,13 @@ async function register(view, kind) {
     for (const [key, label, predicate] of filters) { const b = button('', () => { state.filter = key; draw(); tabs.querySelector('[aria-pressed=true]')?.focus(); }, 'filter-tab'); b.setAttribute('aria-pressed', String(state.filter === key)); b.append(el('span', label), el('span', String(items.filter(predicate).length), 'filter-count')); tabs.append(b); }
     const predicate = filters.find(f => f[0] === state.filter)?.[2] ?? (() => true);
     const query = state.query.toLowerCase().trim();
-    const visible = items.filter(item => predicate(item) && [nameOf(item), item.reference, item.clientName, item.role, ...(item.primaryRecords ?? []).map(r => r.reference)].filter(Boolean).join(' ').toLowerCase().includes(query));
+    const visible = items.filter(item => predicate(item) && [nameOf(item), item.reference, item.clientName, item.role, item.summary].filter(Boolean).join(' ').toLowerCase().includes(query));
     const key = item => state.sort === 'date' ? item.dueDate ?? '9999' : state.sort === 'client' ? item.clientName : state.sort === 'reference' ? item.reference : nameOf(item);
     visible.sort((a, b) => String(key(a)).localeCompare(String(key(b)), 'en-AU', { numeric: true }) * (state.sort === 'reverse' ? -1 : 1));
     if (!visible.some(i => i.id === state.selected)) state.selected = visible[0]?.id ?? null;
     const table = el('table', undefined, kind + '-table'); const thead = el('thead'); const tr = el('tr');
-    const columns = kind === 'projects' ? ['Project / request', 'Client', 'Status', 'Target'] : kind === 'clients' ? ['Client', 'Primary requests', 'Projects'] : kind === 'people' ? ['Person', 'Role', 'Projects'] : ['Organisation', 'Role', 'Projects'];
-    columns.forEach((label, i) => { const th = el('th', label); th.scope = 'col'; if ((kind === 'projects' && i === 3) || (kind === 'clients' && i === 1)) th.className = 'optional-col'; tr.append(th); }); thead.append(tr); table.append(thead);
+    const columns = kind === 'projects' ? ['Project', 'Client', 'Status', 'Target'] : kind === 'clients' ? ['Client', 'Projects'] : kind === 'people' ? ['Person', 'Role', 'Projects'] : ['Organisation', 'Role', 'Projects'];
+    columns.forEach((label, i) => { const th = el('th', label); th.scope = 'col'; if ((kind === 'projects' && i === 3)) th.className = 'optional-col'; tr.append(th); }); thead.append(tr); table.append(thead);
     const tbody = el('tbody');
     for (const item of visible) {
       const row = el('tr'); row.dataset.id = item.id; row.classList.toggle('selected', item.id === state.selected);
@@ -114,7 +114,7 @@ async function register(view, kind) {
       const text = el('span'); text.append(el('span', nameOf(item), 'row-title'), el('span', kind === 'projects' ? `${item.reference} · ${item.kind || 'Project'}` : kind === 'clients' ? item.person.email : kind === 'people' ? item.email : item.description, 'row-sub'));
       if (kind === 'clients' || kind === 'people') { const identity = el('span', undefined, 'name-cell'); identity.append(avatar(nameOf(item)), text); control.append(identity); } else control.append(text); first.append(control); row.append(first);
       if (kind === 'projects') { row.append(el('td', item.clientName)); const s = el('td'); s.append(status(item.status)); row.append(s, el('td', date(item.dueDate), 'optional-col')); }
-      else if (kind === 'clients') row.append(el('td', item.primaryRecords.map(r => r.reference).join(', '), 'optional-col'), el('td', String(item.projects.length)));
+      else if (kind === 'clients') row.append(el('td', String(item.projects.length)));
       else row.append(el('td', item.role), el('td', String(item.projects.length)));
       row.addEventListener('click', event => { if (!event.target.closest('button,a')) choose(item); }); tbody.append(row);
     }
@@ -130,7 +130,7 @@ async function search(view, term) {
   view.append(heading(term ? `Results for “${term}”` : 'Find a record', 'Search across clients, projects, people and organisations.', 'Workspace search'));
   if (!term) { view.append(empty('Start with a name or reference', 'Use the search field above. Press Ctrl K to jump there.')); return; }
   const { results } = await api(`search?q=${encodeURIComponent(term)}`); const box = el('div', undefined, 'results');
-  if (!results.length) { box.append(empty('No matching records', 'Try a shorter name, a project title or a primary reference.'), link('New client', 'new-client', 'button secondary')); }
+  if (!results.length) { box.append(empty('No matching records', 'Try a shorter name, a project title or a project number.'), link('New client', 'new-client', 'button secondary')); }
   for (const r of results) { const a = link('', `${r.type}/${r.id}`, 'result'); const text = el('span'); text.append(el('strong', r.label), el('small', r.description)); a.append(text, el('span', cap(r.type), 'result-type')); box.append(a); }
   view.append(el('p', `${results.length} matching record${results.length === 1 ? '' : 's'}${results.length === 50 ? ' · showing the first 50' : ''}`, 'muted'), box);
 }
@@ -138,17 +138,15 @@ function recordHeader(view, eyebrow, title, meta, action) { const header = el('d
 async function client(view, id) {
   const c = await api(`clients/${id}`); view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); meta.append(el('span', 'Client'), el('span', `${c.projects.length} linked projects`)); recordHeader(view, 'Client record', c.person.name, meta, link('New project', `new-project/${c.id}`, 'button primary'));
-  const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const info = panel('Contact details'); info.append(details([['Email', c.person.email], ['Phone', c.person.phone]]), link('Edit profile & roles', 'edit-person/' + c.person.id, 'text-button')); const requests = panel('Primary requests');
-  for (const r of c.primaryRecords) { const n = el('div', undefined, 'request'); n.append(el('strong', r.reference), el('p', r.summary)); requests.append(n); }
-  if (!c.primaryRecords.length) requests.append(el('p', 'No primary requests recorded.', 'muted'));
-  const contacts = panel('Client contacts'); addClientContactActions(contacts, c); left.append(clientDetailsSummary(c),info, contacts, projectLinks(c.projects), requests); const related = relationships(c.relationships); related.querySelector('h2').textContent = 'People linked through projects'; grid.append(left, related); view.append(el('div', undefined, 'heading-rule'), grid);
+  const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const info = panel('Contact details'); info.append(details([['Email', c.person.email], ['Phone', c.person.phone]]), link('Edit profile & roles', 'edit-person/' + c.person.id, 'text-button'));
+  const contacts = panel('Client contacts'); addClientContactActions(contacts, c); left.append(projectLinks(c.projects),clientDetailsSummary(c),info,contacts); const related = relationships(c.relationships); related.querySelector('h2').textContent = 'People linked through projects'; grid.append(left, related); view.append(el('div', undefined, 'heading-rule'), grid);
 }
 const fieldNames = { title: 'Project title', status: 'Status', feedbackRequired: 'Feedback required', invoiceRequired: 'Invoice required' };
 const displayValue = value => typeof value === 'boolean' ? value ? 'Required' : 'Not required' : String(value ?? 'Not recorded');
 function auditPanel(p) {
   const box = panel('Project activity'); box.append(el('p', 'Saved changes, newest first. Development activity is not an authenticated staff audit trail.', 'muted'));
   if (!p.audit.length) box.append(empty('No changes recorded yet', 'Updates to this project will appear here after saving.'));
-  for (const a of p.audit) { const row = el('div', undefined, 'audit'); row.append(el('strong', a.action), el('small', `${a.actor} · ${new Date(a.at).toLocaleString('en-AU')}`)); for (const [key, value] of Object.entries(a.changes)) row.append(el('p', `${fieldNames[key] ?? key}: ${displayValue(value.from)} → ${displayValue(value.to)}`)); box.append(row); }
+  for (const a of p.audit) { const row = el('div', undefined, 'audit'); row.append(el('strong', a.action), el('small', `${a.actor} · ${new Date(a.at).toLocaleString('en-AU')}`)); for (const [key, value] of Object.entries(a.changes).filter(([key])=>!['primaryRecordId','primaryReference','primary_record_id'].includes(key))) row.append(el('p', `${fieldNames[key] ?? key}: ${displayValue(value.from)} → ${displayValue(value.to)}`)); box.append(row); }
   return box;
 }
 async function project(view, id) {
@@ -161,7 +159,7 @@ async function project(view, id) {
   const care=el('div',undefined,'project-care-pane');care.hidden=true;care.id='project-care-content';view.append(care);await renderProjectCare(care,id,phoneNotes);
   function draw() {
     projectTabs.set(id,tab);
-    header.querySelector('h1').textContent = p.title; header.querySelector('button')?.remove(); meta.replaceChildren(status(p.status), link(p.clientName, `client/${p.clientId}`), el('span', p.kind || 'Project'),el('span','Request '+p.primaryReference));
+    header.querySelector('h1').textContent = p.title; header.querySelector('button')?.remove(); meta.replaceChildren(status(p.status), link(p.clientName, `client/${p.clientId}`), el('span', p.kind || 'Project'));
     if (!editMode) headerActions.append(button('Edit project', () => { editMode = true; tab = 'Overview'; draw(); content.querySelector('input')?.focus(); }, 'primary'));
     tabs.replaceChildren();
     const tabNames=['Overview','Details & files','Activity'];
@@ -170,9 +168,9 @@ async function project(view, id) {
     care.hidden=tab!=='Details & files';content.hidden=tab==='Details & files';care.setAttribute('role','tabpanel');care.setAttribute('aria-labelledby','tab-details-&-files');if(tab==='Details & files')return;
     if (success) content.append(message(success));
     if (tab === 'Activity') { content.append(auditPanel(p)); return; }
-    const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const box = panel(editMode ? 'Edit project' : 'The request');
-    if (editMode) editForm(box); else { box.append(el('p', p.summary, 'record-summary'), details([['Primary reference', p.primaryReference], ['Target date', date(p.dueDate)], ['Opened', date(p.openedAt)], ['Type', p.kind], ['Feedback', p.feedbackRequired ? 'Required' : 'Not required'], ['Invoice', p.invoiceRequired ? 'Required' : 'Not required']])); if (p.kind === 'Assessment') box.append(el('p', 'An assessment request does not authorise making equipment.', 'muted')); }
-    left.append(editMode?box:foldPanel(box,'Request details'));
+    const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const box = panel(editMode ? 'Edit project' : 'Project details');
+    if (editMode) editForm(box); else { box.append(el('p', p.summary, 'record-summary'), details([['Target date', date(p.dueDate)], ['Opened', date(p.openedAt)], ['Type', p.kind], ['Feedback', p.feedbackRequired ? 'Required' : 'Not required'], ['Invoice', p.invoiceRequired ? 'Required' : 'Not required']])); if (p.kind === 'Assessment') box.append(el('p', 'An assessment request does not authorise making equipment.', 'muted')); }
+    left.append(editMode?box:foldPanel(box,'Project details'));
     if (!editMode && p.coordination) { const allocation = panel('Funding & technician'); const c = p.coordination; const payer = c.fundingStatus === 'unknown' ? 'Not known yet — follow up' : c.fundingStatus === 'self' ? p.clientName : p.relationships.find(r => r.id === c.payerId)?.name ?? 'Selected payer'; allocation.append(details([['Expected payer', payer], ['Funding notes', c.fundingNotes || 'None recorded'], ['Skills needed', c.requiredSkills.join(', ') || 'Not specified'], ['Technician', p.relationships.find(r => r.id === c.technicianId)?.name || 'Not assigned yet']]), link('Update funding or technician', `coordination/${p.id}`, 'button secondary'), el('p', 'Funding and allocation are recorded plans. They do not authorise work or spending.', 'muted')); left.append(foldPanel(allocation,'Funding & technician')); } grid.append(left,editMode?relationships(p.relationships):foldPanel(relationships(p.relationships),'People & organisations')); content.append(grid);
   }
   function editForm(box) {

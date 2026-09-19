@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "f2100285034d090c6c2285b9c126979b952627fd",
+  "sourceRevision": "53d428c09e44765c54b06cae547ca560693df3e9",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "accounts.js": {
@@ -19,7 +19,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "e9d8a64e2a3ff5bbb925a0f4ab98d6987b9749b88e8da9386af11fc1f62aa0ff",
+      "sha256": "d78a0ff31c32bbc631971691c0a580cb356cd0a74f2366d75a72285317f93667",
       "transform": null
     },
     "settings.js": {
@@ -34,7 +34,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "cf521bb726b1cd68f079a5d52865278b490533546afbd3b25765955a47baecea",
+      "sha256": "95e6cac73cb0ddff1b4c029a7ea1c62608e3b64f62a68911f4d99c85c87878ba",
       "transform": null
     },
     "operations.js": {
@@ -64,7 +64,7 @@
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "03fd5870fd998b32ffc7dda7c95f52f649bfd438d5d8ea44aeedc9a657c53beb",
+      "sha256": "339d33604e8a074f6b503ca4bf1d0f1bd7bc374ca9685155f818cd9649d01afa",
       "transform": null
     },
     "boot.js": {
@@ -79,7 +79,7 @@
     },
     "seed.mjs": {
       "source": "src/seed.mjs",
-      "sha256": "57fd94ac21c69a0d563064825ad903cdeefed07736c63f7ec93dd3fcc205764b",
+      "sha256": "09c29439815f2675a59c0122dc9fb5cc80bb3f8ab6146b6ab36805b1b210d910",
       "transform": "Fictional authored fixture only"
     },
     "index.html": {
@@ -89,5 +89,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "9b22c55990041211b304d89a04213a0e935af5a76735a8122c8e624618983572"
+  "shellHash": "876d280abac2fa85c43d663861098690f00fe1f7edbffe00a32dce28470eb75f"
 }

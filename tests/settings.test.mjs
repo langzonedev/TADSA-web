@@ -8,7 +8,7 @@ test('device settings retain old project prices and capture new rates immediatel
  const before=call('projects/project-1/work-plan');assert.equal(before.labourRateCents,5000);
  const payload={requestId:crypto.randomUUID(),version:1,labourRateCents:6550};
  const updated=call('settings','PUT',payload);assert.equal(updated.version,2);assert.equal(updated.audit.length,1);assert.deepEqual(call('settings','PUT',payload),updated);
- const project=call('projects','POST',{requestId:crypto.randomUUID(),clientId:'client-1',primaryRecordId:null,title:'Synthetic rate snapshot',summary:'Rate verification',kind:'Technical',requiredSkills:[],technicianId:null,fundingStatus:'unknown',payerId:null,fundingNotes:''});
+ const project=call('projects','POST',{requestId:crypto.randomUUID(),clientId:'client-1',title:'Synthetic rate snapshot',summary:'Rate verification',kind:'Technical',requiredSkills:[],technicianId:null,fundingStatus:'unknown',payerId:null,fundingNotes:''});
  call('settings','PUT',{requestId:crypto.randomUUID(),version:2,labourRateCents:7000});
  assert.equal(call(`projects/${project.id}/work-plan`).labourRateCents,6550);assert.equal(call('projects/project-1/work-plan').labourRateCents,5000);
  assert.throws(()=>call('settings','PUT',{requestId:crypto.randomUUID(),version:1,labourRateCents:6000}),e=>e.status===409);

@@ -89,3 +89,5 @@ html[data-auth-state=locked] :is(.app-shell,.mobile-navigation,.navigation-backd
 html[data-local-file=true] #auth-gate{display:none!important}
 
 .auth-left>#auth-open[aria-expanded=true]{background:transparent;border-color:#74859e;color:#e0e8f5;font-weight:400;min-height:40px;align-self:flex-start;width:auto;padding:8px 16px}
+
+.project-link-description{display:block;color:var(--muted);font-size:14px;font-weight:400;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}.project-link>span:first-child{min-width:0}.project-link .badge{flex-shrink:0}

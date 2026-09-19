@@ -39,3 +39,7 @@ See PARITY.md. Production identity/permissions, cross-device sync, official invo
 ## Demo profiles
 
 The username and password fields are prefilled with `demo-admin` / `TadsaDemo2026!`; click **Login** to explore. No credentials need to be shared. Open **Accounts** to create additional named demo profiles, independent of client or professional records. New notes and audit entries show the selected profile. Demo profiles are not secure authentication: the default administrator credentials are public. Created demo accounts can sign back in with their own demo-only passwords. Never enter real personal information or reuse real passwords. Profiles and operational data stay on that device; changing devices does not synchronise them.
+
+## Client projects
+
+Each issue is a separate project directly linked to its client, with its own number, description and status. Client profiles show a summary of each project. Primary-request grouping is removed from the workflow. Saved projects and older backups upgrade in place; legacy request information is retained internally for recovery compatibility.

@@ -25,8 +25,7 @@ export function seed() {
     ['Desk positioning review','client-6','open','Assessment','2026-10-05','Discuss and assess a comfortable arrangement for everyday desk activities.',false,false,'person-13'],
     ['Craft material organiser','client-8','closed','Technical','2026-09-10','An accessible arrangement for storing and selecting small craft materials.',true,false,'person-12']
   ];
-  const primaryRecords = definitions.map((d,i) => ({id:'case-'+(i+1),reference:'PR-'+(2601+i),clientId:d[1],summary:d[5]}));
-  const projects = definitions.map((d,i) => ({id:'project-'+(i+1),reference:'2026-'+(181+i),primaryRecordId:'case-'+(i+1),title:d[0],status:d[2],kind:d[3],dueDate:d[4],openedAt:'2026-09-'+String(1+i).padStart(2,'0'),summary:d[5],feedbackRequired:d[6],invoiceRequired:d[7],version:1}));
+  const projects = definitions.map((d,i) => ({id:'project-'+(i+1),reference:'2026-'+(181+i),clientId:d[1],title:d[0],status:d[2],kind:d[3],dueDate:d[4],openedAt:'2026-09-'+String(1+i).padStart(2,'0'),summary:d[5],feedbackRequired:d[6],invoiceRequired:d[7],version:1}));
   const relationships = definitions.map((d,i) => ({projectId:'project-'+(i+1),type:'person',id:d[8],role:'Technician'}));
   relationships.push(
     {projectId:'project-1',type:'person',id:'person-4',role:'Carer'},
@@ -37,7 +36,7 @@ export function seed() {
     {projectId:'project-7',type:'person',id:'person-14',role:'Carer'},
     {projectId:'project-9',type:'organisation',id:'org-3',role:'Funder'}
   );
-  return {people,clients,primaryRecords,projects,relationships,audit:[],organisations:[
+  return {people,clients,projects,relationships,audit:[],organisations:[
     {id:'org-1',name:'Westhaven Community Foundation',role:'Funder',description:'Community support for individually adapted equipment.'},
     {id:'org-2',name:'Harbour Allied Health',role:'Allied-health organisation',description:'Assessment and allied-health referral coordination.'},
     {id:'org-3',name:'Southern Access Network',role:'Funder',description:'Support for practical accessibility projects.'}
