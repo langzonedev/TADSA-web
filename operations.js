@@ -27,7 +27,7 @@ export async function renderOperations(view,route,id){
   const [p,ops,people,orgs,approvers,business,clients]=await Promise.all([api('projects/'+id),api(`projects/${id}/operations`),api('people'),api('organisations'),api('approvers'),api('business-settings'),api('clients')]);
   const lifecycle=await api(`projects/${id}/lifecycle`);
   ops.invoices=ops.invoices.map(i=>({...i,...i.snapshot}));
-  view.append(link('← Back to project','project/'+id),node('h1',route==='documents'?'Project documents':'Case workspace'),node('p',p.title,'subtitle'));
+  view.append(link(lifecycle.managed?'← Return to current step':'← Back to project','project/'+id),node('h1',route==='documents'?'Project documents':'Case workspace'),node('p',p.title,'subtitle'));
   if(route==='documents'){renderDocuments(view,p,ops,lifecycle);return true;}
   const sections=node('nav',null,'actions');sections.setAttribute('aria-label','Case workspace sections');for(const[label,heading]of [['Hours & holds','Hours, funding and holds'],['Case notes','Case notes'],...(lifecycle.managed||p.kind!=='Assessment'?[['Draft invoices','Draft invoices']]:[])])sections.append(button(label,()=>{const target=[...view.querySelectorAll('h2')].find(h=>h.textContent===heading);if(target){target.tabIndex=-1;target.scrollIntoView({block:'start'});target.focus({preventScroll:true});}}));view.append(sections);
  const key='case/'+id,d=drafts.get(key)??{...ops,requestId:crypto.randomUUID(),fundingContributors:ops.fundingContributors.map(c=>({...c,amount:money(c.amountCents)}))};

@@ -14,7 +14,7 @@ Offline operation starts after the first successful online load and service-work
 
 ## Guided project workflow — 0.11
 
-The 0.11.1 operator pass brings project navigation above the workflow, contextual file upload, current-stage-first forms, clearer billing prerequisites and deliberate copying of accepted quote items into an invoice draft. Finance packs contain readable decisions, invoice lines and receipt evidence. Finalised actual costs remain available in project history. These improvements share the main application's UI; the demo's records still stay on your device.
+Projects now open at **Current step**, showing only the current gate's required form and guidance. Assessment files stay within the project, with **Return to current step** preserving unfinished findings. Notes, saved records and exceptional actions have separate tabs; the latest note remains visible at the current step. Finance packs appear only at the relevant Finance stages, and actual costs are saved before final Finance confirmation. Mobile rows open projects directly without the desktop selection stripe. These improvements share the main application's UI; the demo's records still stay on your device.
 
 New projects keep one number from assessment through technical work. Versioned quotes, technical peer review, client acceptance and recorded external Finance clearance guide progression. Customer sign-off, the technician's actual cost return and Finance finalisation precede closure. Revisions pause work and require renewed approvals; cancellation preserves costs and history. Existing projects can explicitly adopt this workflow without automatically merging old assessment and technical records.
 

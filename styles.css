@@ -111,3 +111,8 @@ html[data-local-file=true] #auth-gate{display:none!important}
 .phone-notes[hidden]{display:none!important}
 
 .compact-care-summary>.button,.compact-care-summary>a{display:inline-flex;margin:8px 12px 0 0}
+
+/* A phone opens the record directly; selection belongs to the desktop preview. */
+@media(max-width:800px){tbody tr.selected{background:transparent}tbody tr.selected td:first-child{box-shadow:none}.record-tabs{flex-wrap:wrap}.record-tabs button{flex:1 1 auto}}
+.current-step-pane .lifecycle-panel{max-width:900px;margin-inline:auto}
+.project-care-pane > button:first-child{margin-bottom:1rem}

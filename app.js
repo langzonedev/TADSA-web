@@ -111,8 +111,8 @@ async function register(view, kind) {
     columns.forEach((label, i) => { const th = el('th', label); th.scope = 'col'; if ((kind === 'projects' && i === 3)) th.className = 'optional-col'; tr.append(th); }); thead.append(tr); table.append(thead);
     const tbody = el('tbody');
     for (const item of visible) {
-      const row = el('tr'); row.dataset.id = item.id; row.classList.toggle('selected', item.id === state.selected);
-      const first = el('td'); const control = button('', () => choose(item), 'row-open'); control.setAttribute('aria-label', `Preview ${nameOf(item)}`); control.setAttribute('aria-pressed', String(item.id === state.selected));
+      const row = el('tr'); row.dataset.id = item.id; row.classList.toggle('selected', !matchMedia('(max-width:800px)').matches && item.id === state.selected);
+      const first = el('td'); const control = button('', () => choose(item), 'row-open'); control.setAttribute('aria-label', `${matchMedia('(max-width:800px)').matches?'Open':'Preview'} ${nameOf(item)}`); if(!matchMedia('(max-width:800px)').matches)control.setAttribute('aria-pressed', String(item.id === state.selected));
       const text = el('span'); text.append(el('span', nameOf(item), 'row-title'), el('span', kind === 'projects' ? `${item.reference}` : kind === 'clients' ? item.person.email : kind === 'people' ? item.email : item.description, 'row-sub'));
       if (kind === 'clients' || kind === 'people') { const identity = el('span', undefined, 'name-cell'); identity.append(avatar(nameOf(item)), text); control.append(identity); } else control.append(text); first.append(control); row.append(first);
       if (kind === 'projects') { row.append(el('td', item.clientName)); const s = el('td'); s.append(status(item.status)); row.append(s, el('td', date(item.dueDate), 'optional-col')); }
@@ -152,25 +152,41 @@ function auditPanel(p) {
   return box;
 }
 async function project(view, id) {
-  let p = await api(`projects/${id}`); let tab = projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
-  view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
+  let p = await api(`projects/${id}`); let tab = projectTabs.get(id)??'Current step'; let editMode = drafts.has(id); let success = '';
+  view.append(link('← All projects', 'projects', 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); const header = recordHeader(view, p.reference, p.title, meta); const tabs = el('div', undefined, 'record-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Project detail'); const content = el('div'); view.append(tabs, content);
-  const headerActions=el('div',undefined,'actions record-header-actions');headerActions.append(link('Hours, invoices & holds','operations/'+id,'button secondary'),link('Print documents','documents/'+id,'button secondary'));header.append(headerActions);
+  const headerActions=el('div',undefined,'actions record-header-actions');header.append(headerActions);
   function foldPanel(box,label){const section=el('details',undefined,'care-details overview-section'),key=id+'/'+label;section.append(el('summary',label));box.querySelector('h2')?.remove();section.append(box);section.open=projectSections.get(key)??!matchMedia('(max-width:800px)').matches;section.addEventListener('toggle',()=>{projectSections.set(key,section.open);if(section.open&&matchMedia('(max-width:800px)').matches)for(const other of view.querySelectorAll('.overview-section'))if(other!==section)other.open=false;});return section;}
-  const phoneNotes=el('div',undefined,'phone-notes');view.insertBefore(phoneNotes,content);renderNotes(phoneNotes,id,await api(`projects/${id}/operations`),true);
-  const lifecycle=await renderLifecycle(phoneNotes,p,{openFiles:()=>{tab='Details & files';draw();const files=care.querySelector('.project-files');if(files){files.open=true;files.scrollIntoView({block:'start',behavior:'auto'});files.querySelector('summary')?.focus();}}});
-  const care=el('div',undefined,'project-care-pane');care.hidden=true;care.id='project-care-content';view.append(care);await renderProjectCare(care,id,phoneNotes);
+  const phoneNotes=el('div',undefined,'current-step-pane'),notesPane=el('div'),recordPane=el('div'),actionsPane=el('div');
+  view.insertBefore(phoneNotes,content);view.append(notesPane,recordPane,actionsPane);recordPane.append(content);
+  const projectOperations=await api(`projects/${id}/operations`);renderNotes(notesPane,id,projectOperations);
+  const latestNote=projectOperations.notes[0];if(latestNote){const handover=el('aside',undefined,'panel latest-project-note');handover.append(el('strong','Latest case note'),el('p',latestNote.text),button('View or add case notes',()=>{tab='Case notes';draw();notesPane.querySelector('textarea')?.focus();},'secondary'));phoneNotes.append(handover);}
+  const goStep=()=>{tab='Current step';draw();tabs.querySelector('[aria-selected=true]')?.focus();};
+  const care=el('div',undefined,'project-care-pane');care.hidden=true;care.id='project-care-content';view.append(care);
+  const lifecycle=await renderLifecycle(phoneNotes,p,{recordTarget:recordPane,actionsTarget:actionsPane,openFiles:()=>{tab='Step files';draw();care.querySelector('.project-files input')?.focus();}});
+  await renderProjectCare(care,id);
+  const returnToStep=button('← Return to current step',goStep,'secondary');care.prepend(returnToStep);
+  for(const pane of [notesPane,recordPane,actionsPane])pane.prepend(button('← Return to current step',goStep,'secondary'));
+  actionsPane.append(link('Hours, invoices & holds','operations/'+id,'button secondary'),link('Print documents','documents/'+id,'button secondary'));
+  view.addEventListener('click',event=>{const target=event.target.closest('a[href]');if(target&&/^#(?:operations|coordination|documents|person)\//.test(target.getAttribute('href')))projectTabs.set(id,'Current step');});
   function draw() {
     projectTabs.set(id,tab);
     header.querySelector('h1').textContent = p.title; header.querySelector('button')?.remove(); meta.replaceChildren(status(p.status), link(p.clientName, `client/${p.clientId}`), el('span', lifecycle.managed ? 'Guided project' : p.kind || 'Project'));
-    if (!editMode) headerActions.append(button('Edit project', () => { editMode = true; tab = 'Overview'; draw(); content.querySelector('input')?.focus(); }, 'secondary'));
+    if (!editMode && tab==='Project record') headerActions.append(button('Edit project', () => { editMode = true; tab = 'Project record'; draw(); content.querySelector('input')?.focus(); }, 'secondary'));
     tabs.replaceChildren();
-    const tabNames=['Overview','Details & files','Activity'];
-    for (const name of tabNames) { const b = button(name, () => { tab = name; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); }, ''); b.setAttribute('role', 'tab'); b.tabIndex = tab === name ? 0 : -1; b.setAttribute('aria-selected', String(tab === name)); b.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); tab = event.key === 'Home' ? tabNames[0] : event.key === 'End' ? tabNames.at(-1) : tabNames[(tabNames.indexOf(tab)+(event.key==='ArrowRight'?1:tabNames.length-1))%tabNames.length]; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); } }); b.id = `tab-${name.toLowerCase().replaceAll(' ','-')}`; b.setAttribute('aria-controls', name==='Details & files'?'project-care-content':'project-tab-content'); tabs.append(b); }
-    content.id = 'project-tab-content'; content.setAttribute('role', 'tabpanel'); content.setAttribute('aria-labelledby', `tab-${tab.toLowerCase().replaceAll(' ','-')}`); content.replaceChildren();
-    phoneNotes.hidden=tab!=='Overview';care.hidden=tab!=='Details & files';content.hidden=tab==='Details & files';care.setAttribute('role','tabpanel');care.setAttribute('aria-labelledby','tab-details-&-files');if(tab==='Details & files')return;
+    const tabNames=['Current step','Case notes','Details & files','Project record','Project actions'];
+    for (const name of tabNames) { const b = button(name, () => { tab = name; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); }, ''); b.setAttribute('role', 'tab'); b.tabIndex = (tab === name || (tab==='Step files'&&name==='Current step')) ? 0 : -1; b.setAttribute('aria-selected', String(tab === name || (tab==='Step files'&&name==='Current step'))); b.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); tab = event.key === 'Home' ? tabNames[0] : event.key === 'End' ? tabNames.at(-1) : tabNames[(tabNames.indexOf(tab==='Step files'?'Current step':tab)+(event.key==='ArrowRight'?1:tabNames.length-1))%tabNames.length]; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); } }); b.id = `tab-${name.toLowerCase().replaceAll(' ','-')}`; b.setAttribute('aria-controls', name==='Details & files'?'project-care-content':'project-tab-content'); tabs.append(b); }
+    content.id = 'project-tab-content'; content.removeAttribute('role'); content.removeAttribute('aria-labelledby'); content.replaceChildren();
+    phoneNotes.hidden=tab!=='Current step';notesPane.hidden=tab!=='Case notes';recordPane.hidden=tab!=='Project record';actionsPane.hidden=tab!=='Project actions';
+    care.hidden=!['Details & files','Step files'].includes(tab);content.hidden=tab!=='Project record';
+    for(const child of care.children)child.hidden=tab==='Step files'&&child!==returnToStep&&!child.classList.contains('project-files');
+    const files=care.querySelector('.project-files');if(tab==='Step files'&&files)files.open=true;
+    care.setAttribute('role','tabpanel');care.setAttribute('aria-labelledby',tab==='Step files'?'tab-current-step':'tab-details-&-files');
+    for(const [pane,name] of [[phoneNotes,'current-step'],[notesPane,'case-notes'],[recordPane,'project-record'],[actionsPane,'project-actions']]){pane.setAttribute('role','tabpanel');pane.setAttribute('aria-labelledby','tab-'+name);pane.id='project-'+name;}
+    for(const control of tabs.children){const name=control.textContent;control.setAttribute('aria-controls',name==='Details & files'||(name==='Current step'&&tab==='Step files')?'project-care-content':'project-'+name.toLowerCase().replaceAll(' ','-'));}
+    if(tab!=='Project record')return;
     if (success) content.append(message(success));
-    if (tab === 'Activity') { content.append(auditPanel(p)); return; }
+    content.append(auditPanel(p));
     const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const box = panel(editMode ? 'Edit project' : 'Project details');
     if (editMode) editForm(box); else { box.append(el('p', p.summary, 'record-summary'), details([['Target date', date(p.dueDate)], ['Opened', date(p.openedAt)], ['Workflow', lifecycle.managed ? 'Assessment through delivery' : p.kind], ['Feedback', p.feedbackRequired ? 'Required' : 'Not required'], ['Invoice', p.invoiceRequired ? 'Required' : 'Not required']])); if (!lifecycle.managed && p.kind === 'Assessment') box.append(el('p', 'An assessment request does not authorise making equipment.', 'muted')); }
     left.append(editMode?box:foldPanel(box,'Project details'));
@@ -256,7 +272,8 @@ document.querySelector('.skip').addEventListener('click', event => { event.preve
 window.addEventListener('keydown', event => { if (document.documentElement.dataset.authState==='ready' && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if(drawerOpen)setDrawer(false,false);globalInput.focus(); globalInput.select(); } });
 window.addEventListener('hashchange', event => { if (saving) { history.replaceState(null, '', new URL(event.oldURL).hash || '#projects'); announce('Your changes are saving. Please wait before leaving this record.'); const pending = main.querySelector('.message'); if (pending) pending.textContent = 'Your changes are saving. Please wait before leaving this record.'; return; } render(); });
 window.addEventListener('beforeunload', event => { if(sessionEnded||workspaceRestored)return; if (drafts.size || workflowHasDrafts() || operationsHaveDrafts() || careHasDrafts() || clientDetailsHasDrafts() || saving) { event.preventDefault(); event.returnValue = ''; } });
-render();// The desktop rail becomes a focus-contained navigation drawer on small screens.
+render();
+// The desktop rail becomes a focus-contained navigation drawer on small screens.
 const drawer=document.querySelector('#workspace-navigation'),drawerToggle=document.querySelector('#navigation-toggle'),drawerClose=document.querySelector('#navigation-close'),backdrop=document.querySelector('#navigation-backdrop'),mobileMedia=matchMedia('(max-width:800px)');
 let drawerOpen=false;
 function setDrawer(open,restoreFocus=true){drawerOpen=open&&mobileMedia.matches;document.body.classList.toggle('drawer-open',drawerOpen);drawerToggle.setAttribute('aria-expanded',String(drawerOpen));drawer.inert=mobileMedia.matches&&!drawerOpen;backdrop.hidden=!drawerOpen;document.querySelector('.workspace').inert=drawerOpen;document.querySelector('.mobile-navigation').inert=drawerOpen;if(drawerOpen){drawer.setAttribute('role','dialog');drawer.setAttribute('aria-modal','true');drawer.setAttribute('aria-label','Workspace navigation');drawerClose.focus();}else{drawer.removeAttribute('role');drawer.removeAttribute('aria-modal');drawer.removeAttribute('aria-label');if(restoreFocus&&mobileMedia.matches)drawerToggle.focus();}}
