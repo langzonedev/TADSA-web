@@ -105,3 +105,9 @@ html[data-local-file=true] #auth-gate{display:none!important}
 .quote-summary dd { margin:0; }
 .quote-summary dt,.quote-summary dd { overflow-wrap:anywhere; }
 @media(max-width:600px){.quote-line{grid-template-columns:1fr}.quote-summary{grid-template-columns:1fr}.quote-summary dd{margin-bottom:.5rem}.lifecycle-panel{padding:1rem}.lifecycle-progress{gap:.3rem}.lifecycle-progress li{font-size:.8rem}}
+
+/* Keep project navigation ahead of the workflow and avoid an empty desktop column. */
+.phone-notes{grid-template-columns:minmax(0,1fr)}
+.phone-notes[hidden]{display:none!important}
+
+.compact-care-summary>.button,.compact-care-summary>a{display:inline-flex;margin:8px 12px 0 0}

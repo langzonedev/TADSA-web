@@ -113,6 +113,7 @@ function coordinationFields(form, d, directories) {
     }
     if (!visible.length) technicians.append(note('No technicians match every selected skill. Save unassigned, or show other technicians to review their skills.'));
     const selected = directories.technicians.find(t => t.id === d.technicianId);
+    if(selected)technicians.append(link('View '+selected.name+' — qualifications & clearances','person/'+selected.id));
     d.needsAcknowledgement = Boolean(selected && (selected.availability !== 'available' || !d.requiredSkills.every(s => selected.skills.includes(s))||!locationMatches(selected)));
     if (d.needsAcknowledgement) { technicians.append(note('Check this allocation: the recorded skills, availability or location need a conversation. This is not an eligibility or safety assessment.')); check(technicians, 'I have reviewed the skill / availability / location warning', d.assignmentAcknowledged ?? false, on => { d.assignmentAcknowledged = on; touch(d); }); }
   }

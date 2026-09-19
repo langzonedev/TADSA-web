@@ -155,10 +155,10 @@ async function project(view, id) {
   let p = await api(`projects/${id}`); let tab = projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
   view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); const header = recordHeader(view, p.reference, p.title, meta); const tabs = el('div', undefined, 'record-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Project detail'); const content = el('div'); view.append(tabs, content);
-  const headerActions=el('div',undefined,'actions record-header-actions');headerActions.append(link('Documents & invoices','documents/'+id,'button secondary'));header.append(headerActions);
+  const headerActions=el('div',undefined,'actions record-header-actions');headerActions.append(link('Hours, invoices & holds','operations/'+id,'button secondary'),link('Print documents','documents/'+id,'button secondary'));header.append(headerActions);
   function foldPanel(box,label){const section=el('details',undefined,'care-details overview-section'),key=id+'/'+label;section.append(el('summary',label));box.querySelector('h2')?.remove();section.append(box);section.open=projectSections.get(key)??!matchMedia('(max-width:800px)').matches;section.addEventListener('toggle',()=>{projectSections.set(key,section.open);if(section.open&&matchMedia('(max-width:800px)').matches)for(const other of view.querySelectorAll('.overview-section'))if(other!==section)other.open=false;});return section;}
-  const phoneNotes=el('div',undefined,'phone-notes');view.insertBefore(phoneNotes,tabs);renderNotes(phoneNotes,id,await api(`projects/${id}/operations`),true);
-  const lifecycle=await renderLifecycle(phoneNotes,p);
+  const phoneNotes=el('div',undefined,'phone-notes');view.insertBefore(phoneNotes,content);renderNotes(phoneNotes,id,await api(`projects/${id}/operations`),true);
+  const lifecycle=await renderLifecycle(phoneNotes,p,{openFiles:()=>{tab='Details & files';draw();const files=care.querySelector('.project-files');if(files){files.open=true;files.scrollIntoView({block:'start',behavior:'auto'});files.querySelector('summary')?.focus();}}});
   const care=el('div',undefined,'project-care-pane');care.hidden=true;care.id='project-care-content';view.append(care);await renderProjectCare(care,id,phoneNotes);
   function draw() {
     projectTabs.set(id,tab);
@@ -168,7 +168,7 @@ async function project(view, id) {
     const tabNames=['Overview','Details & files','Activity'];
     for (const name of tabNames) { const b = button(name, () => { tab = name; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); }, ''); b.setAttribute('role', 'tab'); b.tabIndex = tab === name ? 0 : -1; b.setAttribute('aria-selected', String(tab === name)); b.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); tab = event.key === 'Home' ? tabNames[0] : event.key === 'End' ? tabNames.at(-1) : tabNames[(tabNames.indexOf(tab)+(event.key==='ArrowRight'?1:tabNames.length-1))%tabNames.length]; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); } }); b.id = `tab-${name.toLowerCase().replaceAll(' ','-')}`; b.setAttribute('aria-controls', name==='Details & files'?'project-care-content':'project-tab-content'); tabs.append(b); }
     content.id = 'project-tab-content'; content.setAttribute('role', 'tabpanel'); content.setAttribute('aria-labelledby', `tab-${tab.toLowerCase().replaceAll(' ','-')}`); content.replaceChildren();
-    care.hidden=tab!=='Details & files';content.hidden=tab==='Details & files';care.setAttribute('role','tabpanel');care.setAttribute('aria-labelledby','tab-details-&-files');if(tab==='Details & files')return;
+    phoneNotes.hidden=tab!=='Overview';care.hidden=tab!=='Details & files';content.hidden=tab==='Details & files';care.setAttribute('role','tabpanel');care.setAttribute('aria-labelledby','tab-details-&-files');if(tab==='Details & files')return;
     if (success) content.append(message(success));
     if (tab === 'Activity') { content.append(auditPanel(p)); return; }
     const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const box = panel(editMode ? 'Edit project' : 'Project details');
@@ -199,7 +199,7 @@ async function project(view, id) {
           try { const latest = await api(`projects/${id}`); const comparison = panel('Latest saved version'); comparison.append(details([['Project title', latest.title], ['Status', cap(latest.status)], ['Feedback', displayValue(latest.feedbackRequired)], ['Invoice', displayValue(latest.invoiceRequired)]]), el('p', 'Your draft above has not changed. Compare each value before continuing.', 'muted')); comparison.append(button('Keep my draft against this version', () => { draft.version = latest.version; drafts.set(id, read()); comparison.replaceWith(message('Latest version acknowledged. Review your draft, then save to apply it.')); compareButton.remove(); }, 'secondary')); notice.append(comparison); }
           catch { notice.append(message('Could not load the latest version. Your draft is retained.', true)); compareButton.disabled = false; }
         }, 'secondary'));
-      } finally { saving = false; save.disabled = false; cancel.disabled = false; input.disabled = false; select.disabled = false; Object.values(checks).forEach(c => c.disabled = false); tabs.querySelectorAll('button').forEach(b => b.disabled = false); save.textContent = 'Save changes'; }
+      } finally { saving = false; save.disabled = false; cancel.disabled = false; input.disabled = false; select.disabled = Boolean(lifecycle.managed); Object.values(checks).forEach(c => c.disabled = false); tabs.querySelectorAll('button').forEach(b => b.disabled = false); save.textContent = 'Save changes'; }
     });
   }
   draw();

@@ -14,6 +14,8 @@ Offline operation starts after the first successful online load and service-work
 
 ## Guided project workflow — 0.11
 
+The 0.11.1 operator pass brings project navigation above the workflow, contextual file upload, current-stage-first forms, clearer billing prerequisites and deliberate copying of accepted quote items into an invoice draft. Finance packs contain readable decisions, invoice lines and receipt evidence. Finalised actual costs remain available in project history. These improvements share the main application's UI; the demo's records still stay on your device.
+
 New projects keep one number from assessment through technical work. Versioned quotes, technical peer review, client acceptance and recorded external Finance clearance guide progression. Customer sign-off, the technician's actual cost return and Finance finalisation precede closure. Revisions pause work and require renewed approvals; cancellation preserves costs and history. Existing projects can explicitly adopt this workflow without automatically merging old assessment and technical records.
 
 NDIS is an external client reference, not an internal approval gate. Technician profiles include qualifications, safety training and clearances. Download a printable client quote or a Finance ZIP containing the summary and project files. Email drafts require the operator to select the sender and attach the pack manually; the app sends nothing. All records remain synthetic and device-local.
