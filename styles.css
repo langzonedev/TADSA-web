@@ -91,3 +91,17 @@ html[data-local-file=true] #auth-gate{display:none!important}
 .auth-left>#auth-open[aria-expanded=true]{background:transparent;border-color:#74859e;color:#e0e8f5;font-weight:400;min-height:40px;align-self:flex-start;width:auto;padding:8px 16px}
 
 .project-link-description{display:block;color:var(--muted);font-size:14px;font-weight:400;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}.project-link>span:first-child{min-width:0}.project-link .badge{flex-shrink:0}
+.lifecycle-panel { margin-block: 1rem; }
+.lifecycle-progress { display:flex; flex-wrap:wrap; gap:.4rem; padding:0; list-style:none; }
+.lifecycle-progress li { padding:.35rem .6rem; border:1px solid var(--border,#cbd3df); border-radius:.5rem; font-size:.85rem; }
+.lifecycle-progress li[aria-current="step"] { background:#97c64b; color:#14213a; font-weight:700; border-color:#97c64b; }
+.lifecycle-section { margin-block:.7rem; }
+.lifecycle-section > .workflow-panel { border:0; box-shadow:none; margin:0; }
+.lifecycle-section .form-grid,.credential-row { min-width:0; }
+.lifecycle-quote-lines,.quote-line { min-width:0; width:100%; }
+.quote-line { display:grid; gap:.8rem; grid-template-columns:repeat(2,minmax(0,1fr)); margin-bottom:1rem; }
+.quote-line legend { font-weight:700; }
+.quote-summary { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.5rem 1rem; }
+.quote-summary dd { margin:0; }
+.quote-summary dt,.quote-summary dd { overflow-wrap:anywhere; }
+@media(max-width:600px){.quote-line{grid-template-columns:1fr}.quote-summary{grid-template-columns:1fr}.quote-summary dd{margin-bottom:.5rem}.lifecycle-panel{padding:1rem}.lifecycle-progress{gap:.3rem}.lifecycle-progress li{font-size:.8rem}}

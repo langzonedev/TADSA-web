@@ -129,7 +129,7 @@ async function newProject(view, clientId) {
   const [clients, dirs] = await Promise.all([request('clients'),directories()]);
   if (clientId && !d.clientId) { d.clientId = clientId; d.step = 2; }
   let selected = clients.items.find(c => c.id === d.clientId);
-  title(view, 'New project', 'Record the call in four short steps. You can leave funding and allocation for later.');
+  title(view, 'New project', 'Record an email enquiry or phone call. A project number is assigned automatically; assessment and technical work stay in this project.');
   const steps = el('ol', null, 'workflow-steps'); for (const [i,label] of ['Client','Project details','Funding & technician','Review'].entries()) { const n = el('li', `${i+1}. ${label}`); if (i+1 === d.step) n.setAttribute('aria-current','step'); steps.append(n); } view.append(steps);
   const slot = el('div'); view.append(slot);
   function draw() {
@@ -147,12 +147,12 @@ async function newProject(view, clientId) {
       form.append(note(`Client: ${selected?.person.name ?? 'Choose a client first'}`));
       field(form,'Project title',d,'title',{required:true,help:'A short description the client and team will recognise.'});
       field(form,'What does the client need?',d,'summary',{type:'textarea',required:true,max:2000,help:'Describe the goal in the client’s words. Avoid unnecessary sensitive information.'});
-      selectField(form,'Project type',d,'kind',[['Assessment','Assessment — understand the need first'],['Technical','Technical — making or modifying equipment']]);
-      form.append(el('p','Creating a project does not authorise fabrication, spending or release. An assessment is separate from making equipment.','field-help'));
+      form.append(el('p','Assessment, quote acceptance and technical work will be recorded as stages of this project.','field-help'));
+      form.append(el('p','Creating a project does not authorise work or spending. Progress through the project’s assessment, acceptance and Finance checks first.','field-help'));
     } else if (d.step === 3) {form.append(note('Client work location: '+(selected?.details?.workAddress||selected?.details?.residentialAddress||'Not recorded. Open the client record to add an address.')));coordinationFields(form,d,dirs);}
     else {
       const payer = d.fundingStatus==='unknown' ? 'Not known yet — follow up' : d.fundingStatus==='self' ? `Client: ${selected?.person.name}` : (d.fundingStatus==='organisation'?dirs.organisations:dirs.people).find(p=>p.id===d.payerId)?.name;
-      form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Type',d.kind],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technician',dirs.technicians.find(t=>t.id===d.technicianId)?.name||'Not assigned yet']]));
+      form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technician',dirs.technicians.find(t=>t.id===d.technicianId)?.name||'Not assigned yet']]));
       form.append(note('Check the client and project details before saving. No emails, work instructions or invoices will be sent.'));
     }
     const actions=el('div',null,'actions');const next=saveButton(d.step===4?'Create project':'Continue');

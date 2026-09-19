@@ -1,0 +1,10 @@
+import {node,field,editor,request,action} from './project-care.js';
+export async function renderCredentials(parent,id){
+ const current=await request(`people/${id}/credentials`),section=node('details',null,'care-details');section.append(node('summary','Qualifications, safety training and clearances'),node('p','Record relevant credentials and expiry dates. These entries are not an independent verification or a project-specific safety assessment. Do not enter passwords or identity-document numbers.','field-help'));parent.append(section);
+ editor(section,'credentials/'+id,{...current,qualifications:structuredClone(current.qualifications),safetyTraining:structuredClone(current.safetyTraining),clearances:structuredClone(current.clearances)},null,(f,d)=>{
+  for(const [key,label]of [['qualifications','Qualifications'],['safetyTraining','Safety training'],['clearances','Clearances']]){
+   const group=node('fieldset');group.append(node('legend',label));const rows=node('div');group.append(rows);const draw=()=>{rows.replaceChildren();d[key].forEach((row,i)=>{const box=node('div',null,'panel credential-row');field(box,`${label} ${i+1} title`,row,'title').required=true;field(box,`${label} ${i+1} issuer`,row,'issuer');field(box,`${label} ${i+1} expiry`,row,'expiresOn','date');if(row.expiresOn&&row.expiresOn<new Intl.DateTimeFormat('en-CA').format(new Date()))box.append(node('p','Expired — review suitability before assigning work.','message warning'));box.append(action('Remove '+label.toLowerCase()+' '+(i+1),()=>{d[key].splice(i,1);draw();f.dispatchEvent(new Event('input',{bubbles:true}));}));rows.append(box);});};draw();group.append(action('Add '+label.toLowerCase(),()=>{if(d[key].length>=20)return;d[key].push({title:'',issuer:'',expiresOn:''});draw();f.dispatchEvent(new Event('input',{bubbles:true}));}));f.append(group);
+  }
+  field(f,'Qualification notes',d,'notes','textarea').maxLength=1000;
+ },`people/${id}/credentials`,'PUT',d=>Object.fromEntries(['requestId','version','qualifications','safetyTraining','clearances','notes'].map(k=>[k,d[k]])));
+}

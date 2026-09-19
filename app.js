@@ -4,6 +4,8 @@ import {renderSettings,configureSettings} from './settings.js';
 import {requireLocalSession,sessionEnded,showAuthFailure} from './local-login.js';
 import {configureOperations,renderOperations,operationsHaveDrafts,renderNotes} from './operations.js';
 import {configureCare,careHasDrafts,renderProjectCare} from './project-care.js';
+import {renderLifecycle} from './project-lifecycle.js';
+import {renderCredentials} from './technician-credentials.js';
 import {renderAvailability} from './availability.js';
 import {renderClientDetails,clientDetailsSummary,clientDetailsHasDrafts} from './client-details.js';
 import { configureWorkflows, renderWorkflow, workflowHasDrafts, addClientContactActions } from './workflows.js';
@@ -56,7 +58,7 @@ function relationships(rows) {
 function projectLinks(projects) {
   const box = panel('Linked projects'); if (!projects.length) box.append(el('p', 'No linked projects recorded.', 'muted'));
   const list = el('div', undefined, 'project-links');
-  for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference} · ${p.kind || 'Project'}`));const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, status(p.status)); list.append(a); }
+  for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference}`));const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, status(p.status)); list.append(a); }
   box.append(list); return box;
 }
 function inspect(item, kind, slot) {
@@ -65,7 +67,7 @@ function inspect(item, kind, slot) {
   if (!item) { body.append(empty('Select a record', 'Choose a row to see its details here.')); slot.append(body); return; }
   if (kind === 'projects') {
     body.append(el('span', item.reference, 'inspector-reference'), el('h2', item.title), status(item.status), el('p', item.summary));
-    const context = el('div', undefined, 'inspector-section'); context.append(el('h3', 'Project details'), details([['Client', link(item.clientName, `client/${item.clientId}`)], ['Type', item.kind], ['Target date', date(item.dueDate)]])); body.append(context);
+    const context = el('div', undefined, 'inspector-section'); context.append(el('h3', 'Project details'), details([['Client', link(item.clientName, `client/${item.clientId}`)], ['Target date', date(item.dueDate)]])); body.append(context);
     const people = el('div', undefined, 'inspector-section'); people.append(el('h3', 'Working together'));
     for (const r of [...item.relationships].sort((a, b) => Number(b.role === 'Technician') - Number(a.role === 'Technician'))) { const a = link('', `${r.type}/${r.id}`, 'person-line'); const text = el('span'); text.append(el('strong', r.name), el('small', r.role)); a.append(avatar(r.name), text); people.append(a); }
     if (!item.relationships.length) people.append(el('p', 'No assignments recorded.'));
@@ -111,7 +113,7 @@ async function register(view, kind) {
     for (const item of visible) {
       const row = el('tr'); row.dataset.id = item.id; row.classList.toggle('selected', item.id === state.selected);
       const first = el('td'); const control = button('', () => choose(item), 'row-open'); control.setAttribute('aria-label', `Preview ${nameOf(item)}`); control.setAttribute('aria-pressed', String(item.id === state.selected));
-      const text = el('span'); text.append(el('span', nameOf(item), 'row-title'), el('span', kind === 'projects' ? `${item.reference} · ${item.kind || 'Project'}` : kind === 'clients' ? item.person.email : kind === 'people' ? item.email : item.description, 'row-sub'));
+      const text = el('span'); text.append(el('span', nameOf(item), 'row-title'), el('span', kind === 'projects' ? `${item.reference}` : kind === 'clients' ? item.person.email : kind === 'people' ? item.email : item.description, 'row-sub'));
       if (kind === 'clients' || kind === 'people') { const identity = el('span', undefined, 'name-cell'); identity.append(avatar(nameOf(item)), text); control.append(identity); } else control.append(text); first.append(control); row.append(first);
       if (kind === 'projects') { row.append(el('td', item.clientName)); const s = el('td'); s.append(status(item.status)); row.append(s, el('td', date(item.dueDate), 'optional-col')); }
       else if (kind === 'clients') row.append(el('td', String(item.projects.length)));
@@ -156,11 +158,12 @@ async function project(view, id) {
   const headerActions=el('div',undefined,'actions record-header-actions');headerActions.append(link('Documents & invoices','documents/'+id,'button secondary'));header.append(headerActions);
   function foldPanel(box,label){const section=el('details',undefined,'care-details overview-section'),key=id+'/'+label;section.append(el('summary',label));box.querySelector('h2')?.remove();section.append(box);section.open=projectSections.get(key)??!matchMedia('(max-width:800px)').matches;section.addEventListener('toggle',()=>{projectSections.set(key,section.open);if(section.open&&matchMedia('(max-width:800px)').matches)for(const other of view.querySelectorAll('.overview-section'))if(other!==section)other.open=false;});return section;}
   const phoneNotes=el('div',undefined,'phone-notes');view.insertBefore(phoneNotes,tabs);renderNotes(phoneNotes,id,await api(`projects/${id}/operations`),true);
+  const lifecycle=await renderLifecycle(phoneNotes,p);
   const care=el('div',undefined,'project-care-pane');care.hidden=true;care.id='project-care-content';view.append(care);await renderProjectCare(care,id,phoneNotes);
   function draw() {
     projectTabs.set(id,tab);
-    header.querySelector('h1').textContent = p.title; header.querySelector('button')?.remove(); meta.replaceChildren(status(p.status), link(p.clientName, `client/${p.clientId}`), el('span', p.kind || 'Project'));
-    if (!editMode) headerActions.append(button('Edit project', () => { editMode = true; tab = 'Overview'; draw(); content.querySelector('input')?.focus(); }, 'primary'));
+    header.querySelector('h1').textContent = p.title; header.querySelector('button')?.remove(); meta.replaceChildren(status(p.status), link(p.clientName, `client/${p.clientId}`), el('span', lifecycle.managed ? 'Guided project' : p.kind || 'Project'));
+    if (!editMode) headerActions.append(button('Edit project', () => { editMode = true; tab = 'Overview'; draw(); content.querySelector('input')?.focus(); }, 'secondary'));
     tabs.replaceChildren();
     const tabNames=['Overview','Details & files','Activity'];
     for (const name of tabNames) { const b = button(name, () => { tab = name; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); }, ''); b.setAttribute('role', 'tab'); b.tabIndex = tab === name ? 0 : -1; b.setAttribute('aria-selected', String(tab === name)); b.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); tab = event.key === 'Home' ? tabNames[0] : event.key === 'End' ? tabNames.at(-1) : tabNames[(tabNames.indexOf(tab)+(event.key==='ArrowRight'?1:tabNames.length-1))%tabNames.length]; draw(); tabs.querySelector('[aria-selected=true]')?.focus(); } }); b.id = `tab-${name.toLowerCase().replaceAll(' ','-')}`; b.setAttribute('aria-controls', name==='Details & files'?'project-care-content':'project-tab-content'); tabs.append(b); }
@@ -169,7 +172,7 @@ async function project(view, id) {
     if (success) content.append(message(success));
     if (tab === 'Activity') { content.append(auditPanel(p)); return; }
     const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const box = panel(editMode ? 'Edit project' : 'Project details');
-    if (editMode) editForm(box); else { box.append(el('p', p.summary, 'record-summary'), details([['Target date', date(p.dueDate)], ['Opened', date(p.openedAt)], ['Type', p.kind], ['Feedback', p.feedbackRequired ? 'Required' : 'Not required'], ['Invoice', p.invoiceRequired ? 'Required' : 'Not required']])); if (p.kind === 'Assessment') box.append(el('p', 'An assessment request does not authorise making equipment.', 'muted')); }
+    if (editMode) editForm(box); else { box.append(el('p', p.summary, 'record-summary'), details([['Target date', date(p.dueDate)], ['Opened', date(p.openedAt)], ['Workflow', lifecycle.managed ? 'Assessment through delivery' : p.kind], ['Feedback', p.feedbackRequired ? 'Required' : 'Not required'], ['Invoice', p.invoiceRequired ? 'Required' : 'Not required']])); if (!lifecycle.managed && p.kind === 'Assessment') box.append(el('p', 'An assessment request does not authorise making equipment.', 'muted')); }
     left.append(editMode?box:foldPanel(box,'Project details'));
     if (!editMode && p.coordination) { const allocation = panel('Funding & technician'); const c = p.coordination; const payer = c.fundingStatus === 'unknown' ? 'Not known yet — follow up' : c.fundingStatus === 'self' ? p.clientName : p.relationships.find(r => r.id === c.payerId)?.name ?? 'Selected payer'; allocation.append(details([['Expected payer', payer], ['Funding notes', c.fundingNotes || 'None recorded'], ['Skills needed', c.requiredSkills.join(', ') || 'Not specified'], ['Technician', p.relationships.find(r => r.id === c.technicianId)?.name || 'Not assigned yet']]), link('Update funding or technician', `coordination/${p.id}`, 'button secondary'), el('p', 'Funding and allocation are recorded plans. They do not authorise work or spending.', 'muted')); left.append(foldPanel(allocation,'Funding & technician')); } grid.append(left,editMode?relationships(p.relationships):foldPanel(relationships(p.relationships),'People & organisations')); content.append(grid);
   }
@@ -177,11 +180,11 @@ async function project(view, id) {
     const draft = drafts.get(id) ?? { version: p.version, title: p.title, status: p.status, feedbackRequired: p.feedbackRequired, invoiceRequired: p.invoiceRequired };
     const form = el('form', undefined, 'form-grid');
     const titleLabel = el('label'); titleLabel.append(el('span', 'Project title', 'field-label')); const input = el('input'); input.name = 'title'; input.required = true; input.maxLength = 120; input.value = draft.title; titleLabel.append(input);
-    const stateLabel = el('label'); stateLabel.append(el('span', 'Status', 'field-label')); const select = el('select'); select.name = 'status'; for (const s of ['open', 'review', 'closed']) { const o = el('option', cap(s)); o.value = s; select.append(o); } select.value = draft.status; stateLabel.append(select); form.append(titleLabel, stateLabel);
+    const stateLabel = el('label'); stateLabel.append(el('span', 'Status', 'field-label')); const select = el('select'); select.name = 'status'; for (const s of ['open', 'review', 'closed']) { const o = el('option', cap(s)); o.value = s; select.append(o); } select.value = draft.status; select.disabled=Boolean(lifecycle.managed); stateLabel.append(select); form.append(titleLabel, stateLabel);
     const checks = {}; for (const [key, label] of [['feedbackRequired', 'Feedback required'], ['invoiceRequired', 'Invoice required']]) { const l = el('label', undefined, 'checkbox'); const check = el('input'); check.type = 'checkbox'; check.name = key; check.checked = draft[key]; checks[key] = check; l.append(check, el('span', label)); form.append(l); }
     const read = () => ({ version: draft.version, title: input.value, status: select.value, feedbackRequired: checks.feedbackRequired.checked, invoiceRequired: checks.invoiceRequired.checked });
     form.addEventListener('input', () => { drafts.set(id, read()); success = ''; });
-    form.append(el('p', 'Workflow states remain provisional until the Access discovery review.', 'muted'));
+    form.append(el('p', lifecycle.managed?'Use the project workflow to close or reopen this project. Its number and history are retained.':'Use the guided workflow to record stage approvals before changing status.', 'muted'));
     const notice = el('div'); const actions = el('div', undefined, 'actions'); const save = el('button', 'Save changes', 'primary'); save.type = 'submit'; const cancel = button('Cancel edit', () => { drafts.delete(id); editMode = false; success = ''; draw(); header.querySelector('button')?.focus(); }, 'secondary'); actions.append(save, cancel); form.append(notice, actions); box.append(form);
     form.addEventListener('submit', async event => {
       event.preventDefault(); if (saving) return;
@@ -207,6 +210,7 @@ async function entity(view, type, id) {
   const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
   info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role]]) : el('p', item.description, 'record-summary'));
   if (item.clientId) info.append(link('Open client record →', `client/${item.clientId}`, 'text-button'));
+  if (item.technician) await renderCredentials(left,id);
   if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['Availability', cap(item.technician.availability)]])); left.append(tech); } left.append(info, projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted')); grid.append(left, context); view.append(el('div', undefined, 'heading-rule'), grid);
 }
 async function render() {

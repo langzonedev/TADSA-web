@@ -8,7 +8,7 @@ installModelExtensions(ctx=>{
  const {d,parts,method,input,find,version,bump,project,ops,event,str}=ctx,[kind,id,sub]=parts;
  if(ctx.phase==='guard'){
   if(kind==='projects'&&sub==='work-plan'&&method==='PUT'&&input.ndisApproved&&!eligible(d.people.find(p=>p.id===input.ndisApprovedBy)))fail('Select an existing administrator as approver.');
-  if(kind==='projects'&&sub==='operations'&&method==='PUT'){const before=ops(id),changed=input.approvedBy!==before.approvedBy||input.approvedOn!==before.approvedOn,stopping=input.clientStopped&&!before.clientStopped;if(!stopping&&((input.workApproved&&(!before.workApproved||changed||input.actualMinutes>before.actualMinutes))||(input.fundingExceptionReason&&(input.fundingExceptionReason!==before.fundingExceptionReason||changed))||(before.clientStopped&&!input.clientStopped))&&!eligible(d.people.find(p=>p.id===input.approvedBy)))fail('Select an existing administrator as approver.');}
+  if(kind==='projects'&&sub==='operations'&&method==='PUT'){const before=ops(id),changed=input.approvedBy!==before.approvedBy||input.approvedOn!==before.approvedOn,stopping=input.clientStopped&&!before.clientStopped;if(!stopping&&((!d.lifecycles?.[id]&&input.workApproved&&(!before.workApproved||changed||input.actualMinutes>before.actualMinutes))||(!d.lifecycles?.[id]&&input.fundingExceptionReason&&(input.fundingExceptionReason!==before.fundingExceptionReason||changed))||(!d.lifecycles?.[id]&&before.clientStopped&&!input.clientStopped))&&!eligible(d.people.find(p=>p.id===input.approvedBy)))fail('Select an existing administrator as approver.');}
   return;
  }
  if(kind==='business-settings'){if(method==='GET')return structuredClone(businessSettings(d));if(method==='PUT')return updateBusiness(d,input,ctx);}

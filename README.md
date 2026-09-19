@@ -6,11 +6,17 @@ Works on phone, tablet and desktop. Open online once before using offline.
 
 The shared TADSA workspace interface runs against a device-local IndexedDB adapter. Use fictional information only. No records go to the private TADSA database, another device, an email service, NDIS, a bank or payment processor. Named demo profiles show who made a change, but do not provide secure staff authentication.
 
-Projects, clients, people, contacts, coordination, intake details, notes, draft invoices, manually recorded receipts, NDIS approval, dated technician availability and files persist in this browser. Changes and audit events commit together. Stale versions are rejected; retries do not duplicate creation. Browser storage can be cleared or exhausted. Use Settings → Backup and restore to create/download backups, import a device backup, preview its contents and explicitly restore it. Replacement retains a before-restore backup atomically. Other tabs must reload afterwards.
+Projects, clients, people, contacts, coordination, intake details, notes, draft invoices, manually recorded receipts, NDIS reference, dated technician availability and files persist in this browser. Changes and audit events commit together. Stale versions are rejected; retries do not duplicate creation. Browser storage can be cleared or exhausted. Use Settings → Backup and restore to create/download backups, import a device backup, preview its contents and explicitly restore it. Replacement retains a before-restore backup atomically. Other tabs must reload afterwards.
 
 Existing tadsa-web-v1 localStorage records are copied into IndexedDB on upgrade. The original value remains a recovery copy and is not reimported after later saves. Unreadable data blocks startup instead of being silently erased. Legacy UUID record IDs survive.
 
 Offline operation starts after the first successful online load and service-worker activation. Use Update ready in the Device demo menu after saving your work, or close all tabs and reopen. Cache identity includes every shell file and device adapter. GitHub Pages subpaths are supported. Real iOS/Android installation and operating-system storage eviction are unverified.
+
+## Guided project workflow — 0.11
+
+New projects keep one number from assessment through technical work. Versioned quotes, technical peer review, client acceptance and recorded external Finance clearance guide progression. Customer sign-off, the technician's actual cost return and Finance finalisation precede closure. Revisions pause work and require renewed approvals; cancellation preserves costs and history. Existing projects can explicitly adopt this workflow without automatically merging old assessment and technical records.
+
+NDIS is an external client reference, not an internal approval gate. Technician profiles include qualifications, safety training and clearances. Download a printable client quote or a Finance ZIP containing the summary and project files. Email drafts require the operator to select the sender and attach the pack manually; the app sends nothing. All records remain synthetic and device-local.
 
 ## Mobile and administration update
 

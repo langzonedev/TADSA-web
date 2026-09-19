@@ -1,3 +1,5 @@
+import {validateLifecycleBackup} from './device-lifecycle-validation.mjs';
+import {validateCredentials} from './device-credentials.mjs';
 import {normalise,fail} from './device-model.mjs';
 import {validateDeviceFile} from './device-files.mjs';
 const STORE='workspace',MAX_BYTES=256*1024*1024,FORMAT='tadsa-device-backup';
@@ -52,7 +54,7 @@ export async function validateBackup(input){
  for(const r of raw.relationships){if(!object(r))invalid('invalid relationship.');ref('projects',r.projectId,'Relationship');if(!['person','organisation'].includes(r.type))invalid('unsupported relationship type.');ref(r.type==='person'?'people':'organisations',r.id,'Relationship');text(r.role,'Relationship role',120);}
  for(const a of raw.audit){if(!object(a))invalid('invalid audit event.');ref('projects',a.projectId,'Audit event');}
  if(raw.contacts!==undefined&&!Array.isArray(raw.contacts))invalid('contacts must be a list.');for(const c of raw.contacts??[]){ref('clients',c.clientId,'Contact');ref('people',c.personId,'Contact');}
- for(const key of ['operations','calendars','workPlans','attachments','clientNdis','replays'])if(raw[key]!==undefined&&!object(raw[key]))invalid(key+' must be an object.');
+ for(const key of ['operations','calendars','workPlans','attachments','clientNdis','credentials','lifecycles','replays'])if(raw[key]!==undefined&&!object(raw[key]))invalid(key+' must be an object.');
  const invoiceIds=new Map(),invoiceTotals=new Map();
  for(const [id,o]of Object.entries(raw.operations??{})){
   ref('projects',id,'Operations');if(!object(o))invalid('invalid operations.');for(const key of ['actualMinutes','remainingMinutes'])amount(o[key],'Operation minutes',0,600000);
@@ -78,6 +80,8 @@ export async function validateBackup(input){
   for(const receipt of w.payments??[]){if(!object(receipt)||!uuid(receipt.id)||receiptIds.has(receipt.id)||!invoiceIds.get(id)?.has(receipt.invoiceId)||!validDay(receipt.receivedOn)||!validInstant(receipt.at))invalid('invalid receipt identifier, invoice or date.');amount(receipt.amountCents,'Receipt amount',1);text(receipt.reference,'Payment reference',200);receiptIds.add(receipt.id);paid.set(receipt.invoiceId,(paid.get(receipt.invoiceId)||0)+receipt.amountCents);if(paid.get(receipt.invoiceId)>invoiceTotals.get(id+':'+receipt.invoiceId))invalid('receipts exceed the invoice total.');}
  }
  for(const [id,n]of Object.entries(raw.clientNdis??{})){ref('clients',id,'NDIS record');if(!object(n))invalid('invalid NDIS record.');amount(n.version,'NDIS version',0,2147483647);if(typeof n.number!=='string'||(n.number&&!/^[0-9 ]{3,30}$/.test(n.number)))invalid('invalid NDIS number.');}
+ for(const [id,state]of Object.entries(raw.lifecycles??{})){ref('projects',id,'Lifecycle');validateLifecycleBackup(state);const project=raw.projects.find(p=>p.id===id);if(Boolean(state.closed)!==(project.status==='closed'))invalid('lifecycle closure does not match project status.');}
+ for(const [id,value]of Object.entries(raw.credentials??{})){ref('people',id,'Technician credentials');if(value.personId!==id)invalid('credential person does not match its record.');validateCredentials(value);}
  for(const [id,files]of Object.entries(raw.attachments??{})){ref('projects',id,'Attachments');if(!Array.isArray(files))invalid('attachment list is invalid.');const ids=new Set();for(const file of files){if(!uuid(file.id)||ids.has(file.id))invalid('invalid or duplicate attachment ID.');ids.add(file.id);await validateDeviceFile({name:file.name,mime:file.mime,dataBase64:file.dataBase64});if(file.size!==atob(file.dataBase64).length)invalid('attachment size does not match contents.');}if(files.filter(x=>!x.removed).length>20)invalid('a project exceeds the active attachment limit.');}
  if(!Number.isSafeInteger(raw.sequence)||raw.sequence<0)invalid('invalid identifier sequence.');for(const set of Object.values(sets))for(const id of set){const n=id.match(/-(\d+)$/)?.[1];if(n&&Number(n)>raw.sequence)invalid('identifier sequence is behind an existing record.');}
  let data;try{data=normalise(raw);}catch{invalid('data cannot be upgraded safely.');}return data;
