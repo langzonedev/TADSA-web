@@ -126,3 +126,5 @@ html[data-local-file=true] #auth-gate{display:none!important}
 .project-home-grid>div{grid-column:1;grid-row:1}.project-home-notes{grid-column:2;grid-row:1 / span 2}.project-home-brief{grid-column:1;grid-row:2;margin-top:0!important}@media(max-width:700px){.project-home-grid>div,.project-home-notes,.project-home-brief{grid-column:1;grid-row:auto}}
 
 .quote-evidence-line{display:flex;justify-content:space-between;align-items:start;gap:16px;margin-top:12px}.quote-evidence-line>span{min-width:0;overflow-wrap:anywhere}.quote-evidence-line>strong{white-space:nowrap}.quote-evidence>small{display:block;color:var(--muted);margin-bottom:10px}
+
+.workflow-comment{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65}.revision-feedback{border-left:4px solid var(--brand-coral)}.revision-feedback button{margin-top:12px}
