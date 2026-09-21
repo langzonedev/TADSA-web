@@ -181,3 +181,7 @@ html[data-local-file=true] #auth-gate{display:none!important}
 @media(min-width:1101px){.project-workspace .project-more-wrap{display:none}}
 html[data-theme=dark] .project-subnav button[aria-selected=true]{background:#334584!important;color:#fff!important;border-color:#a9c64e!important}
 .project-workspace .project-nav button[aria-selected=true]{border-bottom-color:var(--brand-coral)!important}
+
+/* Visible link signifiers do not depend on hover or colour alone. */
+.project-facts a,.project-workspace .record-meta a,.project-home-brief .text-button{text-decoration:underline;text-underline-offset:3px}
+.project-nav button:hover,.project-subnav button:hover{box-shadow:inset 0 -2px 0 var(--accent)}

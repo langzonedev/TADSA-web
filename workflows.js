@@ -83,7 +83,8 @@ async function newClient(view, arg) {
 }
 
 function coordinationValues(d) { return { requiredSkills: d.requiredSkills, technicianId: d.technicianId || null, technicianIds: d.technicianIds ?? (d.technicianId?[d.technicianId]:[]), fundingStatus: d.fundingStatus, payerId: ['person', 'organisation'].includes(d.fundingStatus) ? d.payerId || null : null, fundingNotes: d.fundingNotes.trim() }; }
-function coordinationFields(form, d, directories) {
+function coordinationFields(form, d, directories, focus) {
+  if (focus !== 'team') {
   const funding = el('fieldset'); funding.append(el('legend', 'Who is expected to pay?'));
   selectField(funding, 'Payer', d, 'fundingStatus', [['unknown','Not known yet'],['self','The client'],['organisation','An organisation'],['person','Another person']], () => { d.payerId = ''; drawPayer(); });
   const payerSlot = el('div'); funding.append(payerSlot);
@@ -92,6 +93,8 @@ function coordinationFields(form, d, directories) {
     const control = selectField(payerSlot, d.fundingStatus === 'organisation' ? 'Paying organisation' : 'Paying person', d, 'payerId', [['','Choose a payer'], ...items.map(p => [p.id,p.name])]); control.required = true;
   } }
   drawPayer(); field(funding, 'Funding notes', d, 'fundingNotes', { type: 'textarea', max: 1000, help: 'For example, who will confirm funding. Selecting a payer does not approve spending or confirm payment.' }); form.append(funding);
+  }
+  if (focus === 'funding') return;
   d.technicianIds??=d.technicianId?[d.technicianId]:[];
   const assignment = el('fieldset'); assignment.append(el('legend', 'Choose the technical team'), el('p', 'Use recorded skills to narrow the list. Confirm availability and suitability with the technician before work begins.', 'field-help'));
   const skills = el('div', null, 'skill-options'); const technicians = el('div');
@@ -170,12 +173,47 @@ async function newProject(view, clientId) {
   draw();
 }
 async function editCoordination(view,id,options={}) {
-  const [project,dirs,projectLocation]=await Promise.all([request('projects/'+id),directories(),request('projects/'+id+'/location')]);const key='coordination/'+id;
+  const focus=['team','funding'].includes(options.focus)?options.focus:null;
+  const [project,dirs,projectLocation]=await Promise.all([request('projects/'+id),directories(),request('projects/'+id+'/location')]);
+  const key='coordination/'+id+(focus?'/'+focus:'');
+  const previous=drafts.get(key);
+  if(previous&&!previous.dirty&&!previous.pending)drafts.delete(key);
   const d=getDraft(key,{...project.coordination,technicianId:project.coordination.technicianId||'',payerId:project.coordination.payerId||'',version:project.version,filterArea:projectLocation.serviceArea,filterPostcode:projectLocation.postcode});
-  if(!options.embedded)title(view,'Funding & technical team',project.title,'project/'+id);view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location from More, then Edit project details.'))); const box=panel('Review the allocation');const form=el('form',null,'form-grid');coordinationFields(form,d,dirs);const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save allocation');actions.append(submit,cancel(form,d,key,options.onCancel??('project/'+id)));form.append(notice,actions);box.append(form);view.append(box);
-  form.addEventListener('submit',e=>{e.preventDefault();if(!allocationValid(form,d,notice))return;save(form,d,notice,submit,'projects/'+id+'/coordination','PUT',{version:d.version,...coordinationValues(d)},()=>{drafts.delete(key);host.announce('Allocation saved.');if(options.embedded)host.refresh();else location.hash='project/'+id;});});
+  const label=focus==='team'?'Team':focus==='funding'?'Funding':'Allocation';
+  if(!options.embedded)title(view,focus?label:'Funding & technical team',project.title,'project/'+id);
+  if(focus!=='funding')view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location in Project details.')));
+  const box=panel(focus?null:'Review the allocation');
+  const form=el('form',null,'form-grid');coordinationFields(form,d,dirs,focus);
+  const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save '+label.toLowerCase());
+  actions.append(submit,cancel(form,d,key,options.onCancel??('project/'+id)));form.append(notice,actions);box.append(form);view.append(box);
+  function compare(latest) {
+    const rows=[['Latest version',String(latest.version)]];
+    if(focus!=='team')rows.push(['Funding',latest.coordination.fundingStatus],['Funding notes',latest.coordination.fundingNotes||'None']);
+    if(focus!=='funding')rows.push(['Technicians',(latest.coordination.technicianIds??[latest.coordination.technicianId]).map(id=>dirs.technicians.find(t=>t.id===id)?.name).filter(Boolean).join(', ')||'Unassigned'],['Skills',latest.coordination.requiredSkills.join(', ')||'None']);
+    notice.replaceChildren(note('This project changed since you started. Your draft is kept. Compare the latest saved details before continuing.',true),reviewList(rows));
+    notice.append(button('Use latest version with my draft',()=>{d.version=latest.version;notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));
+  }
+  let checking=false;
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();if(checking||host.isSaving()||!(focus==='funding'?valid(form):allocationValid(form,d,notice)))return;
+    checking=true;submit.disabled=true;
+    try {
+      let payload=d.pending;
+      if(!payload){
+        const latest=await request('projects/'+id);
+        if(latest.version!==d.version){compare(latest);return;}
+        // The endpoint accepts both sections. Merge only the edited section into
+        // the fresh record so acknowledging a conflict cannot restore stale data.
+        const edited=coordinationValues(d),values={...latest.coordination};
+        for(const field of focus==='team'?['requiredSkills','technicianId','technicianIds']:focus==='funding'?['fundingStatus','payerId','fundingNotes']:Object.keys(edited))values[field]=edited[field];
+        payload={version:latest.version,...coordinationValues(values)};
+      }
+      await save(form,d,notice,submit,'projects/'+id+'/coordination','PUT',payload,()=>{drafts.delete(key);host.announce(label+' saved.');if(options.embedded)host.refresh();else location.hash='project/'+id;});
+    } catch(error){notice.replaceChildren(note(error.status?error.message:'Could not check the latest project. Your draft is kept. Try saving again.',true));}
+    finally{checking=false;submit.disabled=false;}
+  });
   if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';}
-  if(d.version!==project.version){notice.append(note('This project changed since you started. Your draft is kept. Compare the latest saved allocation before continuing.',true),reviewList([['Latest version',String(project.version)],['Funding',project.coordination.fundingStatus],['Funding notes',project.coordination.fundingNotes||'None'],['Technician',dirs.technicians.find(t=>t.id===project.coordination.technicianId)?.name||'Unassigned'],['Skills',project.coordination.requiredSkills.join(', ')||'None']]));notice.append(button('Use latest version with my draft',()=>{d.version=project.version;notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));}
+  else if(d.version!==project.version)compare(project);
 }
 
 async function linkContact(view,id) {
