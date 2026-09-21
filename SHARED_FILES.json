@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "1acf3cb691224a7c0d527de5079e363036becf1e",
+  "sourceRevision": "abee26e0cc2d668cd113c0f8742d2bb6fd68eb65",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "lifecycle-model.js": {
@@ -54,7 +54,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "0e7d24f2ebc6d5ae115035395acbb6021e79ad596efc20c6e694fb5b86af48d5",
+      "sha256": "bcb1194e6a7f9507f52383cdff8d05cbf3364894158effa1021da01ffbe3e612",
       "transform": null
     },
     "operations.js": {
@@ -109,5 +109,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "4024c21c7a5b64145a85372cb3035d3708e11e92ec1967b73e3920170a697e6a"
+  "shellHash": "436decbdd3a0c24a279fd582d4c4e1d9174763c53fab4367a2afbe8f884cb699"
 }
