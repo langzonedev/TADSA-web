@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "729df20aa5f894fab140f884f9451b5719c9bd44",
+  "sourceRevision": "b156b72f475913aed85a6db15382d72c4e43deec",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "lifecycle-model.js": {
@@ -49,7 +49,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "356a390427b7e44c47a7c10152287165546fb4137658c3e884a89d37e65f4ade",
+      "sha256": "18d6097fcaf5cbce1dbd35ec934e95a1090a962a4fbb06725b96438f0d73606c",
       "transform": null
     },
     "settings.js": {
@@ -84,7 +84,12 @@
     },
     "availability.js": {
       "source": "public/availability.js",
-      "sha256": "5429751a7160293bd4556447c2917464bde8ec2035dae370375cc733f1b511b7",
+      "sha256": "e5efea38e0a6c8dc6bf23e0e385668132e3a6c6720dbc61b490ea480a25449a9",
+      "transform": null
+    },
+    "technician-location.js": {
+      "source": "public/technician-location.js",
+      "sha256": "adcf4d49f0667b77cb71b1d9d03066b86230b23e6948f524b9fe5cb1d6f948f0",
       "transform": null
     },
     "project-care.js": {
@@ -94,7 +99,7 @@
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "3bcdee49fadd080c63a0d524b6f3496cc745ed385ad73061425c00e1e7743d7b",
+      "sha256": "0a874c5f0216dd5e9a13fcd5f0bb9c64640df8dc223b760d4d3a68c96e778b2c",
       "transform": null
     },
     "boot.js": {
@@ -119,5 +124,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "8baf3d57960239811380f80d805b9423fbe286ae2c0fc78c0dfec2e29ae98833"
+  "shellHash": "dfd0eafa6cf3f96aaa4303a288c0774e7f8ed108d8f9adf6369257e487030b55"
 }

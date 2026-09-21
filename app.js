@@ -7,6 +7,7 @@ import {configureCare,careHasDrafts,renderProjectCare} from './project-care.js';
 import {renderLifecycle} from './project-lifecycle.js';
 import {renderCredentials} from './technician-credentials.js';
 import {renderAvailability} from './availability.js';
+import {renderTechnicianLocation} from './technician-location.js';
 import {renderClientDetails,clientDetailsSummary,clientDetailsHasDrafts} from './client-details.js';
 import { configureWorkflows, renderWorkflow, workflowHasDrafts, addClientContactActions } from './workflows.js';
 const main = document.querySelector('#content');
@@ -269,8 +270,9 @@ async function entity(view, type, id) {
   info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role]]) : el('p', item.description, 'record-summary'));
   if (item.clientId) info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));
   if(type==='organisation'){info.append(details([['Category',item.category||'Not categorised'],['Email',item.email||'Not recorded']]),link('Edit contact & category','organisation-category/'+id,'button secondary'));}
-  if (item.technician) {try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}
-  if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['Availability', cap(item.technician.availability)]])); left.append(tech); } left.append(info, projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted')); grid.append(left, context); view.append(el('div', undefined, 'heading-rule'), grid);
+  left.append(info);
+  if (item.technician) {await renderTechnicianLocation(left,id);try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}
+  if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['Availability', cap(item.technician.availability)]])); left.append(tech); } left.append(projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted')); grid.append(left, context); view.append(el('div', undefined, 'heading-rule'), grid);
 }
 async function render() {
   if (saving) { announce('Please wait for the save to finish.'); return; }
@@ -286,7 +288,7 @@ async function render() {
     else if(route==='reports') await renderReports(view);
     else if(route==='settings') await renderSettings(view);
     else if (route==='client-details') await renderClientDetails(view,arg,{announce,setSaving:value=>{saving=value;},request:async(path,method='GET',body)=>{const response=await fetch('/api/'+path,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await response.json();if(!response.ok){const e=Error(data.error);e.status=response.status;throw e;}return data;}});
-    else if(route==='availability') await renderAvailability(view);
+    else if(route==='availability') await renderAvailability(view,arg,()=>ticket===renderVersion);
     else if(await renderOperations(view,route,arg)) { /* Case workspace supplied. */ }
     else if (await renderWorkflow(view, route, arg)) { /* Workflow view supplied. */ }
     else if (['projects', 'clients', 'people', 'organisations'].includes(route)) await register(view, route==='clients'?'people':route);
