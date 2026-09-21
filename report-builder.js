@@ -1,4 +1,4 @@
-import {REPORT_DATASETS,REPORT_OPERATORS,REPORT_PRESETS,validateReportQuery} from './report-model.js';
+import {REPORT_DATASETS,REPORT_OPERATORS,validateReportQuery} from './report-model.js';
 import {node,action,notice} from './project-care.js';
 const clone=v=>JSON.parse(JSON.stringify(v));
 const storageKey='tadsa-report-definitions-v1';
@@ -7,17 +7,17 @@ export function renderReportBuilder(view){
  let query={dataset:'organisations',columns:[],filters:[],limit:50,offset:0},result=null,requestController,sequence=0,disposed=false;
  const lifetime=new AbortController();const dispose=()=>{disposed=true;sequence++;requestController?.abort();lifetime.abort();};window.addEventListener('hashchange',dispose,{once:true,signal:lifetime.signal});
  const heading=node('p','Choose what you need, add conditions, then run your report. Changes here never alter the records.','subtitle');
- const presets=node('div',null,'report-presets');
  const builder=node('form',null,'panel report-builder');const fields=node('div',null,'report-controls'),filterBox=node('div'),columnBox=node('fieldset',null,'report-columns'),output=node('section',null,'report-output');output.setAttribute('aria-live','polite');
  const feedback=node('div'),run=node('button','Run report','primary');run.type='submit';const cancel=action('Cancel report',()=>{sequence++;requestController?.abort();run.disabled=false;cancel.hidden=true;output.removeAttribute('aria-busy');output.replaceChildren(notice('Report cancelled. Adjust the filters or run it again.'));});cancel.hidden=true;
- const savedBox=node('div',null,'report-saved');
- view.append(heading,presets,builder,output);builder.append(savedBox,fields,filterBox,columnBox,feedback);const controls=node('div',null,'actions');controls.append(run,cancel);builder.append(controls);
+ const savedBox=node('div',null,'report-saved'),savedState=node('p',null,'field-help');let selectedName='',modified=false;
+ view.append(heading,builder,output);builder.append(savedBox,fields,filterBox,columnBox,feedback);const controls=node('div',null,'actions');controls.append(run,cancel);builder.append(controls);
  function datasets(){return Object.entries(REPORT_DATASETS);}
  function config(){return REPORT_DATASETS[query.dataset];}
  function fieldList(){return config().fields;}
  function labelControl(parent,label,input){const box=node('label',null,'workflow-field');box.append(node('span',label,'field-label'),input);input.setAttribute('aria-label',label);parent.append(box);return input;}
  function select(parent,label,items,value,onChange){const input=node('select');for(const [value,label] of items){const option=node('option',label);option.value=value;input.append(option);}input.value=value;input.onchange=()=>onChange(input.value);return labelControl(parent,label,input);}
- function invalidate(){const saved=savedBox.querySelector('[aria-label="Saved reports"]');if(saved)saved.value='';sequence++;requestController?.abort();run.disabled=false;cancel.hidden=true;result=null;query.offset=0;output.removeAttribute('aria-busy');output.replaceChildren(node('p','Run the report to see results for these choices.','field-help'));}
+ function invalidate(markModified=true){if(markModified&&selectedName)modified=true;savedState.textContent=selectedName?(modified?'Unsaved changes to “'+selectedName+'”. Save these choices to update it.':'Selected report: '+selectedName):'';sequence++;requestController?.abort();run.disabled=false;cancel.hidden=true;result=null;query.offset=0;output.removeAttribute('aria-busy');output.replaceChildren(node('p','Run the report to see results for these choices.','field-help'));}
+
  function operators(field){return REPORT_OPERATORS[field.type]??REPORT_OPERATORS.text;}
  function draw(){
   fields.replaceChildren();select(fields,'Report on',datasets().map(([key,c])=>[key,c.label]),query.dataset,value=>{query={dataset:value,columns:[...REPORT_DATASETS[value].defaultColumns],filters:[],limit:50,offset:0};invalidate();draw();});
@@ -40,7 +40,28 @@ export function renderReportBuilder(view){
   columnBox.replaceChildren(node('legend','Columns to show'));for(const f of fieldList()){const label=node('label',null,'checkbox'),input=node('input');input.type='checkbox';input.checked=query.columns.includes(f.key);input.onchange=()=>{query.columns=input.checked?[...query.columns,f.key]:query.columns.filter(key=>key!==f.key);invalidate();};label.append(input,node('span',f.label));columnBox.append(label);}
  }
  function savedReports(){try{const values=JSON.parse(localStorage.getItem(storageKey)||'[]');return Array.isArray(values)?values.slice(0,20).filter(v=>{try{return typeof v.name==='string'&&v.name.length<=60&&Boolean(validateReportQuery(v.query));}catch{return false;}}):[];}catch{return [];}}
- function drawSaved(){savedBox.replaceChildren();const name=node('input');name.maxLength=60;name.placeholder='e.g. Government contacts';labelControl(savedBox,'Report name',name);savedBox.append(action('Save these choices',()=>{if(!name.value.trim()){name.focus();return;}try{validateReportQuery(query);const saved=savedReports().filter(s=>s.name!==name.value.trim());saved.unshift({name:name.value.trim(),query:clone(query)});localStorage.setItem(storageKey,JSON.stringify(saved.slice(0,20)));feedback.replaceChildren(notice('Report choices saved on this device. Results are always fetched again.'));drawSaved();}catch{feedback.replaceChildren(notice('Complete the conditions before saving. Device storage must also be available.',true));}}));const saved=savedReports();if(saved.length){const choices=select(savedBox,'Saved reports',[['','Choose a saved report'],...saved.map((s,i)=>[String(i),s.name])],'',value=>{if(value==='')return;query=clone(saved[Number(value)].query);if(!REPORT_DATASETS[query.dataset])return;invalidate();draw();});savedBox.append(action('Delete selected saved report',()=>{if(choices.value==='')return;try{saved.splice(Number(choices.value),1);localStorage.setItem(storageKey,JSON.stringify(saved));drawSaved();}catch{feedback.replaceChildren(notice('Could not delete these saved choices.',true));}}));}}
+ function drawSaved(){
+  savedBox.replaceChildren();const name=node('input');name.maxLength=60;name.placeholder='e.g. Government contacts';name.value=selectedName;labelControl(savedBox,'Report name',name);
+  savedBox.append(action('Save these choices',()=>{
+   const reportName=name.value.trim();if(!reportName){name.focus();return;}
+   try{validateReportQuery(query);const saved=savedReports().filter(s=>s.name!==reportName);saved.unshift({name:reportName,query:clone(query)});localStorage.setItem(storageKey,JSON.stringify(saved.slice(0,20)));selectedName=reportName;modified=false;feedback.replaceChildren(notice('Report choices saved on this device.'));drawSaved();}
+   catch{feedback.replaceChildren(notice('Complete the conditions before saving. Device storage must also be available.',true));}
+  }));
+  const saved=savedReports();if(saved.length){
+   const choices=select(savedBox,'Saved reports',[['','Choose a saved report'],...saved.map(s=>[s.name,s.name])],selectedName,value=>{
+    if(!value){selectedName='';modified=false;drawSaved();return;}
+    const report=savedReports().find(s=>s.name===value);if(!report){selectedName='';drawSaved();return;}
+    query=clone(report.query);selectedName=report.name;modified=false;invalidate(false);draw();drawSaved();
+   });
+   const remove=action('Delete selected saved report',()=>{
+    if(!selectedName)return;const deletedName=selectedName;
+    try{localStorage.setItem(storageKey,JSON.stringify(savedReports().filter(s=>s.name!==deletedName)));selectedName='';modified=false;drawSaved();feedback.replaceChildren(notice('Saved report “'+deletedName+'” deleted. The current report choices remain available.'));}
+    catch{feedback.replaceChildren(notice('Could not delete these saved choices.',true));}
+   });remove.disabled=!choices.value;savedBox.append(remove);
+  }
+  savedState.textContent=selectedName?(modified?'Unsaved changes to “'+selectedName+'”. Save these choices to update it.':'Selected report: '+selectedName):'';savedBox.append(savedState);
+ }
+
  function format(value,field){if(value===null||value===undefined||value==='')return 'Not recorded';if(Array.isArray(value))return value.join(', ');if(field.type==='number')return new Intl.NumberFormat('en-AU',{maximumFractionDigits:2}).format(value);return String(value);}
  function show(){
   output.replaceChildren();const rows=result.rows;const meta=config();const columns=query.columns.map(key=>fieldList().find(f=>f.key===key));
@@ -72,6 +93,6 @@ export function renderReportBuilder(view){
   finally{clearTimeout(timeout);if(current===sequence&&!disposed){run.disabled=false;cancel.hidden=true;output.removeAttribute('aria-busy');}}
  }
  builder.onsubmit=e=>{e.preventDefault();query.offset=0;load();};
- for(const preset of REPORT_PRESETS)presets.append(action(preset.label,()=>{query={limit:50,offset:0,...clone(preset.query)};invalidate();draw();load();}));
- query.columns=[...config().defaultColumns];drawSaved();draw();invalidate();return dispose;
+
+ query.columns=[...config().defaultColumns];drawSaved();draw();invalidate(false);return dispose;
 }

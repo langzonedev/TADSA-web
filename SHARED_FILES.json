@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "202158144b736a202611a38becb7eafebf14ee99",
+  "sourceRevision": "729df20aa5f894fab140f884f9451b5719c9bd44",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "lifecycle-model.js": {
@@ -39,7 +39,7 @@
     },
     "report-builder.js": {
       "source": "public/report-builder.js",
-      "sha256": "edc112dd098cc4e2c2628ae7748aecfbd4e6c70257062d6f146cf3abcab06d8c",
+      "sha256": "16db29af1059ff9f3baa0723e2ecf7a7481be4887c51e894b5bf72f935c323d0",
       "transform": null
     },
     "jpeg.js": {
@@ -119,5 +119,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "8592c7eab3443e39c6b704dfa966881b9ed49b4c93dbcb49120f9d5d6dd47e85"
+  "shellHash": "8baf3d57960239811380f80d805b9423fbe286ae2c0fc78c0dfec2e29ae98833"
 }
