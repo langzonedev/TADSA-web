@@ -7,7 +7,7 @@ const el = (tag, text, cls) => { const n = document.createElement(tag); if (text
 const link = (text, route, cls = 'text-button') => { const n = el('a', text, cls); n.href = '#' + route; return n; };
 const button = (text, action, cls = 'secondary') => { const n = el('button', text, cls); n.type = 'button'; n.addEventListener('click', action); return n; };
 const note = (text, error = false) => { const n = el('div', text, error ? 'message error' : 'message'); n.setAttribute('role', error ? 'alert' : 'status'); return n; };
-const title = (view, text, sub, back) => { if (back) view.append(link('← Back to client', back, 'breadcrumb')); view.append(el('h1', text), el('p', sub, 'subtitle workflow-intro')); };
+const title = (view, text, sub, back) => { if (back) view.append(link('← Back to '+(back.startsWith('project/')?'project':'client'), back, 'breadcrumb')); view.append(el('h1', text), el('p', sub, 'subtitle workflow-intro')); };
 const panel = text => { const n = el('section', null, 'panel workflow-panel'); if (text) n.append(el('h2', text)); return n; };
 const getDraft = (key, initial) => { if (!drafts.has(key)) drafts.set(key, { ...initial, requestId: crypto.randomUUID(), dirty: false }); return drafts.get(key); };
 const touch = d => { d.dirty = true; };
@@ -67,7 +67,7 @@ async function newClient(view, arg) {
   field(form, 'Phone number', d, 'phone', { type: 'tel', max: 40, help: 'Optional. Helpful when checking whether this person already has a record.' });
   field(form, 'Email address', d, 'email', { type: 'email', max: 200, help: 'Optional. Do not invent an address if it is unknown.' });
   const notice = el('div'); const actions = el('div', null, 'actions'); const submit = saveButton('Save client');
-  actions.append(submit, cancel(form, d, key, d.forProject ? 'new-project' : 'clients')); form.append(notice, actions); box.append(form); view.append(box);
+  actions.append(submit, cancel(form, d, key, d.forProject ? 'new-project' : 'people')); form.append(notice, actions); box.append(form); view.append(box);
   function duplicates(rows) {
     const match = panel('Please check these existing records');
     match.append(el('p', 'A matching name or contact detail does not always mean the same person. Open the record and check before creating another client.'));
@@ -82,7 +82,7 @@ async function newClient(view, arg) {
   if (d.pending) { notice.append(note('A previous save was not confirmed. Retry it safely.')); lock(form, true, submit); submit.textContent = 'Retry save safely'; }
 }
 
-function coordinationValues(d) { return { requiredSkills: d.requiredSkills, technicianId: d.technicianId || null, fundingStatus: d.fundingStatus, payerId: ['person', 'organisation'].includes(d.fundingStatus) ? d.payerId || null : null, fundingNotes: d.fundingNotes.trim() }; }
+function coordinationValues(d) { return { requiredSkills: d.requiredSkills, technicianId: d.technicianId || null, technicianIds: d.technicianIds ?? (d.technicianId?[d.technicianId]:[]), fundingStatus: d.fundingStatus, payerId: ['person', 'organisation'].includes(d.fundingStatus) ? d.payerId || null : null, fundingNotes: d.fundingNotes.trim() }; }
 function coordinationFields(form, d, directories) {
   const funding = el('fieldset'); funding.append(el('legend', 'Who is expected to pay?'));
   selectField(funding, 'Payer', d, 'fundingStatus', [['unknown','Not known yet'],['self','The client'],['organisation','An organisation'],['person','Another person']], () => { d.payerId = ''; drawPayer(); });
@@ -92,7 +92,8 @@ function coordinationFields(form, d, directories) {
     const control = selectField(payerSlot, d.fundingStatus === 'organisation' ? 'Paying organisation' : 'Paying person', d, 'payerId', [['','Choose a payer'], ...items.map(p => [p.id,p.name])]); control.required = true;
   } }
   drawPayer(); field(funding, 'Funding notes', d, 'fundingNotes', { type: 'textarea', max: 1000, help: 'For example, who will confirm funding. Selecting a payer does not approve spending or confirm payment.' }); form.append(funding);
-  const assignment = el('fieldset'); assignment.append(el('legend', 'Find a technician'), el('p', 'Use recorded skills to narrow the list. Confirm availability and suitability with the technician before work begins.', 'field-help'));
+  d.technicianIds??=d.technicianId?[d.technicianId]:[];
+  const assignment = el('fieldset'); assignment.append(el('legend', 'Choose the technical team'), el('p', 'Use recorded skills to narrow the list. Confirm availability and suitability with the technician before work begins.', 'field-help'));
   const skills = el('div', null, 'skill-options'); const technicians = el('div');
   for (const skill of directories.skills) check(skills, skill, d.requiredSkills.includes(skill), on => { d.requiredSkills = on ? [...d.requiredSkills,skill] : d.requiredSkills.filter(s => s !== skill); d.assignmentAcknowledged = false; touch(d); drawTechnicians(); });
   assignment.append(el('h3', 'Skills needed (optional)'), skills);
@@ -101,20 +102,21 @@ function coordinationFields(form, d, directories) {
   assignment.append(link('View all technician calendars and service areas','availability'),technicians); form.append(assignment);
   function drawTechnicians() {
     technicians.replaceChildren();
-    if(d.technicianId&&!directories.technicians.some(t=>t.id===d.technicianId)) technicians.append(note('The previously assigned person is no longer listed as a technician. Their saved assignment remains in the project history. Choose an active technician or Not assigned yet before saving this allocation.',true));
-    const locationMatches=t=>(!d.filterArea||(t.serviceAreas||[]).includes(d.filterArea))&&(!d.filterPostcode||t.postcode===d.filterPostcode);const visible = directories.technicians.filter(t => t.id === d.technicianId || ((d.showAll || d.requiredSkills.every(s => t.skills.includes(s)))&&locationMatches(t)));
-    const rows = [{ id:'',name:'Not assigned yet',skills:[],availability:'',openCount:0 }, ...visible];
+    if(d.technicianId&&!directories.technicians.some(t=>t.id===d.technicianId)) technicians.append(note('The previously assigned person is no longer listed as a technician. Their saved assignment remains in the project history. Choose active technical members or clear the team selection before saving this allocation.',true));
+    const locationMatches=t=>(!d.filterArea||(t.serviceAreas||[]).includes(d.filterArea))&&(!d.filterPostcode||t.postcode===d.filterPostcode);const visible = directories.technicians.filter(t => d.technicianIds.includes(t.id) || ((d.showAll || d.requiredSkills.every(s => t.skills.includes(s)))&&locationMatches(t)));
+    const rows=visible;if(d.technicianIds.length)technicians.append(button('Clear team selection',()=>{d.technicianIds=[];d.technicianId='';d.assignmentAcknowledged=false;touch(d);drawTechnicians();}));technicians.append(el('p',d.technicianIds.length?`${d.technicianIds.length} technical members selected`:'No technician assigned yet. You can allocate the team later.','field-help'));
     for (const t of rows) {
-      const l = el('label', null, 'choice-card'); const radio = el('input'); radio.type = 'radio'; radio.name = 'technician'; radio.value = t.id; radio.checked = d.technicianId === t.id;
+      const l = el('label', null, 'choice-card'); const radio = el('input'); radio.type = 'checkbox'; radio.name = 'technician'; radio.value = t.id; radio.checked = d.technicianIds.includes(t.id);
       const text = el('span'); text.append(el('strong', t.name));
       if (t.id) text.append(el('small', `${t.skills.join(' · ')}. ${t.openCount} open projects. ${Math.round((t.remainingMinutes??0)/60*100)/100} hours remaining. General availability: ${t.availability}. Base: ${[t.suburb,t.postcode].filter(Boolean).join(' ')||'Not recorded'}. Service areas: ${(t.serviceAreas||[]).map(a=>({western:'Western suburbs',southern:'Southern suburbs',northern:'Northern suburbs',eastern:'Eastern suburbs','adelaide-hills':'Adelaide Hills',metro:'Metropolitan Adelaide',regional:'Regional South Australia'}[a]||a)).join(', ')||'Not recorded'}.`));
       else text.append(el('small', 'Save the request now and allocate someone later.'));
-      radio.addEventListener('change', () => { d.technicianId = t.id; d.assignmentAcknowledged = false; touch(d); drawTechnicians(); technicians.querySelector('input:checked')?.focus({preventScroll:true}); }); l.append(radio,text); technicians.append(l);
+      radio.addEventListener('change', () => { d.technicianIds=radio.checked?[...d.technicianIds,t.id]:d.technicianIds.filter(id=>id!==t.id);if(!d.technicianIds.includes(d.technicianId))d.technicianId=d.technicianIds[0]||'';d.assignmentAcknowledged = false; touch(d); drawTechnicians(); [...technicians.querySelectorAll('input[name=technician]')].find(input=>input.value===t.id)?.focus({preventScroll:true}); }); l.append(radio,text); technicians.append(l);
     }
     if (!visible.length) technicians.append(note('No technicians match every selected skill. Save unassigned, or show other technicians to review their skills.'));
+    const team=directories.technicians.filter(t=>d.technicianIds.includes(t.id));if(team.length){selectField(technicians,'Lead technician',d,'technicianId',team.map(t=>[t.id,t.name]));technicians.append(el('p','The lead is the main contact; every selected technical member is linked to this project.','field-help'));}
     const selected = directories.technicians.find(t => t.id === d.technicianId);
     if(selected)technicians.append(link('View '+selected.name+' — qualifications & clearances','person/'+selected.id));
-    d.needsAcknowledgement = Boolean(selected && (selected.availability !== 'available' || !d.requiredSkills.every(s => selected.skills.includes(s))||!locationMatches(selected)));
+    d.needsAcknowledgement = team.some(t=>t.availability !== 'available'||!d.requiredSkills.every(s=>t.skills.includes(s))||!locationMatches(t));
     if (d.needsAcknowledgement) { technicians.append(note('Check this allocation: the recorded skills, availability or location need a conversation. This is not an eligibility or safety assessment.')); check(technicians, 'I have reviewed the skill / availability / location warning', d.assignmentAcknowledged ?? false, on => { d.assignmentAcknowledged = on; touch(d); }); }
   }
   drawTechnicians();
@@ -131,11 +133,11 @@ async function newProject(view, clientId) {
   if (clientId && !d.clientId) { d.clientId = clientId; d.step = 2; }
   let selected = clients.items.find(c => c.id === d.clientId);
   title(view, 'New project', 'Record an email enquiry or phone call. A project number is assigned automatically; assessment and technical work stay in this project.');
-  const steps = el('ol', null, 'workflow-steps'); for (const [i,label] of ['Client','Project details','Funding & technician','Review'].entries()) { const n = el('li', `${i+1}. ${label}`); if (i+1 === d.step) n.setAttribute('aria-current','step'); steps.append(n); } view.append(steps);
+  const steps = el('ol', null, 'workflow-steps'); for (const [i,label] of ['Client','Project details','Funding & technical team','Review'].entries()) { const n = el('li', `${i+1}. ${label}`); if (i+1 === d.step) n.setAttribute('aria-current','step'); steps.append(n); } view.append(steps);
   const slot = el('div'); view.append(slot);
   function draw() {
     slot.replaceChildren(); steps.querySelectorAll('li').forEach((n,i) => i+1 === d.step ? n.setAttribute('aria-current','step') : n.removeAttribute('aria-current'));
-    const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technician','Review'][d.step-1]}`); const form = el('form', null, 'form-grid'); const notice = el('div');
+    const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technical team','Review'][d.step-1]}`); const form = el('form', null, 'form-grid'); const notice = el('div');
     if (d.step === 1) {
       const q = el('input'); q.type = 'search'; q.setAttribute('aria-label','Find client'); q.placeholder = 'Name, phone or email'; const label = el('label'); label.append(el('span','Find an existing client','field-label'),q); form.append(label);
       const matches = el('div', null, 'client-matches');
@@ -153,7 +155,7 @@ async function newProject(view, clientId) {
     } else if (d.step === 3) {form.append(note('Client work location: '+(selected?.details?.workAddress||selected?.details?.residentialAddress||'Not recorded. Open the client record to add an address.')));coordinationFields(form,d,dirs);}
     else {
       const payer = d.fundingStatus==='unknown' ? 'Not known yet — follow up' : d.fundingStatus==='self' ? `Client: ${selected?.person.name}` : (d.fundingStatus==='organisation'?dirs.organisations:dirs.people).find(p=>p.id===d.payerId)?.name;
-      form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technician',dirs.technicians.find(t=>t.id===d.technicianId)?.name||'Not assigned yet']]));
+      form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technical team',dirs.technicians.filter(t=>(d.technicianIds??[]).includes(t.id)).map(t=>t.name+(t.id===d.technicianId?' (lead)':'')).join(', ')||'Not assigned yet']]));
       form.append(note('Check the client and project details before saving. No emails, work instructions or invoices will be sent.'));
     }
     const actions=el('div',null,'actions');const next=saveButton(d.step===4?'Create project':'Continue');
@@ -170,7 +172,7 @@ async function newProject(view, clientId) {
 async function editCoordination(view,id) {
   const [project,dirs,projectLocation]=await Promise.all([request('projects/'+id),directories(),request('projects/'+id+'/location')]);const key='coordination/'+id;
   const d=getDraft(key,{...project.coordination,technicianId:project.coordination.technicianId||'',payerId:project.coordination.payerId||'',version:project.version,filterArea:projectLocation.serviceArea,filterPostcode:projectLocation.postcode});
-  title(view,'Funding & technician',project.title,'project/'+id);view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location from the project’s Details & files tab.'))); const box=panel('Review the allocation');const form=el('form',null,'form-grid');coordinationFields(form,d,dirs);const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save allocation');actions.append(submit,cancel(form,d,key,'project/'+id));form.append(notice,actions);box.append(form);view.append(box);
+  title(view,'Funding & technical team',project.title,'project/'+id);view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location from More, then Edit project details.'))); const box=panel('Review the allocation');const form=el('form',null,'form-grid');coordinationFields(form,d,dirs);const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save allocation');actions.append(submit,cancel(form,d,key,'project/'+id));form.append(notice,actions);box.append(form);view.append(box);
   form.addEventListener('submit',e=>{e.preventDefault();if(!allocationValid(form,d,notice))return;save(form,d,notice,submit,'projects/'+id+'/coordination','PUT',{version:d.version,...coordinationValues(d)},()=>{drafts.delete(key);host.announce('Allocation saved.');location.hash='project/'+id;});});
   if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';}
   if(d.version!==project.version){notice.append(note('This project changed since you started. Your draft is kept. Compare the latest saved allocation before continuing.',true),reviewList([['Latest version',String(project.version)],['Funding',project.coordination.fundingStatus],['Funding notes',project.coordination.fundingNotes||'None'],['Technician',dirs.technicians.find(t=>t.id===project.coordination.technicianId)?.name||'Unassigned'],['Skills',project.coordination.requiredSkills.join(', ')||'None']]));notice.append(button('Use latest version with my draft',()=>{d.version=project.version;notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));}
@@ -206,6 +208,7 @@ export async function renderWorkflow(view,route,arg) {
   else if(route==='new-project')await newProject(view,arg);
   else if(route==='link-contact')await linkContact(view,arg);
   else if(route==='coordination')await editCoordination(view,arg);
+  else if(route==='organisation-category')await organisationCategory(view,arg);
   else return false;
   return true;
 }
@@ -228,7 +231,7 @@ async function personProfile(view, id) {
   d.profileType??=compatible?(d.roles.includes('Technician')?'Technician':d.roles[0]):'';
   if(!compatible&&d.roles.length)roles.append(note('This existing profile combines '+d.roles.join(', ')+'. Select its correct type before saving. Linked projects and history remain recorded; reassign current technician work before removing that role.',true));
   const typePicker=selectField(roles,'Profile type',d,'profileType',[['','Choose a profile type'],...catalogue.roles.map(r=>[r,r])]);typePicker.required=true;
-  if(person&&!person.clientId){for(const option of typePicker.options)if(option.value==='Client')option.disabled=true;roles.append(el('p','Create a separate Client profile instead of converting this professional or support profile.','field-help'),link('Create a separate client','new-client'));}
+  if(person&&!person.clientId)roles.append(el('p','Choosing Client creates the linked client record for this person. Reassign technician work before changing their profile type.','field-help'));
   if(person?.clientId){for(const option of typePicker.options)if(option.value&&option.value!=='Client')option.disabled=true;roles.append(el('p','This profile has a linked client record. Retain Client here; create a separate profile for another type.','field-help'));}
   const alsoAdmin=el('div');const adminCheck=check(alsoAdmin,'Also an administrator',d.roles.includes('Administrator')&&d.roles.includes('Technician'),on=>{d.roles=on?['Technician','Administrator']:['Technician'];touch(d);});roles.append(alsoAdmin);
   const chooseType=()=>{d.roles=d.profileType==='Technician'?(adminCheck.checked?['Technician','Administrator']:['Technician']):d.profileType?[d.profileType]:[];tech.hidden=d.profileType!=='Technician';alsoAdmin.hidden=d.profileType!=='Technician';touch(d);};
@@ -254,4 +257,13 @@ async function personProfile(view, id) {
     if(id&&notice.querySelector('[role=alert]')&&!d.pending) notice.append(button('Compare latest profile',()=>host.refresh()));
   });
   if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';notice.append(note('A previous save could not be confirmed. Retry it before changing these details.'));}
+}
+
+async function organisationCategory(view,id){
+ const item=await request('organisations/'+id),key='organisation-category/'+id,d=getDraft(key,{category:item.category||'',version:item.version});
+ title(view,'Organisation category',item.name);view.append(link('Back to organisation','organisation/'+id,'breadcrumb'));
+ const box=panel('Category'),form=el('form',null,'form-grid');const input=field(form,'Category',d,'category',{max:80,help:'Choose a suggestion or enter a category used by your team.'});const suggestions=el('datalist');suggestions.id='organisation-categories';for(const value of ['School','NDIS','Health service','Government','Community organisation','Supplier','Other']){const option=el('option');option.value=value;suggestions.append(option);}input.setAttribute('list',suggestions.id);form.append(suggestions);
+ const notice=el('div'),actions=el('div',null,'actions'),submit=saveButton('Save category');actions.append(submit,cancel(form,d,key,'organisation/'+id));form.append(notice,actions);box.append(form);view.append(box);
+ if(d.version!==item.version)notice.append(note('This organisation changed. Latest category: '+(item.category||'Not categorised'),true),button('Use latest version with my draft',()=>{d.version=item.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Review your category, then save.'));}));
+ form.addEventListener('submit',e=>{e.preventDefault();if(!valid(form))return;save(form,d,notice,submit,'organisations/'+id+'/category','PUT',{requestId:d.requestId,version:d.version,category:d.category.trim()},()=>{drafts.delete(key);host.announce('Organisation category saved.');location.hash='organisation/'+id;});});
 }

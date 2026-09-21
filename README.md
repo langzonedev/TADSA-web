@@ -46,7 +46,9 @@ See PARITY.md. Production identity/permissions, cross-device sync, official invo
 
 ## Demo profiles
 
-The username and password fields are prefilled with `demo-admin` / `TadsaDemo2026!`; click **Login** to explore. No credentials need to be shared. Open **Accounts** to create additional named demo profiles, independent of client or professional records. New notes and audit entries show the selected profile. Demo profiles are not secure authentication: the default administrator credentials are public. Created demo accounts can sign back in with their own demo-only passwords. Never enter real personal information or reuse real passwords. Profiles and operational data stay on that device; changing devices does not synchronise them.
+Sign in as `demo-admin` using the demonstration password shared by Greg. The password is no longer prefilled or returned by the status endpoint. Custom demo accounts keep their own passwords. The shared demo login is a convenience gate, not secure hosting: this public application's code and device storage are accessible to the person using that browser. Never enter real personal information or reuse real passwords.
+
+Open **Account** to create named demo accounts and demonstrate restricted technician-detail permissions. Accounts are independent of People profiles. Data, accounts and changes stay on the current device; they are not synchronised with the main application or other devices.
 
 ## Client projects
 

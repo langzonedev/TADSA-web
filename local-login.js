@@ -20,10 +20,10 @@ export async function requireLocalSession(container,refresh,isCurrent=()=>true,h
  }
  const form=node('form',undefined,'panel workflow-panel form-grid');form.append(node('h1',demo?'Explore the TADSA demonstration':'Sign in to TADSA'));
  const message=node('p');message.setAttribute('role','alert');
- if(demo)form.append(node('p','Demo credentials are prefilled. Use a demo-only password for any account you create. Data stays on this device; this is not secure staff authentication.'));
+ if(demo)form.append(node('p','Enter the demo password shared with you. This demonstration saves fictional data in this browser only; it is not the live system. Do not enter real information.'));
  if(demo&&status.demoMigrationHint)form.append(node('p',status.demoMigrationHint));
  const fields={};for(const [name,label,type]of [['username','Username','text'],['password','Password','password']]){const wrap=node('label',label),input=node('input');input.type=type;input.required=true;input.autocomplete=name==='username'?'username':'current-password';wrap.append(input);form.append(wrap);fields[name]=input;}
- if(demo&&status.demoDefaults){fields.username.value=status.demoDefaults.username;fields.password.value=status.demoDefaults.password;}
+ if(demo&&status.demoDefaults){fields.username.value=status.demoDefaults.username;fields.password.value='';}
  const button=node('button','Login','primary');form.append(message,button,node('p',demo?'Use your own demo username and password to sign back in.':'For a local password reset, contact your nominated account administrator or IT provider.'));
  form.onsubmit=async e=>{e.preventDefault();button.disabled=true;try{await accountRequest('auth/login',{username:fields.username.value,password:fields.password.value});fields.password.value='';await refresh();}catch(e){message.textContent=e.message;button.disabled=false;}};mountGate(form);return false;
 }

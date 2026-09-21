@@ -128,3 +128,12 @@ html[data-local-file=true] #auth-gate{display:none!important}
 .quote-evidence-line{display:flex;justify-content:space-between;align-items:start;gap:16px;margin-top:12px}.quote-evidence-line>span{min-width:0;overflow-wrap:anywhere}.quote-evidence-line>strong{white-space:nowrap}.quote-evidence>small{display:block;color:var(--muted);margin-bottom:10px}
 
 .workflow-comment{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65}.revision-feedback{border-left:4px solid var(--brand-coral)}.revision-feedback button{margin-top:12px}
+/* Customer feedback: a visible search entry, direct project links, compact readable context. */
+#global-search{border:2px solid var(--action-green);border-radius:10px;padding:5px 10px;gap:10px;background:var(--surface)}
+#global-search:focus-within{box-shadow:0 0 0 3px color-mix(in srgb,var(--action-green) 25%,transparent)}
+#global-search input{min-width:0}
+.project-status{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}.badge.invoice,.badge.workflow-stage{background:var(--surface-soft);color:var(--text)}
+.projects-table .row-open{display:block;text-decoration:none;min-height:36px}.projects-table .row-open:hover .row-title{text-decoration:underline}.projects-table .row-preview{font-size:12px;margin-top:4px;padding:4px 0;min-height:30px}.projects-table td{padding-top:12px;padding-bottom:12px}.projects-table .row-sub{font-size:12px}
+.project-workspace .project-home-grid{gap:18px}.project-workspace .panel{padding:20px}.project-workspace .project-facts{margin:16px 0;gap:14px}.project-workspace .project-home-brief .detail-pairs{gap:14px}.project-workspace .project-home-brief h2{margin-bottom:12px}.project-workspace .project-next h2{font-size:23px}.project-workspace .project-nav{margin-bottom:18px}.project-workspace .project-phases{margin-bottom:18px}
+@media(min-width:1100px){.register-layout{grid-template-columns:minmax(0,1fr) 330px;gap:16px}.person-detail-layout>div:first-child{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.person-detail-layout>div:first-child>.panel{margin:0}.person-detail-layout>div:first-child>.care-details{grid-column:1/-1}}
+@media(max-width:800px){.projects-table .row-preview{display:none}.project-workspace .record-meta .workflow-stage{white-space:normal}.project-workspace .panel{padding:17px}#global-search{padding:4px 8px}.topbar #global-search{min-width:0;width:100%}}

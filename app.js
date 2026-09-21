@@ -31,7 +31,8 @@ const cap = text => text ? text[0].toUpperCase() + text.slice(1) : 'Not recorded
 const initials = name => name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('');
 const avatar = name => { const n = el('span', initials(name), 'avatar'); n.setAttribute('aria-hidden', 'true'); return n; };
 const date = value => value ? new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short' }).format(new Date(`${value.slice(0, 10)}T12:00:00`)) : 'Not recorded';
-const status = value => el('span', cap(value), `badge ${value}`);
+const status = value => el('span', value === 'open' ? 'Opened' : cap(value), `badge ${value}`);
+function projectStatus(p){const group=el('span',undefined,'project-status');group.append(status(p.status));if(p.invoiceRequired&&p.status!=='closed')group.append(el('span','Invoice required','badge invoice'));return group;}
 const nameOf = item => item.person?.name ?? item.name ?? item.title;
 const typeOf = kind => ({ projects: 'project', clients: 'client', people: 'person', organisations: 'organisation' })[kind];
 const pathOf = type => ({ project: 'projects', client: 'clients', person: 'people', organisation: 'organisations' })[type];
@@ -57,7 +58,7 @@ function relationships(rows) {
 function projectLinks(projects) {
   const box = panel('Linked projects'); if (!projects.length) box.append(el('p', 'No linked projects recorded.', 'muted'));
   const list = el('div', undefined, 'project-links');
-  for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference}`));const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, status(p.status)); list.append(a); }
+  for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference}`));const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, projectStatus(p)); list.append(a); }
   box.append(list); return box;
 }
 function inspect(item, kind, slot) {
@@ -65,7 +66,7 @@ function inspect(item, kind, slot) {
   const body = el('div', undefined, 'inspector-body');
   if (!item) { body.append(empty('Select a record', 'Choose a row to see its details here.')); slot.append(body); return; }
   if (kind === 'projects') {
-    body.append(el('span', item.reference, 'inspector-reference'), el('h2', item.title), status(item.status), el('p', item.summary));
+    body.append(el('span', item.reference, 'inspector-reference'), el('h2', item.title), projectStatus(item), el('p', item.summary));
     const context = el('div', undefined, 'inspector-section'); context.append(el('h3', 'Project details'), details([['Client', link(item.clientName, `client/${item.clientId}`)], ['Target date', date(item.dueDate)]])); body.append(context);
     const people = el('div', undefined, 'inspector-section'); people.append(el('h3', 'Working together'));
     for (const r of [...item.relationships].sort((a, b) => Number(b.role === 'Technician') - Number(a.role === 'Technician'))) { const a = link('', `${r.type}/${r.id}`, 'person-line'); const text = el('span'); text.append(el('strong', r.name), el('small', r.role)); a.append(avatar(r.name), text); people.append(a); }
@@ -101,28 +102,28 @@ async function register(view, kind) {
     for (const [key, label, predicate] of filters) { const b = button('', () => { state.filter = key; draw(); tabs.querySelector('[aria-pressed=true]')?.focus(); }, 'filter-tab'); b.setAttribute('aria-pressed', String(state.filter === key)); b.append(el('span', label), el('span', String(items.filter(predicate).length), 'filter-count')); tabs.append(b); }
     const predicate = filters.find(f => f[0] === state.filter)?.[2] ?? (() => true);
     const query = state.query.toLowerCase().trim();
-    const visible = items.filter(item => predicate(item) && [nameOf(item), item.reference, item.clientName, item.role, item.summary].filter(Boolean).join(' ').toLowerCase().includes(query));
+    const visible = items.filter(item => predicate(item) && [nameOf(item), item.reference, item.clientName, item.role, item.category, item.summary].filter(Boolean).join(' ').toLowerCase().includes(query));
     const key = item => state.sort === 'date' ? item.dueDate ?? '9999' : state.sort === 'client' ? item.clientName : state.sort === 'reference' ? item.reference : nameOf(item);
     visible.sort((a, b) => String(key(a)).localeCompare(String(key(b)), 'en-AU', { numeric: true }) * (state.sort === 'reverse' ? -1 : 1));
     if (!visible.some(i => i.id === state.selected)) state.selected = visible[0]?.id ?? null;
     const table = el('table', undefined, kind + '-table'); const thead = el('thead'); const tr = el('tr');
-    const columns = kind === 'projects' ? ['Project', 'Client', 'Status', 'Target'] : kind === 'clients' ? ['Client', 'Projects'] : kind === 'people' ? ['Person', 'Role', 'Projects'] : ['Organisation', 'Role', 'Projects'];
+    const columns = kind === 'projects' ? ['Project', 'Client', 'Status', 'Target'] : kind === 'clients' ? ['Client', 'Projects'] : kind === 'people' ? ['Person', 'Role', 'Projects'] : ['Organisation', 'Category', 'Projects'];
     columns.forEach((label, i) => { const th = el('th', label); th.scope = 'col'; if ((kind === 'projects' && i === 3)) th.className = 'optional-col'; tr.append(th); }); thead.append(tr); table.append(thead);
     const tbody = el('tbody');
     for (const item of visible) {
       const row = el('tr'); row.dataset.id = item.id; row.classList.toggle('selected', !matchMedia('(max-width:800px)').matches && item.id === state.selected);
-      const first = el('td'); const control = button('', () => choose(item), 'row-open'); control.setAttribute('aria-label', `${matchMedia('(max-width:800px)').matches?'Open':'Preview'} ${nameOf(item)}`); if(!matchMedia('(max-width:800px)').matches)control.setAttribute('aria-pressed', String(item.id === state.selected));
+      const first = el('td'); const control = kind==='projects'?link('',`project/${item.id}`,'row-open'):button('', () => choose(item), 'row-open'); control.setAttribute('aria-label', `${kind==='projects'||matchMedia('(max-width:800px)').matches?'Open':'Preview'} ${nameOf(item)}`); if(kind!=='projects'&&!matchMedia('(max-width:800px)').matches)control.setAttribute('aria-pressed', String(item.id === state.selected));
       const text = el('span'); text.append(el('span', nameOf(item), 'row-title'), el('span', kind === 'projects' ? `${item.reference}` : kind === 'clients' ? item.person.email : kind === 'people' ? item.email : item.description, 'row-sub'));
-      if (kind === 'clients' || kind === 'people') { const identity = el('span', undefined, 'name-cell'); identity.append(avatar(nameOf(item)), text); control.append(identity); } else control.append(text); first.append(control); row.append(first);
-      if (kind === 'projects') { row.append(el('td', item.clientName)); const s = el('td'); s.append(status(item.status)); row.append(s, el('td', date(item.dueDate), 'optional-col')); }
+      if (kind === 'clients' || kind === 'people') { const identity = el('span', undefined, 'name-cell'); identity.append(avatar(nameOf(item)), text); control.append(identity); } else control.append(text); first.append(control); if(kind==='projects'){const previewButton=button('Quick view',()=>choose(item),'text-button row-preview');previewButton.setAttribute('aria-label','Preview '+item.title);first.append(previewButton);} row.append(first);
+      if (kind === 'projects') { row.append(el('td', item.clientName)); const s = el('td'); s.append(projectStatus(item)); row.append(s, el('td', date(item.dueDate), 'optional-col')); }
       else if (kind === 'clients') row.append(el('td', String(item.projects.length)));
-      else row.append(el('td', item.role), el('td', String(item.projects.length)));
-      row.addEventListener('click', event => { if (!event.target.closest('button,a')) choose(item); }); tbody.append(row);
+      else row.append(el('td', kind==='organisations'?(item.category||'Uncategorised'):item.role), el('td', String(item.projects.length)));
+      row.addEventListener('click', event => { if (!event.target.closest('button,a')) {if(kind==='projects')location.hash='project/'+item.id;else choose(item);} }); tbody.append(row);
     }
     table.append(tbody); tableSlot.replaceChildren(visible.length ? table : empty('No matching records', 'Try another filter or clear your search.'));
-    foot.replaceChildren(el('span', `${visible.length} of ${items.length} records`), el('span', items.length >= limit ? `Showing the first ${limit} records` : 'Select a row for a closer look'));
+    foot.replaceChildren(el('span', `${visible.length} of ${items.length} records`), el('span', items.length >= limit ? `Showing the first ${limit} records` : kind==='projects'?'Click a project to open · Quick view for a preview':'Select a row for a closer look'));
     inspect(visible.find(i => i.id === state.selected), kind, inspector);
-    function choose(item) { state.selected = item.id; if (window.matchMedia('(max-width: 800px)').matches) { location.hash = typeOf(kind) + '/' + item.id; return; } tbody.querySelectorAll('tr').forEach(r => { const selected = r.dataset.id === item.id; r.classList.toggle('selected', selected); r.querySelector('button').setAttribute('aria-pressed', String(selected)); }); inspect(item, kind, inspector); announce(`${nameOf(item)} selected. Quick view updated.`); }
+    function choose(item) { state.selected = item.id; if (window.matchMedia('(max-width: 800px)').matches) { location.hash = typeOf(kind) + '/' + item.id; return; } tbody.querySelectorAll('tr').forEach(r => { const selected = r.dataset.id === item.id; r.classList.toggle('selected', selected); r.querySelector('button')?.setAttribute('aria-pressed', String(selected)); }); inspect(item, kind, inspector); announce(`${nameOf(item)} selected. Quick view updated.`); }
   }
   q.addEventListener('input', () => { state.query = q.value; draw(); }); sort.addEventListener('change', () => { state.sort = sort.value; draw(); }); draw();
 }
@@ -139,7 +140,7 @@ function recordHeader(view, eyebrow, title, meta, action) { const header = el('d
 async function client(view, id) {
   const c = await api(`clients/${id}`); view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); meta.append(el('span', 'Client'), el('span', `${c.projects.length} linked projects`)); recordHeader(view, 'Client record', c.person.name, meta, link('New project', `new-project/${c.id}`, 'button primary'));
-  const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const info = panel('Contact details'); info.append(details([['Email', c.person.email], ['Phone', c.person.phone]]), link('Edit profile & roles', 'edit-person/' + c.person.id, 'text-button'));
+  const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel('Contact details'); info.append(details([['Email', c.person.email], ['Phone', c.person.phone]]), link('Edit profile & roles', 'edit-person/' + c.person.id, 'text-button'));
   const contacts = panel('Client contacts'); addClientContactActions(contacts, c); left.append(projectLinks(c.projects),clientDetailsSummary(c),info,contacts); const related = relationships(c.relationships); related.querySelector('h2').textContent = 'People linked through projects'; grid.append(left, related); view.append(el('div', undefined, 'heading-rule'), grid);
 }
 const fieldNames = { title: 'Project title', status: 'Status', feedbackRequired: 'Feedback required', invoiceRequired: 'Invoice required' };
@@ -147,7 +148,7 @@ const displayValue = value => typeof value === 'boolean' ? value ? 'Required' : 
 function auditPanel(p) {
   const box = panel('Project activity'); box.append(el('p', 'Saved changes, newest first. Development activity is not an authenticated staff audit trail.', 'muted'));
   if (!p.audit.length) box.append(empty('No changes recorded yet', 'Updates to this project will appear here after saving.'));
-  for (const a of p.audit) { const row = el('div', undefined, 'audit'); row.append(el('strong', a.action), el('small', `${a.actor} · ${new Date(a.at).toLocaleString('en-AU')}`)); for (const [key, value] of Object.entries(a.changes).filter(([key])=>!['primaryRecordId','primaryReference','primary_record_id'].includes(key))) row.append(el('p', `${fieldNames[key] ?? key}: ${displayValue(value.from)} → ${displayValue(value.to)}`)); box.append(row); }
+  for (const a of p.audit) { const row = el('div', undefined, 'audit'); row.append(el('strong', a.action), el('small', `${a.actor} · ${new Date(a.at).toLocaleString('en-AU')}`)); for (const [key, value] of Object.entries(a.changes).filter(([key])=>!['primaryRecordId','primaryReference','primary_record_id'].includes(key))) row.append(el('p', `${fieldNames[key] ?? key}: ${displayValue(value?.from)} → ${displayValue(value&&typeof value==='object'&&'to' in value?value.to:value)}`)); box.append(row); }
   return box;
 }
 async function project(view, id) {
@@ -191,7 +192,7 @@ async function project(view, id) {
   const quote=state?.quotes?.at(-1);if(quote)next.append(el('p',`Quote revision ${quote.version} · ${new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(quote.totalCents/100)}`,'project-next-evidence'));
   next.append(button(info[2]+' →',()=>navigate('Task'),'primary'));left.append(next);
   const brief=panel('The work');brief.append(el('p',p.summary||p.title,'record-summary'));
-  const facts=el('div',undefined,'project-facts');const client=el('div');client.append(el('small','CLIENT'),link(p.clientName,`client/${p.clientId}`));const tech=el('div');tech.append(el('small','LEAD TECHNICIAN'),technician?link(technician.name,'person/'+technician.id):el('span','Not assigned yet'));facts.append(client,tech);brief.append(facts,details([['Skills needed',p.coordination?.requiredSkills?.join(', ')||'Not specified'],['Target date',date(p.dueDate)],['Work location',[projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded'],['Expected payer',p.coordination?.fundingStatus==='self'?p.clientName:p.relationships?.find(r=>r.id===p.coordination?.payerId)?.name||'Not confirmed']]),link('Update technician or funding','coordination/'+id,'text-button'),button('Edit project details',()=>{editMode=false;navigate('Edit details');},'text-button'));brief.classList.add('project-home-brief');layout.append(brief);
+  const facts=el('div',undefined,'project-facts');const client=el('div');client.append(el('small','CLIENT'),link(p.clientName,`client/${p.clientId}`));const tech=el('div');tech.append(el('small','TECHNICAL TEAM'));const team=p.relationships.filter(r=>r.role==='Technician');if(!team.length)tech.append(el('span','Not assigned yet'));for(const member of team)tech.append(link(member.name+(member.id===p.coordination?.technicianId?' · Lead':''),'person/'+member.id));facts.append(client,tech);brief.append(facts,details([['Skills needed',p.coordination?.requiredSkills?.join(', ')||'Not specified'],['Target date',date(p.dueDate)],['Work location',[projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded'],['Expected payer',p.coordination?.fundingStatus==='self'?p.clientName:p.relationships?.find(r=>r.id===p.coordination?.payerId)?.name||'Not confirmed']]),link('Update team or funding','coordination/'+id,'text-button'),button('Edit project details',()=>{editMode=false;navigate('Edit details');},'text-button'));brief.classList.add('project-home-brief');layout.append(brief);
   renderNotes(notes,id,projectOperations,true);const notesLink=notes.querySelector('a[href="#operations/'+id+'"]');if(notesLink)notesLink.replaceWith(button('View all case notes',()=>navigate('Case-note history'),'text-button'));
   const phase=el('ol',undefined,'project-phases'),groups=[['Assessment',['enquiry','assessment']],['Quote & approval',['quote','peer_review','client_acceptance','finance_clearance']],['Technical work',['work']],['Completion',['customer_signoff','finance_finalisation','ready_to_close','closed']]],phaseIndex=groups.findIndex(([,keys])=>keys.includes(stage));
   for(const [i,[name]] of groups.entries()){const item=el('li',(i<phaseIndex?'✓ ':`${i+1} · `)+name);if(i===phaseIndex){item.setAttribute('aria-current','step');item.className='current';}else if(i<phaseIndex)item.className='complete';phase.append(item);}if(lifecycle.managed)overview.prepend(phase);
@@ -202,7 +203,7 @@ async function project(view, id) {
   view.addEventListener('click',event=>{if(!headerActions.contains(event.target)){menu.hidden=true;more.setAttribute('aria-expanded','false');}});
   function navigate(name){tab=name;menu.hidden=true;more.setAttribute('aria-expanded','false');draw();const destination=name==='Task'?task:name==='Overview'?overview:name==='Files'?filesPane:name==='Costs & invoices'?costsPane:name==='Workflow history'?recordPane:name==='Edit details'?editPane:name==='Audit trail'?auditPane:name==='Case-note history'?caseNotesPane:actionPanes.get(name)?.pane;destination?.focus({preventScroll:true});tabs.scrollIntoView({block:'nearest'});}
   function draw(){
-    projectTabs.set(id,tab);header.querySelector('h1').textContent=p.title;meta.replaceChildren(status(p.status),link(p.clientName,`client/${p.clientId}`),el('span',technician?'Lead: '+technician.name:'Technician not assigned'));
+    projectTabs.set(id,tab);header.querySelector('h1').textContent=p.title;meta.replaceChildren(projectStatus(p),link(p.clientName,`client/${p.clientId}`),el('span',technician?'Lead: '+technician.name:'Technician not assigned'),el('span',({enquiry:'Enquiry',assessment:'Assessment',quote:'Preparing quote',peer_review:'Technical review',client_acceptance:'Client acceptance',finance_clearance:'Invoice / payment clearance',work:'Technical work',customer_signoff:'Customer sign-off',finance_finalisation:'Final finance review',ready_to_close:'Ready to close',closed:'Completed'})[stage]||'Workflow not started','badge workflow-stage'));
     tabs.replaceChildren();for(const name of destinations){const b=button(name,()=>navigate(name),'');b.setAttribute('role','tab');b.id='project-tab-'+destinations.indexOf(name);b.setAttribute('aria-selected',String(tab===name||(!destinations.includes(tab)&&name==='Overview')));b.tabIndex=tab===name||(!destinations.includes(tab)&&name==='Overview')?0:-1;b.setAttribute('aria-controls',name==='Overview'&&!destinations.includes(tab)?'project-focused-pane':'project-pane-'+destinations.indexOf(name));b.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();navigate(event.key==='Home'?destinations[0]:event.key==='End'?destinations.at(-1):destinations[(destinations.indexOf(name)+(event.key==='ArrowRight'?1:3))%4]);tabs.querySelector('[aria-selected=true]')?.focus();}});tabs.append(b);}
     for(const [i,pane]of [overview,filesPane,costsPane,recordPane].entries()){pane.hidden=tab!==destinations[i];pane.id='project-pane-'+i;pane.setAttribute('role','tabpanel');pane.setAttribute('aria-labelledby','project-tab-'+i);pane.tabIndex=-1;}
     for(const pane of [task,editPane,auditPane,caseNotesPane,...[...actionPanes.values()].map(a=>a.pane)]){pane.removeAttribute('id');pane.removeAttribute('role');pane.removeAttribute('aria-labelledby');}const focused=tab==='Task'?task:tab==='Edit details'?editPane:tab==='Audit trail'?auditPane:tab==='Case-note history'?caseNotesPane:actionPanes.get(tab)?.pane;if(focused){focused.id='project-focused-pane';focused.setAttribute('role','tabpanel');focused.setAttribute('aria-labelledby','project-tab-0');}task.hidden=tab!=='Task';editPane.hidden=tab!=='Edit details';auditPane.hidden=tab!=='Audit trail';caseNotesPane.hidden=tab!=='Case-note history';auditPane.tabIndex=caseNotesPane.tabIndex=-1;task.tabIndex=-1;editPane.tabIndex=-1;for(const [key,{pane}]of actionPanes){pane.hidden=tab!==key;pane.tabIndex=-1;}
@@ -239,10 +240,11 @@ async function project(view, id) {
 async function entity(view, type, id) {
   const item = await api(`${pathOf(type)}/${id}`); view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); meta.append(el('span', item.roles?.join(' · ') ?? item.role)); recordHeader(view, type === 'person' ? 'Person record' : 'Organisation record', item.name, meta, type === 'person' ? link('Edit profile & roles', 'edit-person/' + id, 'button primary') : undefined);
-  const grid = el('div', undefined, 'detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
+  const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
   info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role]]) : el('p', item.description, 'record-summary'));
-  if (item.clientId) info.append(link('Open client record →', `client/${item.clientId}`, 'text-button'));
-  if (item.technician) await renderCredentials(left,id);
+  if (item.clientId) info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));
+  if(type==='organisation'){info.append(details([['Category',item.category||'Not categorised']]),link('Edit category','organisation-category/'+id,'button secondary'));}
+  if (item.technician) {try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}
   if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['Availability', cap(item.technician.availability)]])); left.append(tech); } left.append(info, projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted')); grid.append(left, context); view.append(el('div', undefined, 'heading-rule'), grid);
 }
 async function render() {
@@ -251,7 +253,7 @@ async function render() {
   try{if(!await requireLocalSession(main,render,()=>ticket===renderVersion,()=>Boolean(drafts.size||workflowHasDrafts()||operationsHaveDrafts()||careHasDrafts()||clientDetailsHasDrafts()||saving)))return;if(ticket!==renderVersion)return;}catch{if(ticket!==renderVersion)return;showAuthFailure(render);return;}
   const [route = 'projects', raw = ''] = (location.hash.slice(1) || 'projects').split('/'); const view = el('div');
   main.replaceChildren(el('p', 'Loading workspace…', 'loading')); main.setAttribute('aria-busy', 'true');
-  const active = ({ project: 'projects', client: 'clients', person: 'people', organisation: 'organisations', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'clients', 'new-project': 'projects', coordination: 'projects', operations:'projects',documents:'projects','client-details':'clients' })[route] ?? route;
+  const active = ({ project: 'projects', client: 'people', person: 'people', organisation: 'organisations', 'organisation-category':'organisations', clients:'people', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'people', 'new-project': 'projects', coordination: 'projects', operations:'projects',documents:'projects','client-details':'people' })[route] ?? route;
   document.querySelectorAll('[data-nav]').forEach(a => { if (a.dataset.nav === active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   try {
     const arg = decodeURIComponent(raw);
@@ -262,7 +264,7 @@ async function render() {
     else if(route==='availability') await renderAvailability(view);
     else if(await renderOperations(view,route,arg)) { /* Case workspace supplied. */ }
     else if (await renderWorkflow(view, route, arg)) { /* Workflow view supplied. */ }
-    else if (['projects', 'clients', 'people', 'organisations'].includes(route)) await register(view, route);
+    else if (['projects', 'clients', 'people', 'organisations'].includes(route)) await register(view, route==='clients'?'people':route);
     else if (route === 'dashboard') await register(view, 'projects');
     else if (route === 'search') await search(view, arg);
     else if (route === 'project') await project(view, arg);
