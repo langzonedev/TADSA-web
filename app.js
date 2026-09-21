@@ -268,7 +268,7 @@ async function entity(view, type, id) {
   const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
   info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role]]) : el('p', item.description, 'record-summary'));
   if (item.clientId) info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));
-  if(type==='organisation'){info.append(details([['Category',item.category||'Not categorised']]),link('Edit category','organisation-category/'+id,'button secondary'));}
+  if(type==='organisation'){info.append(details([['Category',item.category||'Not categorised'],['Email',item.email||'Not recorded']]),link('Edit contact & category','organisation-category/'+id,'button secondary'));}
   if (item.technician) {try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}
   if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['Availability', cap(item.technician.availability)]])); left.append(tech); } left.append(info, projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted')); grid.append(left, context); view.append(el('div', undefined, 'heading-rule'), grid);
 }

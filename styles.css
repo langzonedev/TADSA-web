@@ -185,3 +185,13 @@ html[data-theme=dark] .project-subnav button[aria-selected=true]{background:#334
 /* Visible link signifiers do not depend on hover or colour alone. */
 .project-facts a,.project-workspace .record-meta a,.project-home-brief .text-button{text-decoration:underline;text-underline-offset:3px}
 .project-nav button:hover,.project-subnav button:hover{box-shadow:inset 0 -2px 0 var(--accent)}
+
+.report-presets{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}
+.report-builder{max-width:1200px}.report-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:20px 0}
+.report-filter{display:grid;grid-template-columns:1fr 1fr 1fr auto;align-items:end;gap:12px;margin:14px 0}.report-filter button{min-height:44px}
+.report-columns{display:flex;flex-wrap:wrap;gap:14px 24px;margin:24px 0;padding:18px;border:1px solid var(--line);border-radius:8px}
+.report-saved{display:flex;align-items:end;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--line);padding-bottom:18px}
+.report-table-wrap{overflow:auto;max-height:65vh;border:1px solid var(--line);border-radius:8px;margin:16px 0}.report-table-wrap table{width:100%;border-collapse:collapse}.report-table-wrap th{position:sticky;top:0;background:var(--paper);z-index:1}.report-table-wrap td{max-width:360px;overflow-wrap:anywhere;white-space:normal}
+.report-output{margin-top:24px}.report-email textarea{width:100%;min-height:90px}.record-tabs button[aria-pressed=true]{font-weight:700;border-bottom:3px solid var(--brand-coral)}
+@media(max-width:800px){.report-controls{grid-template-columns:1fr 1fr}.report-filter{grid-template-columns:1fr 1fr}.report-saved>*{flex:1 1 160px}.report-columns{gap:12px}.report-filter button{align-self:end}.report-presets button{text-align:left}}
+@media(max-width:480px){.report-controls{grid-template-columns:1fr}.report-filter{padding:12px;border:1px solid var(--line);border-radius:8px}.report-filter>:first-child{grid-column:1/-1}}

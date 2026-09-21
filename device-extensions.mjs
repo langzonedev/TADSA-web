@@ -1,6 +1,7 @@
 import {lifecycleGate} from './device-lifecycle.mjs';
 import './device-credentials.mjs';
 import './device-iteration.mjs';
+import './device-reports.mjs';
 import {installModelExtensions,fail} from './device-model.mjs';
 export const serviceAreas=[{id:'western',label:'Western suburbs'},{id:'southern',label:'Southern suburbs'},{id:'northern',label:'Northern suburbs'},{id:'eastern',label:'Eastern suburbs'},{id:'adelaide-hills',label:'Adelaide Hills'},{id:'metro',label:'Metropolitan Adelaide'},{id:'regional',label:'Regional South Australia'}];
 const planDefaults={location:'',serviceArea:'',ndisApplicable:false,ndisApproved:false,ndisApprovedBy:'',ndisApprovedOn:''};

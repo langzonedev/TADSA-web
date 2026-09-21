@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "8d3c71f199afb7157315bc57abfefb2864094cf6",
+  "sourceRevision": "202158144b736a202611a38becb7eafebf14ee99",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "lifecycle-model.js": {
@@ -29,7 +29,17 @@
     },
     "reports.js": {
       "source": "public/reports.js",
-      "sha256": "ec4cf8b73e608d0b0353836cc754f5cebd36580c2c629b6dcdcd19be47cb0993",
+      "sha256": "022edfa737184acb7807eb1defc7287992f4a542ae648b2d16225cbc40a10502",
+      "transform": null
+    },
+    "report-model.js": {
+      "source": "public/report-model.js",
+      "sha256": "35c9218d2a59b6bf020c7bd2c81b820a057f57134f24e0c4c681be9d36f9acf3",
+      "transform": null
+    },
+    "report-builder.js": {
+      "source": "public/report-builder.js",
+      "sha256": "edc112dd098cc4e2c2628ae7748aecfbd4e6c70257062d6f146cf3abcab06d8c",
       "transform": null
     },
     "jpeg.js": {
@@ -39,7 +49,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "71bd2481399420d69e8ba853dde6da2549bacbc66c84d24e8bb5b3850dee619a",
+      "sha256": "356a390427b7e44c47a7c10152287165546fb4137658c3e884a89d37e65f4ade",
       "transform": null
     },
     "settings.js": {
@@ -54,7 +64,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "1df443b3514620119254b4f614c778350215f38e1473d03eb09b4b7e8f706b85",
+      "sha256": "361ee68cf7fdee2855ca0532531fe34b732fccb5289f31a9ab12f11dadaaa651",
       "transform": null
     },
     "operations.js": {
@@ -84,7 +94,7 @@
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "6e8e81ed3ab4747e4b2ef25ee0d31786bc9855b21b84f087e87f1513e4c79d6d",
+      "sha256": "3bcdee49fadd080c63a0d524b6f3496cc745ed385ad73061425c00e1e7743d7b",
       "transform": null
     },
     "boot.js": {
@@ -109,5 +119,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "fb366185ef228955f92b40d049a03d12ff59376787bc3e70b009508bc451b781"
+  "shellHash": "8592c7eab3443e39c6b704dfa966881b9ed49b4c93dbcb49120f9d5d6dd47e85"
 }
