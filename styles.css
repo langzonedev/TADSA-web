@@ -137,3 +137,26 @@ html[data-local-file=true] #auth-gate{display:none!important}
 .project-workspace .project-home-grid{gap:18px}.project-workspace .panel{padding:20px}.project-workspace .project-facts{margin:16px 0;gap:14px}.project-workspace .project-home-brief .detail-pairs{gap:14px}.project-workspace .project-home-brief h2{margin-bottom:12px}.project-workspace .project-next h2{font-size:23px}.project-workspace .project-nav{margin-bottom:18px}.project-workspace .project-phases{margin-bottom:18px}
 @media(min-width:1100px){.register-layout{grid-template-columns:minmax(0,1fr) 330px;gap:16px}.person-detail-layout>div:first-child{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.person-detail-layout>div:first-child>.panel{margin:0}.person-detail-layout>div:first-child>.care-details{grid-column:1/-1}}
 @media(max-width:800px){.projects-table .row-preview{display:none}.project-workspace .record-meta .workflow-stage{white-space:normal}.project-workspace .panel{padding:17px}#global-search{padding:4px 8px}.topbar #global-search{min-width:0;width:100%}}
+
+/* Keep the project context visible while its working section changes. */
+.project-workspace .project-home-grid{grid-template-columns:minmax(0,1.15fr) minmax(300px,1fr);gap:16px}
+.project-workspace .project-home-grid>div{display:flex;flex-direction:column;gap:16px}
+.project-workspace .project-home-grid .panel{margin:0;padding:18px}
+.project-workspace .project-home-notes{grid-row:1;grid-column:2}
+.project-workspace .project-home-brief .record-summary{margin-bottom:12px;line-height:1.5}
+.project-workspace .project-facts{margin:12px 0;gap:12px}
+.project-workspace .project-home-brief .detail-pairs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px}
+.project-workspace .project-home-brief .detail-pairs>div{padding:0}
+.project-workspace .project-next h2{margin:5px 0 8px}
+.project-workspace .project-next>p:not(.eyebrow){line-height:1.5;margin-bottom:12px}
+.project-workspace .breadcrumb{margin-bottom:10px}.project-workspace .record-header{padding-bottom:10px}
+.project-workspace .project-nav{margin-bottom:14px}.project-workspace .project-phases{margin-bottom:12px}
+.project-workspace .project-home-notes .workflow-panel{padding:0;border:0;background:transparent;box-shadow:none}
+.project-workspace .project-home-notes textarea{min-height:80px}
+.project-embedded-pane{outline:none}.project-embedded-pane>h2{font-size:22px;margin:4px 0 14px}
+.project-embedded-pane>.panel,.project-embedded-pane>div>.panel{margin-top:0}
+.register-card .row-open,.people-table .row-open,.organisations-table .row-open,.clients-table .row-open{display:block;text-align:left;text-decoration:none;min-height:36px}
+.row-open:hover .row-title{text-decoration:underline}.row-preview{font-size:12px;margin-top:3px;padding:4px 0;min-height:30px}
+@media(min-width:801px){main:has(>.project-workspace){padding-top:18px}.project-embedded-pane .operations-form{grid-template-columns:repeat(2,minmax(0,1fr))}.project-embedded-pane .operations-form>fieldset,.project-embedded-pane .operations-form>div{grid-column:1/-1}}
+@media(max-width:800px){.row-preview{display:none}.project-workspace .project-home-grid{grid-template-columns:minmax(0,1fr)}.project-workspace .project-home-notes{grid-column:1;grid-row:auto}.project-workspace .project-home-grid .panel{padding:16px}.project-workspace .project-home-brief .detail-pairs{grid-template-columns:minmax(0,1fr)}}
+@media print{.project-workspace>.record-header,.project-embedded-pane>h2,.project-embedded-pane>div>.message,.project-embedded-pane>div>button,.project-embedded-pane>div>a{display:none!important}.project-embedded-pane .print-document{margin:0}}

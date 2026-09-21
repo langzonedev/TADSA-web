@@ -22,14 +22,14 @@ async function send(form,d,key,path,method,payload,feedback,submit){
   catch(e){if(e.status){d.pending=null;d.requestId=crypto.randomUUID();}feedback.replaceChildren(notice(e.status?e.message:'Save result not confirmed. Retry the same save safely.',true));if(e.status===409&&method==='PUT')feedback.append(button('Compare latest case',()=>host.refresh()));}
   finally{host.setSaving(false);if(workspace){workspace.inert=wasInert;workspace.removeAttribute('aria-busy');}form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=Boolean(d.pending)&&n!==submit);submit.disabled=false;submit.textContent=d.pending?'Retry save safely':submit.dataset.label;if(!wasInert){if(refreshed)workspace?.focus({preventScroll:true});else submit.focus({preventScroll:true});}}
 }
-export async function renderOperations(view,route,id){
+export async function renderOperations(view,route,id,options={}){
   if(route==='review-queue'){view.append(node('h1','Needs attention'),node('p','Shared queue: any administrator or coordinator can pick up an item.','subtitle'));const q=await api('review-queue');if(!q.items.length)view.append(notice('No flagged cases.'));for(const p of q.items){const box=node('section',null,'panel');box.append(link(p.title||p.reference||p.projectId,'operations/'+(p.projectId||p.id)),node('p',p.reason||'Review the case, funding or hold details.'));view.append(box);}return true;}
   if(!['operations','documents'].includes(route))return false;
   const [p,ops,people,orgs,approvers,business,clients]=await Promise.all([api('projects/'+id),api(`projects/${id}/operations`),api('people'),api('organisations'),api('approvers'),api('business-settings'),api('clients')]);
   const lifecycle=await api(`projects/${id}/lifecycle`);
-  const requestedFocus=location.hash.split('/')[2],focus=route==='operations'&&['invoices','hours','holds'].includes(requestedFocus)?requestedFocus:'';
+  const requestedFocus=options.focus??location.hash.split('/')[2],focus=route==='operations'&&['invoices','hours','holds'].includes(requestedFocus)?requestedFocus:'';
   ops.invoices=ops.invoices.map(i=>({...i,...i.snapshot}));
-  view.append(link('← Back to project','project/'+id),node('h1',route==='documents'?'Project documents':({invoices:'Prepare draft invoice',hours:'Record project hours',holds:'Hold or resume work'})[focus]||'Case workspace'),node('p',p.title,'subtitle'));
+  if(!options.embedded)view.append(link('← Back to project','project/'+id),node('h1',route==='documents'?'Project documents':({invoices:'Prepare draft invoice',hours:'Record project hours',holds:'Hold or resume work'})[focus]||'Case workspace'),node('p',p.title,'subtitle'));
   if(route==='documents'){renderDocuments(view,p,ops,lifecycle);return true;}
   const sections=node('nav',null,'actions');sections.setAttribute('aria-label','Case workspace sections');for(const[label,heading]of [['Hours & holds','Hours, funding and holds'],['Case notes','Case notes'],...(lifecycle.managed||p.kind!=='Assessment'?[['Draft invoices','Draft invoices']]:[])])sections.append(button(label,()=>{const target=[...view.querySelectorAll('h2')].find(h=>h.textContent===heading);if(target){target.tabIndex=-1;target.scrollIntoView({block:'start'});target.focus({preventScroll:true});}}));view.append(sections);
  const key='case/'+id+(focus?'/'+focus:''),d=drafts.get(key)??{...ops,requestId:crypto.randomUUID(),fundingContributors:ops.fundingContributors.map(c=>({...c,amount:money(c.amountCents)}))};

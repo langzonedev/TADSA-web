@@ -49,10 +49,10 @@ async function save(form, d, notice, saveButton, path, method, payload, done, du
 }
 function cancel(form, d, key, route, label = 'Cancel') {
   return button(label, () => {
-    if (!d.dirty) { drafts.delete(key); location.hash = route; return; }
+    if (!d.dirty) { drafts.delete(key); typeof route==='function'?route():location.hash = route; return; }
     let confirm = form.querySelector('.discard-question'); if (confirm) return;
     confirm = note('Discard the unsaved details?'); confirm.classList.add('discard-question');
-    confirm.append(button('Keep editing', () => confirm.remove()), button('Discard draft', () => { drafts.delete(key); location.hash = route; })); form.append(confirm); confirm.querySelector('button').focus();
+    confirm.append(button('Keep editing', () => confirm.remove()), button('Discard draft', () => { drafts.delete(key); typeof route==='function'?route():location.hash = route; })); form.append(confirm); confirm.querySelector('button').focus();
   });
 }
 function saveButton(label) { const n = el('button', label, 'primary'); n.type = 'submit'; n.dataset.label = label; return n; }
@@ -169,11 +169,11 @@ async function newProject(view, clientId) {
   }
   draw();
 }
-async function editCoordination(view,id) {
+async function editCoordination(view,id,options={}) {
   const [project,dirs,projectLocation]=await Promise.all([request('projects/'+id),directories(),request('projects/'+id+'/location')]);const key='coordination/'+id;
   const d=getDraft(key,{...project.coordination,technicianId:project.coordination.technicianId||'',payerId:project.coordination.payerId||'',version:project.version,filterArea:projectLocation.serviceArea,filterPostcode:projectLocation.postcode});
-  title(view,'Funding & technical team',project.title,'project/'+id);view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location from More, then Edit project details.'))); const box=panel('Review the allocation');const form=el('form',null,'form-grid');coordinationFields(form,d,dirs);const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save allocation');actions.append(submit,cancel(form,d,key,'project/'+id));form.append(notice,actions);box.append(form);view.append(box);
-  form.addEventListener('submit',e=>{e.preventDefault();if(!allocationValid(form,d,notice))return;save(form,d,notice,submit,'projects/'+id+'/coordination','PUT',{version:d.version,...coordinationValues(d)},()=>{drafts.delete(key);host.announce('Allocation saved.');location.hash='project/'+id;});});
+  if(!options.embedded)title(view,'Funding & technical team',project.title,'project/'+id);view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location from More, then Edit project details.'))); const box=panel('Review the allocation');const form=el('form',null,'form-grid');coordinationFields(form,d,dirs);const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save allocation');actions.append(submit,cancel(form,d,key,options.onCancel??('project/'+id)));form.append(notice,actions);box.append(form);view.append(box);
+  form.addEventListener('submit',e=>{e.preventDefault();if(!allocationValid(form,d,notice))return;save(form,d,notice,submit,'projects/'+id+'/coordination','PUT',{version:d.version,...coordinationValues(d)},()=>{drafts.delete(key);host.announce('Allocation saved.');if(options.embedded)host.refresh();else location.hash='project/'+id;});});
   if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';}
   if(d.version!==project.version){notice.append(note('This project changed since you started. Your draft is kept. Compare the latest saved allocation before continuing.',true),reviewList([['Latest version',String(project.version)],['Funding',project.coordination.fundingStatus],['Funding notes',project.coordination.fundingNotes||'None'],['Technician',dirs.technicians.find(t=>t.id===project.coordination.technicianId)?.name||'Unassigned'],['Skills',project.coordination.requiredSkills.join(', ')||'None']]));notice.append(button('Use latest version with my draft',()=>{d.version=project.version;notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));}
 }
@@ -202,12 +202,12 @@ export function addClientContactActions(box,client) {
   for(const c of client.contacts??[]){const row=el('div',null,'contact-row');const text=el('div');text.append(link(c.name,'person/'+c.personId,'row-title'),el('p',c.role,'muted'));row.append(text);
     row.append(button(`Unlink ${c.name}`,()=>{const prompt=note(`Remove ${c.name} from this client’s contacts? The person record and project links will remain.`);const d={requestId:crypto.randomUUID()};const form=el('form');const submit=saveButton('Unlink contact');form.append(submit,button('Keep contact',()=>prompt.remove()));const feedback=el('div');form.append(feedback);prompt.append(form);row.append(prompt);form.addEventListener('submit',e=>{e.preventDefault();save(form,d,feedback,submit,`clients/${client.id}/contacts/remove`,'POST',{requestId:d.requestId,personId:c.personId,role:c.role},()=>{host.refresh();});});},'text-button'));box.append(row);}
 }
-export async function renderWorkflow(view,route,arg) {
+export async function renderWorkflow(view,route,arg,options={}) {
   if(route==='new-person'||route==='edit-person')await personProfile(view,route==='edit-person'?arg:null);
   else if(route==='new-client')await newClient(view,arg);
   else if(route==='new-project')await newProject(view,arg);
   else if(route==='link-contact')await linkContact(view,arg);
-  else if(route==='coordination')await editCoordination(view,arg);
+  else if(route==='coordination')await editCoordination(view,arg,options);
   else if(route==='organisation-category')await organisationCategory(view,arg);
   else return false;
   return true;
