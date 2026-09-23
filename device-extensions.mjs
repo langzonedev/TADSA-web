@@ -1,5 +1,8 @@
 import {lifecycleGate} from './device-lifecycle.mjs';
 import './device-credentials.mjs';
+import './device-profile-details.mjs';
+import './device-project-details.mjs';
+import './device-invoice-references.mjs';
 import './device-iteration.mjs';
 import './device-reports.mjs';
 import {installModelExtensions,fail} from './device-model.mjs';
@@ -31,8 +34,8 @@ installModelExtensions(ctx=>{const {d,parts,method,input,find,version,bump,proje
  if(kind==='device-records'&&method==='DELETE'){
   if(!['projects','people'].includes(id)||!sub)fail('Choose a device record.');
   const record=find(id,sub);
-  if(id==='projects'){d.projects=d.projects.filter(x=>x.id!==sub);d.relationships=d.relationships.filter(x=>x.projectId!==sub);d.audit=d.audit.filter(x=>x.projectId!==sub);d.statusEvents=d.statusEvents.filter(e=>e.id!==sub);delete d.operations[sub];delete d.workPlans[sub];delete d.attachments[sub];delete d.lifecycles[sub];}
-  else{const client=d.clients.find(c=>c.personId===sub);if(d.relationships.some(x=>x.id===sub)||d.contacts.some(x=>x.personId===sub&&x.active!==false)||(client&&d.projects.some(p=>p.clientId===client.id))||Object.values(d.operations).some(o=>(o.fundingContributors??[]).some(x=>x.type==='person'&&x.id===sub)||(o.invoices??[]).some(i=>i.snapshot.payerId===sub)))fail('This person is linked. Remove or reassign the linked records first.');d.people=d.people.filter(x=>x.id!==sub);if(client){d.clients=d.clients.filter(c=>c.id!==client.id);d.primaryRecords=d.primaryRecords.filter(r=>r.clientId!==client.id);d.contacts=d.contacts.filter(c=>c.clientId!==client.id);}d.contacts=d.contacts.filter(x=>x.personId!==sub);delete d.calendars[sub];delete d.credentials[sub];}
+  if(id==='projects'){d.projects=d.projects.filter(x=>x.id!==sub);d.relationships=d.relationships.filter(x=>x.projectId!==sub);d.audit=d.audit.filter(x=>x.projectId!==sub);d.statusEvents=d.statusEvents.filter(e=>e.id!==sub);delete d.operations[sub];delete d.workPlans[sub];delete d.attachments[sub];delete d.lifecycles[sub];if(d.projectAdminDetails)delete d.projectAdminDetails[sub];if(d.projectFeedback)delete d.projectFeedback[sub];if(d.invoiceReferences)for(const [key,value]of Object.entries(d.invoiceReferences))if(value.projectId===sub)delete d.invoiceReferences[key];}
+  else{const client=d.clients.find(c=>c.personId===sub);if(d.relationships.some(x=>x.id===sub)||d.contacts.some(x=>x.personId===sub&&x.active!==false)||(client&&d.projects.some(p=>p.clientId===client.id))||Object.values(d.operations).some(o=>(o.fundingContributors??[]).some(x=>x.type==='person'&&x.id===sub)||(o.invoices??[]).some(i=>i.snapshot.payerId===sub)))fail('This person is linked. Remove or reassign the linked records first.');d.people=d.people.filter(x=>x.id!==sub);if(client){d.clients=d.clients.filter(c=>c.id!==client.id);d.primaryRecords=d.primaryRecords.filter(r=>r.clientId!==client.id);d.contacts=d.contacts.filter(c=>c.clientId!==client.id);}d.contacts=d.contacts.filter(x=>x.personId!==sub);delete d.calendars[sub];delete d.credentials[sub];if(d.profileDetails)delete d.profileDetails[sub];}
   return {deleted:true,id:sub};
  }
  if(kind==='availability-options')return {serviceAreas};

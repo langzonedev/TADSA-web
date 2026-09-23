@@ -1,5 +1,8 @@
 import {validateLifecycleBackup} from './device-lifecycle-validation.mjs';
 import {validateCredentials} from './device-credentials.mjs';
+import {validateProfileDetailsBackup} from './device-profile-details.mjs';
+import {validateProjectDetailsBackup} from './device-project-details.mjs';
+import {validateInvoiceReferencesBackup} from './device-invoice-references.mjs';
 import {normalise,fail} from './device-model.mjs';
 import {validateDeviceFile} from './device-files.mjs';
 const STORE='workspace',MAX_BYTES=256*1024*1024,FORMAT='tadsa-device-backup';
@@ -56,6 +59,9 @@ export async function validateBackup(input){
  for(const a of raw.audit){if(!object(a))invalid('invalid audit event.');ref('projects',a.projectId,'Audit event');}
  if(raw.contacts!==undefined&&!Array.isArray(raw.contacts))invalid('contacts must be a list.');for(const c of raw.contacts??[]){ref('clients',c.clientId,'Contact');ref('people',c.personId,'Contact');}
  for(const key of ['operations','calendars','workPlans','attachments','clientNdis','credentials','lifecycles','replays'])if(raw[key]!==undefined&&!object(raw[key]))invalid(key+' must be an object.');
+ validateProfileDetailsBackup(raw);
+ validateProjectDetailsBackup(raw);
+ validateInvoiceReferencesBackup(raw);
  const invoiceIds=new Map(),invoiceTotals=new Map();
  for(const [id,o]of Object.entries(raw.operations??{})){
   ref('projects',id,'Operations');if(!object(o))invalid('invalid operations.');for(const key of ['actualMinutes','remainingMinutes'])amount(o[key],'Operation minutes',0,600000);

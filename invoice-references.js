@@ -1,0 +1,6 @@
+import {node,request,field,editor} from './project-care.js';
+export async function renderInvoiceReferences(parent,projectId){
+ const operations=await request(`projects/${projectId}/operations`),panel=node('section',null,'panel');panel.append(node('h2','Purchase orders & Finance references'),node('p','Reference details for each existing invoice. Saving a reference does not issue an invoice, change its original document or confirm payment.','field-help'));parent.append(panel);
+ if(!operations.invoices.length){panel.append(node('p','References can be recorded here once an invoice has been created.'));return;}
+ for(const invoice of operations.invoices){const path=`projects/${projectId}/invoices/${invoice.id}/references`,saved=await request(path);const entry=editor(panel,'invoice-references/'+invoice.id,saved,invoice.number??invoice.snapshot?.number??'Invoice',(form,d)=>{field(form,'Purchase order reference',d,'purchaseOrder').maxLength=120;field(form,'External Finance invoice reference',d,'financeInvoiceReference').maxLength=120;},path,'PUT',d=>Object.fromEntries(['requestId','version','purchaseOrder','financeInvoiceReference'].map(k=>[k,d[k]])));const save=entry.form.querySelector('button[type=submit]');save.dataset.label='Save references';if(!entry.d.pending)save.textContent='Save references';}
+}
