@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "6613ecb6e65503f94ed8cc18b356c16a0c248505",
+  "sourceRevision": "472db5e82527599f244fe4adcf1b114396f01313",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "invoice-references.js": {
@@ -79,7 +79,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "21aee30b5d17eb2fb1e8cf2179dac2c17fba0cf7116678e6a917c4916944d735",
+      "sha256": "e763132d1cfa17dbb4ed8031d6f50f22956d711427cb89baa1e0b7eb720d400b",
       "transform": null
     },
     "settings.js": {
@@ -129,7 +129,7 @@
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "c1bfd2451dec83965e21138eb5716802d803d53f3966b40abf5f5252b8b4aaa4",
+      "sha256": "592c1ff5f5f58546390a588c991f0f989aa19c512ac55cdf58e32f17a0ca8900",
       "transform": null
     },
     "boot.js": {
@@ -154,5 +154,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "d749b70adb1200075afd5523cac217c1806e729f7a98fccc461f4cff865f3cdf"
+  "shellHash": "416f848e18e05d8a660f208bd380599409ecce763f6388e6bd038bac9cc4a81d"
 }

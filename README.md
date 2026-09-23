@@ -26,6 +26,8 @@ Phones use a hamburger menu and grouped project sections. Client, OT and other p
 
 ## Shared source
 
+The project Overview follows the latest customer layout feedback: project identity and status at the top, work and linked people beside Finance status, then case-note entry/history beside the next workflow action. Compact screens stack the content and keep the section picker. Finance dates retain their recorded meanings; a receipt or external Finance confirmation is not presented as proof that every invoice is paid.
+
 Settings contains the default hourly rate for new projects and device appearance preferences (Light, Dark, device setting and reduced motion). Existing projects retain their captured rate. Live search previews and project sections use the same source as the main application. When an update is ready, the Device demo menu offers a reload; finish or save your current work first.
 
 Run: node tools/sync-from-main.mjs ../TADSA

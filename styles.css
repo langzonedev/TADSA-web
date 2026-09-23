@@ -206,3 +206,53 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 .workflow-return .message{grid-column:1 / -1;line-height:1.6}
 
 .profile-details .detail-list{display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,2fr);gap:10px 18px;margin:16px 0}.profile-details .detail-list dt{color:var(--muted)}.profile-details .detail-list dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}.profile-details fieldset{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.profile-details fieldset legend{font-weight:600}.profile-details .checkbox{display:flex;align-items:center;gap:10px}@media(max-width:500px){.profile-details .detail-list{grid-template-columns:1fr;gap:4px}.profile-details .detail-list dd{margin-bottom:10px}}
+
+/* Customer-guided project overview: identity, context/finance, then notes/action. */
+.project-workspace .record-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding:20px 0 6px;gap:20px}
+.project-workspace .record-header>div:first-child{min-width:0}
+.project-workspace .record-header h1{margin:8px 0 0;overflow-wrap:anywhere}
+.project-workspace .record-header>.record-meta{display:grid;grid-template-columns:repeat(3,minmax(110px,1fr));gap:12px 24px;align-items:start;max-width:600px}
+.project-header-fact{display:flex;flex-direction:column;gap:8px;min-width:0;overflow-wrap:anywhere}
+.project-header-fact small{font-size:11px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+.project-header-fact>.badge{align-self:flex-start}
+.project-header-fact>.workflow-stage{font-weight:600}
+.project-overview-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr);gap:20px;align-items:start}
+.project-overview-grid>*{min-width:0}
+.project-overview-grid .panel{margin:0}
+.project-overview-grid>.project-home-brief{grid-column:1;grid-row:1}
+.project-overview-grid>.project-finance-summary{grid-column:2;grid-row:1}
+.project-overview-grid>.project-home-notes{grid-column:1;grid-row:2}
+.project-overview-grid>.project-overview-action{grid-column:2;grid-row:2;display:grid;gap:16px}
+.project-overview-grid .project-facts{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 16px;margin:20px 0}
+.project-overview-grid .project-facts a{overflow-wrap:anywhere;line-height:1.5}
+.project-overview-grid .project-facts>div:last-child{grid-column:span 2}
+.project-context-details{border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;padding:12px 0 0;margin:0}
+.project-context-details>summary{font-size:14px;color:var(--muted);padding:0;min-height:28px}
+.project-context-details .detail-pairs{margin-top:16px}
+.project-overview-links{display:flex;align-items:center;flex-wrap:wrap;gap:4px 18px;margin-top:10px}
+.project-overview-links .text-button,.project-finance-summary .text-button{padding:8px 0;text-decoration:underline;text-underline-offset:3px}
+.project-finance-summary .detail-pairs{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:18px 0}
+.project-finance-summary .detail-pairs>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:0}
+.project-finance-summary .detail-pairs dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.project-finance-summary .field-help{margin:14px 0 4px;line-height:1.5}
+.project-overview-grid .project-home-notes textarea{min-height:110px}
+.project-note-history-title{font-size:14px;margin:22px 0 0;color:var(--muted)}
+.project-overview-action .project-phases{margin:0;font-size:12px}
+.project-overview-action .project-phases li{flex-basis:40%;white-space:normal}
+@media(min-width:1500px){.project-overview-grid .project-facts{grid-template-columns:repeat(5,minmax(0,1fr))}.project-overview-grid .project-facts>div:last-child{grid-column:auto}}
+@media(max-width:1100px){
+ .project-workspace .record-header{grid-template-columns:minmax(0,1fr) auto}
+ .project-workspace .record-header>.record-meta{grid-column:1 / -1;grid-row:2;max-width:none}
+ .project-workspace .record-header>.project-more-wrap{grid-column:2;grid-row:1}
+ .project-overview-grid{grid-template-columns:minmax(0,1.2fr) minmax(260px,1fr);gap:16px}
+ .project-overview-grid .project-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:800px){
+ .project-overview-grid{grid-template-columns:minmax(0,1fr)}
+ .project-overview-grid>.project-home-brief,.project-overview-grid>.project-finance-summary,.project-overview-grid>.project-home-notes,.project-overview-grid>.project-overview-action{grid-column:1;grid-row:auto}
+ .project-workspace .record-header{gap:16px 8px}
+ .project-workspace .record-header>.record-meta{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+ .project-workspace .record-header>.project-more-wrap{max-width:145px}
+ .project-workspace .project-sections-toggle{white-space:normal;text-align:left;font-size:13px;padding:8px}
+ .project-overview-grid .panel{padding:16px}
+}
