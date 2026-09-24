@@ -13,8 +13,8 @@ export function validateProjectDetailsBackup(data){
   }else{
    if(!Array.isArray(value))fail('Backup rejected: feedback must be a list.');const ids=new Set();
    for(const entry of value){
-    if(!exact(entry,['id','recordedOn','comments','followUpRequired','at','actor'])||!uuid(entry.id)||ids.has(entry.id))fail('Backup rejected: invalid or repeated feedback identity.');ids.add(entry.id);
-    try{validateProjectFeedback({requestId:'backup-validation',version:p.version,recordedOn:entry.recordedOn,comments:entry.comments,followUpRequired:entry.followUpRequired});}catch(error){fail('Backup rejected: '+error.message);}
+    if(!exact(entry,['id','recordedOn','comments','followUpRequired','at','actor',...(Object.hasOwn(entry??{},'completed')?['completed']:[])])||!uuid(entry.id)||ids.has(entry.id))fail('Backup rejected: invalid or repeated feedback identity.');ids.add(entry.id);
+    try{validateProjectFeedback({requestId:'backup-validation',version:p.version,recordedOn:entry.recordedOn,comments:entry.comments,followUpRequired:entry.followUpRequired,...(Object.hasOwn(entry,'completed')?{completed:entry.completed}:{})});}catch(error){fail('Backup rejected: '+error.message);}
     if(typeof entry.at!=='string'||!Number.isFinite(Date.parse(entry.at))||new Date(entry.at).toISOString()!==entry.at)fail('Backup rejected: invalid feedback timestamp.');
     if(!exact(entry.actor,['id','displayName'])||entry.actor.id!==null&&!uuid(entry.actor.id)||typeof entry.actor.displayName!=='string'||!entry.actor.displayName.trim()||entry.actor.displayName.length>200)fail('Backup rejected: invalid feedback author.');
    }
@@ -37,5 +37,5 @@ installModelExtensions(ctx=>{
  if(method==='GET')return feedback();if(method!=='POST')fail('Feedback action unavailable.',404);
  let details;try{details=validateProjectFeedback(input);}catch(error){fail(error.message);}version(p,input.version);
  const entry={id:crypto.randomUUID(),...details,at:new Date().toISOString(),actor:{id:actorContext?.id??null,displayName:actorContext?.displayName??'Device demonstration operator'}};
- d.projectFeedback??={};d.projectFeedback[id]??=[];d.projectFeedback[id].unshift(entry);bump(p,'Customer feedback recorded',{feedbackId:entry.id,followUpRequired:entry.followUpRequired});return feedback();
+ d.projectFeedback??={};d.projectFeedback[id]??=[];d.projectFeedback[id].unshift(entry);bump(p,'Customer feedback recorded',{feedbackId:entry.id,followUpRequired:entry.followUpRequired,...(Object.hasOwn(entry,'completed')?{completed:entry.completed}:{})});return feedback();
 });

@@ -21,3 +21,5 @@ test('backup supports old data and historical account identity without carrying 
  const missing=structuredClone(d);missing.projectAdminDetails['project-missing']=missing.projectAdminDetails[id];await assert.rejects(validateBackup(missing),/Backup rejected/);
  dispatch(d,`device-records/projects/${id}`,'DELETE');assert.equal(d.projectAdminDetails[id],undefined);
 });
+
+test('completed response is persisted explicitly while legacy feedback stays unknown',async()=>{const {d,id,call}=fixture();for(const completed of [undefined,false,true]){const before=call('feedback');call('feedback','POST',{requestId:crypto.randomUUID(),version:before.version,recordedOn:'2026-09-24',comments:'Synthetic response',followUpRequired:'no',...(completed===undefined?{}:{completed})});}const items=call('feedback').items;assert.deepEqual(items.map(i=>i.completed),[true,false,undefined]);assert.equal(Object.hasOwn(items[2],'completed'),false);assert.deepEqual((await validateBackup(d)).projectFeedback,d.projectFeedback);const bad=structuredClone(d);bad.projectFeedback[id][0].completed='yes';await assert.rejects(validateBackup(bad),/Backup rejected/);});

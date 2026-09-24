@@ -256,3 +256,15 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
  .project-workspace .project-sections-toggle{white-space:normal;text-align:left;font-size:13px;padding:8px}
  .project-overview-grid .panel{padding:16px}
 }
+
+.management-report-table{width:100%;table-layout:fixed}
+.management-report-table th:first-child{width:72%}
+.management-report-table th:last-child,.management-metric-value{text-align:right}
+.management-metric-value{font-weight:700;vertical-align:top;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.management-metric{margin:0;padding:0;border:0;background:transparent;border-radius:0}
+.management-metric>summary{padding:0;line-height:1.5;font-weight:500}
+.management-metric>a{display:block;margin:8px 0;text-decoration:underline}
+.management-metric .field-help{line-height:1.5}
+.management-report-group h3{margin-top:0}
+@media(max-width:600px){.management-report-group{padding:14px!important}.management-report-table th:first-child{width:62%}.management-report-table td,.management-report-table th{padding:12px 6px}.management-metric-value{font-size:14px}}
+@media print{.management-report-group{break-inside:avoid}.management-report-table summary::marker{content:''}}

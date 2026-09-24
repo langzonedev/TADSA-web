@@ -26,6 +26,8 @@ Phones use a hamburger menu and grouped project sections. Client, OT and other p
 
 ## Shared source
 
+Reports → Monthly overview now groups project outcomes, Freedom Wheels, completed feedback and current active technician profiles. Expand a measure for its definition and contributing records, or export the summary as CSV. Totals use stored records; unknown classifications and undated history are disclosed. Optional quote-sent, final delivery, invoice-line category and feedback-completion fields sit in the existing project forms. Current member counts and prototype draft invoice totals are labelled explicitly.
+
 The project Overview follows the latest customer layout feedback: project identity and status at the top, work and linked people beside Finance status, then case-note entry/history beside the next workflow action. Compact screens stack the content and keep the section picker. Finance dates retain their recorded meanings; a receipt or external Finance confirmation is not presented as proof that every invoice is paid.
 
 Settings contains the default hourly rate for new projects and device appearance preferences (Light, Dark, device setting and reduced motion). Existing projects retain their captured rate. Live search previews and project sections use the same source as the main application. When an update is ready, the Device demo menu offers a reload; finish or save your current work first.
