@@ -44,6 +44,7 @@ async function save(form, d, notice, saveButton, path, method, payload, done, du
     if (error.status) { d.pending = null; d.requestId = crypto.randomUUID(); }
     notice.replaceChildren(note(error.status ? error.message : 'The save result is not confirmed. Your details are kept. Retry the same save to check safely without creating a duplicate.', true));
     if (error.data?.candidates?.length && duplicate) duplicate(error.data.candidates);
+    if (error.status === 401) notice.append(button('Sign in and keep draft', () => host.refresh()));
     if (error.status === 409 && !duplicate) { notice.append(el('p', 'Another change may have been saved. Your draft is retained.', 'field-help')); if (method === 'PUT') notice.append(button('Compare latest allocation', () => host.refresh())); }
   } finally { host.setSaving(false); lock(form, Boolean(d.pending), saveButton); saveButton.disabled = false; saveButton.textContent = d.pending ? 'Retry save safely' : saveButton.dataset.label; }
 }

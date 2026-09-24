@@ -1,7 +1,7 @@
 import {renderReportBuilder} from './report-builder.js';
 import {managementReportCsv} from './management-report.js';
 import {node,link,request,notice,action} from './project-care.js';
-let selectedMonth;
+let selectedMonth,selectedMode='builder';
 const money=c=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(c/100);
 const value=m=>m.value===null?'Not fully recorded':m.unit==='currency'?money(m.value):new Intl.NumberFormat('en-AU',{maximumFractionDigits:2}).format(m.value)+(m.unit==='hours'?' hrs':'');
 async function renderMonthlyReports(view){
@@ -32,5 +32,5 @@ async function renderMonthlyReports(view){
 export async function renderReports(view){
  view.append(node('h1','Reports'));const nav=node('div',null,'record-tabs'),body=node('div');let cleanup;
  const builder=action('Build a report',()=>open('builder')),monthly=action('Monthly overview',()=>open('monthly'));nav.append(builder,monthly);view.append(nav,body);
- function open(mode){cleanup?.();cleanup=null;body.replaceChildren();builder.setAttribute('aria-pressed',String(mode==='builder'));monthly.setAttribute('aria-pressed',String(mode==='monthly'));if(mode==='builder')cleanup=renderReportBuilder(body);else renderMonthlyReports(body).catch(error=>body.replaceChildren(notice(error.message,true)));}open('builder');
+ function open(mode){selectedMode=mode;cleanup?.();cleanup=null;body.replaceChildren();builder.setAttribute('aria-pressed',String(mode==='builder'));monthly.setAttribute('aria-pressed',String(mode==='monthly'));if(mode==='builder')cleanup=renderReportBuilder(body);else renderMonthlyReports(body).catch(error=>body.replaceChildren(notice(error.message,true)));}open(selectedMode);
 }
