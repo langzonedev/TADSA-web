@@ -1,6 +1,6 @@
 import {enrichSeed} from './seed-enrichment.mjs';
 // All identities and narratives are fictional, authored only for development.
-export function seed({enriched=true,asOf=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Adelaide'}).format(new Date())}={}) {
+export function seed({enriched=true,asOf='2026-09-25'}={}) {
   const people = [
     ['person-1','Eleanor Walsh','Client'], ['person-2','Daniel Chen','Client'],
     ['person-3','James Whitfield','Technician'], ['person-4','Olivia Walsh','Carer'],

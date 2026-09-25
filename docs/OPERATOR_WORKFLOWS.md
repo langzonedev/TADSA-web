@@ -97,3 +97,7 @@ Final device tests: 60 passed, zero skipped. Independent mobile browser checks c
 ## Availability date corrections - 25 September 2026
 
 Select one day or a range and save its new status: existing overlaps are replaced only within those dates. Outside dates and notes remain intact. Choose Not recorded to clear selected dates. Indigo indicates selection separately from green/yellow/red availability. Concurrent changes show the latest calendar and retain your draft for review. The project header now emphasizes its number and uses subtle summary cards, with a full-width title on mobile. Both apps independently browser-tested; see the main repository docs/availability-range-20260925/QA.md.
+
+## Clean-browser polish cycle - 25 September 2026
+
+The retained main-repository scripts polish-lifecycle-qa, designer-polish-qa, polish-admin-qa and availability-range-qa exercise the PostgreSQL and device apps with isolated fictional records. See docs/polish-20260925 in TADSA for results and authorship. This cycle clarifies saved payer identities, unknown/partial technician workload, historical workflow evidence, ordinary/cancelled closure milestones, and records restore scope. Mobile status labels and recovery controls remain readable. Fresh fixture dates are fixed; publishing does not replace existing saved records. Contact prefilling was visually verified: text-only browser snapshots can omit live email/phone values even when the controls visibly contain them.

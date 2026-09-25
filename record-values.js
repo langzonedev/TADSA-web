@@ -1,15 +1,15 @@
 // Human-readable values shared by activity history and draft comparisons.
-const labels={actualMinutes:'Actual hours',remainingMinutes:'Estimated hours remaining',approvedBy:'Approver',approvedOn:'Approval date',fundingContributors:'Payer contributions',fundingExceptionReason:'Funding context',resumeClientConsent:'Client agreed to resume work',clientStopped:'Client asked work to stop',onHold:'Work is on hold',reviewRequired:'Needs administrator review',assessmentComplete:'Assessment completed',workApproved:'Work approved',feedbackRequired:'Feedback required',invoiceRequired:'Invoice required',completed:'Feedback completed',amountCents:'Amount',totalCents:'Total',fundingStatus:'Funding status',clientId:'Client',payerId:'Payer',personId:'Person',projectId:'Project',event:'Workflow event',before:'Previous values',after:'Saved values',id:'Record',invoiceId:'Invoice',quantityMilli:'Quantity',unitPriceCents:'Unit price',reviewerId:'Technical reviewer',technicianId:'Technician',technicianIds:'Technical team',quoteVersion:'Quote revision',costReturnVersion:'Cost return revision'};
+const labels={actualMinutes:'Actual hours',remainingMinutes:'Estimated hours remaining',approvedBy:'Approver',approvedOn:'Approval date',fundingContributors:'Payer contributions',fundingExceptionReason:'Funding context',resumeClientConsent:'Client agreed to resume work',clientStopped:'Client asked work to stop',onHold:'Work is on hold',reviewRequired:'Needs administrator review',assessmentComplete:'Assessment completed',workApproved:'Work approved',feedbackRequired:'Feedback required',invoiceRequired:'Invoice required',completed:'Feedback completed',amountCents:'Amount',totalCents:'Total',fundingStatus:'Funding status',clientId:'Client',payerId:'Payer',personId:'Person',projectId:'Project',event:'Decision',before:'Previous values',after:'Saved values',id:'Record',invoiceId:'Invoice',quantityMilli:'Quantity',unitPriceCents:'Unit price',reviewerId:'Technical reviewer',technicianId:'Technician',technicianIds:'Technical team',quoteVersion:'Quote revision',costReturnVersion:'Cost return revision'};
 const events={begin:'Workflow started',assessmentDecision:'Assessment decision recorded',assessmentComplete:'Assessment completed',quote:'Quote prepared',peerReview:'Technical peer review recorded',issueQuote:'Quote sent',acceptQuote:'Client acceptance recorded',financeClearance:'Finance clearance recorded',work:'Work progress recorded',signoff:'Client sign-off recorded',costReturn:'Actual costs returned',financeFinalise:'Finance finalised',close:'Project closed',reopen:'Project reopened',cancel:'Project cancelled',revise:'Revision requested',returnTo:'Returned for correction',enquiry:'Enquiry',peer_review:'Technical peer review',finance_clearance:'Finance clearance',finance_finalisation:'Final Finance review',cost_return:'Actual cost return',in_progress:'In progress'};
 const stages={legacy:'Existing project workflow',enquiry:'Enquiry',assessment:'Assessment',quote:'Quote preparation',peer_review:'Technical peer review',client_acceptance:'Client acceptance',finance_clearance:'Finance clearance',work:'Work',customer_signoff:'Client sign-off',finance_finalisation:'Final Finance review',ready_to_close:'Ready to close',closed:'Closed'};
 const fundingStatuses={unknown:'Not confirmed',self:'Client funded',person:'Named person funds the work',organisation:'Organisation funded'};
 export const auditAction=value=>String(value).startsWith('Project lifecycle: ')?events[String(value).slice(19)]??fieldLabel(String(value).slice(19)):value;
-const internal=new Set(['requestId','version','primaryRecordId','primaryReference','primary_record_id']);
+const internal=new Set(['requestId','version','primaryRecordId','primaryReference','primary_record_id','workEstimateRecorded']);
 export const fieldLabel=key=>labels[key]??String(key).replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
 export function formatValue(value,key='',resolve=(id)=>id){
  if(value===null||value===undefined||value==='')return 'Not recorded';
  if(typeof value==='boolean')return key==='completed'?(value?'Completed':'Not completed'):value?'Yes':'No';
- if(typeof value==='number')return /Cents$/.test(key)?new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(value/100):key==='quantityMilli'?String(value/1000):/Minutes$/.test(key)?`${Math.round(value/60*100)/100} hours`:String(value);
+ if(typeof value==='number')return /Cents$/.test(key)?new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(value/100):key==='quantityMilli'?String(value/1000):/Minutes$/.test(key)?`${Math.round(value/60*100)/100} ${value===60?'hour':'hours'}`:String(value);
  if(Array.isArray(value))return value.length?value.map(v=>formatValue(v,key,resolve)).join('; '):'None';
  if(typeof value==='object'){
   if(value.type&&value.id&&Number.isInteger(value.amountCents))return `${resolve(value.id,value.type)} · ${formatValue(value.amountCents,'amountCents')}`;
@@ -20,13 +20,23 @@ export function formatValue(value,key='',resolve=(id)=>id){
  if(['action','type','status'].includes(key)&&events[value])return events[value];
  return /Id(s)?$/.test(key)||['id','approvedBy','ndisApprovedBy'].includes(key)?resolve(String(value),key):String(value);
 }
-export function auditChanges(changes,resolve){
+export function auditChanges(changes,resolve,options={}){
  // Event actor/time are repeated at the activity header and inside event data.
- const clean=value=>Array.isArray(value)?value.map(clean):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([key])=>!['actor','at'].includes(key)).map(([key,v])=>[key,clean(v)])):value;
+ const obsolete=new Set(options.managed?['assessmentComplete','workApproved','approvedBy','approvedOn']:[]);
+ const clean=value=>Array.isArray(value)?value.map(clean):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([key,v])=>!['actor','at'].includes(key)&&!obsolete.has(key)&&!(key==='programme'&&(v===null||v===''))).map(([key,v])=>[key,clean(v)])):value;
  changes=clean(changes);
+ // Lifecycle envelopes are storage structure, not operator-facing facts. Keep the
+ // recorded decision and its evidence together without repeating Event/Data labels.
+ if(changes?.event&&typeof changes.event==='object'&&!Array.isArray(changes.event)){
+  const {event,...rest}=changes,{action,type,data,...details}=event;
+  return [
+   ...((action||type)?[{label:'Decision',value:events[action||type]??fieldLabel(action||type)}]:[]),
+   ...auditChanges({...details,...(data&&typeof data==='object'?data:{}),...rest},resolve,options)
+  ];
+ }
  const before=changes?.from??changes?.before,after=changes?.to??changes?.after;
  if(before&&after&&typeof before==='object'&&typeof after==='object'&&!Array.isArray(before)&&!Array.isArray(after))return [...new Set([...Object.keys(before),...Object.keys(after)])].filter(key=>!internal.has(key)&&JSON.stringify(before[key])!==JSON.stringify(after[key])).map(key=>({label:fieldLabel(key),value:`${formatValue(before[key],key,resolve)} → ${formatValue(after[key],key,resolve)}`}));
- return Object.entries(changes??{}).filter(([key])=>!internal.has(key)).map(([key,value])=>{
+ return Object.entries(changes??{}).filter(([key,value])=>!internal.has(key)&&!((/Id(s)?$/.test(key)||key==='id')&&typeof value==='string'&&/(?:reference unavailable|no longer available)/.test(formatValue(value,key,resolve)))).map(([key,value])=>{
   const change=value&&typeof value==='object'&&!Array.isArray(value)&&(Object.hasOwn(value,'from')||Object.hasOwn(value,'to'));
   return {label:fieldLabel(key),value:change?`${formatValue(value.from,key,resolve)} → ${formatValue(value.to,key,resolve)}`:formatValue(value,key,resolve)};
  });

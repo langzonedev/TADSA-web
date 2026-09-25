@@ -31,7 +31,7 @@ test('independent: technical unpaid time denied, full receipt unlocks approved t
  const p=dispatch(d,`projects/${id}`),o=dispatch(d,`projects/${id}/invoices`,'POST',{requestId:randomUUID(),version:p.version,milestone:'deposit',billingMode:'nominated',payerType:'client',payerId:'client-1',lines:[{description:'Preparation',amountCents:5000}],milestoneReached:true});
  const i=o.invoices[0];let plan=dispatch(d,`projects/${id}/invoices/${i.id}/payments`,'POST',{requestId:randomUUID(),version:o.version,amountCents:4999,receivedOn:'2026-09-18',reference:'Partial receipt'});assert.equal(plan.workGate.allowed,false);
  plan=dispatch(d,`projects/${id}/invoices/${i.id}/payments`,'POST',{requestId:randomUUID(),version:plan.version,amountCents:1,receivedOn:'2026-09-18',reference:'Balance'});assert.equal(plan.workGate.allowed,true);
- dispatch(d,`projects/${id}/operations`,'PUT',operations(d,id,{actualMinutes:1,remainingMinutes:2,assessmentComplete:true,workApproved:true,approvedBy:approver.id,approvedOn:'2026-09-18'}));
+ dispatch(d,`projects/${id}/operations`,'PUT',operations(d,id,{actualMinutes:1,remainingMinutes:2,workEstimateRecorded:true,assessmentComplete:true,workApproved:true,approvedBy:approver.id,approvedOn:'2026-09-18'}));
  plan=dispatch(d,`projects/${id}/work-plan`);assert.equal(plan.actualLabourCents,83);assert.equal(plan.remainingLabourCents,167);assert.equal(plan.estimatedTotalLabourCents,250);
 });
 test('independent: assessment free and approval date is validated',()=>{

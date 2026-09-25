@@ -292,3 +292,20 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
  .project-workspace .record-header>.record-meta{grid-row:3}
  .project-workspace .record-header>.record-meta>.project-header-fact:last-child{grid-column:1 / -1}
 }
+
+/* Keep device information and recovery controls accessible on narrow screens. */
+@media(max-width:800px){
+ .topbar{position:relative}
+ .environment{position:static;max-width:none}
+ .environment summary{min-height:44px;padding:0 4px;font-weight:600}
+ .environment summary>span:last-child{display:inline}
+ .environment-info{left:16px;right:16px;top:100%;width:auto;max-height:70vh;max-height:70dvh;overflow-y:auto}
+}
+@media(max-width:540px){
+ .projects-table th:last-child,.projects-table td:last-child{min-width:88px}
+ .projects-table .project-status{display:block}
+ .projects-table .project-status .badge{display:block;width:fit-content;max-width:100%;margin:3px 0;overflow-wrap:normal;word-break:normal;white-space:normal;flex-shrink:0}
+ .projects-table .project-status .badge::before{display:inline-block;margin-right:4px}
+ .projects-table .project-status .badge:not(.invoice){white-space:nowrap}
+ .environment-info button{min-height:44px;padding:8px 10px;margin:3px 0;border:1px solid var(--line);border-radius:6px;background:var(--surface-soft,#eef1f9);color:var(--ink)}
+}

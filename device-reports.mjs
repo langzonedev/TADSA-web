@@ -16,7 +16,7 @@ export function deviceReportRows(d,dataset){
   if(invoiceCount>100000)fail('This device report contains too many invoice records. Use the database application for larger reports.');
   return {id:p.id,reference:p.reference,title:p.title,status:p.status,clientName:people.get(clients.get(p.clientId))??'',
    hoursWorked:typeof operations?.actualMinutes==='number'?operations.actualMinutes/60:null,
-   hoursRemaining:typeof operations?.remainingMinutes==='number'?operations.remainingMinutes/60:null,
+   hoursRemaining:operations?.workEstimateRecorded!==false&&typeof operations?.remainingMinutes==='number'?operations.remainingMinutes/60:null,
    quoteTotal:typeof quote?.totalCents==='number'?quote.totalCents/100:null,
    invoicedTotal:invoices?.length?invoices.reduce((sum,i)=>sum+i.snapshot.totalCents,0)/100:null};
  });

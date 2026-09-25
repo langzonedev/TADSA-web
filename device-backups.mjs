@@ -3,7 +3,7 @@ import {validateCredentials} from './device-credentials.mjs';
 import {validateProfileDetailsBackup} from './device-profile-details.mjs';
 import {validateProjectDetailsBackup} from './device-project-details.mjs';
 import {validateInvoiceReferencesBackup} from './device-invoice-references.mjs';
-import {normalise,fail} from './device-model.mjs';
+import {normalise,fail,operationDefaults} from './device-model.mjs';
 import {validateDeviceFile} from './device-files.mjs';
 const STORE='workspace',MAX_BYTES=256*1024*1024,FORMAT='tadsa-device-backup';
 const clone=x=>structuredClone(x);
@@ -64,7 +64,7 @@ export async function validateBackup(input){
  validateInvoiceReferencesBackup(raw);
  const invoiceIds=new Map(),invoiceTotals=new Map();
  for(const [id,o]of Object.entries(raw.operations??{})){
-  ref('projects',id,'Operations');if(!object(o))invalid('invalid operations.');for(const key of ['actualMinutes','remainingMinutes'])amount(o[key],'Operation minutes',0,600000);
+  ref('projects',id,'Operations');if(!object(o))invalid('invalid operations.');if(Object.keys(o).some(k=>![...Object.keys(operationDefaults),'workEstimateRecorded','projectId','version','approvedByName','approvalLegacy','notes','invoices'].includes(k)))invalid('unsupported operational field.');if(o.workEstimateRecorded!==undefined&&typeof o.workEstimateRecorded!=='boolean')invalid('invalid work estimate recording state.');if(o.workEstimateRecorded===false&&o.remainingMinutes!==0)invalid('unrecorded work estimate must have zero remaining minutes.');for(const key of ['actualMinutes','remainingMinutes'])amount(o[key],'Operation minutes',0,600000);
   if(!Array.isArray(o.notes)||!Array.isArray(o.invoices)||!Array.isArray(o.fundingContributors))invalid('invalid operational lists.');
   for(const field of ['assessmentComplete','workApproved','onHold','clientStopped','resumeClientConsent','reviewRequired'])if(typeof o[field]!=='boolean')invalid('invalid operational choice.');
   for(const key of ['approvedBy','approvedOn','fundingExceptionReason'])text(o[key],'Operational '+key);if(o.approvedOn&&!validDay(o.approvedOn))invalid('invalid work approval date.');

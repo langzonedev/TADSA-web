@@ -2,19 +2,23 @@ import {applyLifecycle} from './lifecycle-model.js';
 import {createProfileDetails} from './profile-details-model.js';
 
 // Authored fiction. Fixed reporting months make expected outcomes reproducible;
-// the calendar alone is anchored to the week in which a fresh workspace opens.
+// the default calendar week is fixed too, so repeated resets reproduce it.
 const uuid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 export function enrichSeed(data, asOf='2026-09-25') {
   Object.assign(data,{contacts:[],calendars:{},credentials:{},profileDetails:{},lifecycles:{},operations:{},statusEvents:[],projectAdminDetails:{},projectFeedback:{},workPlans:{}});
   for(const [i,p] of data.people.entries()) {
-    p.phone=`0000 ${String(i+1).padStart(6,'0')}`;
+    p.phone=i%3===2?'':`0000 ${String(i+1).padStart(6,'0')}`;
     const details=createProfileDetails();
-    Object.assign(details.contact,{mobilePhone:p.phone,preferredPhone:'mobile',language:'English',addressLine1:`${i+1} Fictional Example Lane`,suburb:'Example suburb',state:'SA',postcode:'5000',organisationId:p.id==='person-5'||p.id==='person-15'?'org-2':''});
+    Object.assign(details.contact,{mobilePhone:!p.phone?'':p.phone,preferredPhone:!p.phone?'':'mobile',language:'English',addressLine1:`${i+1} Fictional Example Lane`,suburb:'Example suburb',state:'SA',postcode:'5000',organisationId:p.id==='person-5'||p.id==='person-15'?'org-2':''});
     data.profileDetails[p.id]={personId:p.id,version:1,...details};
   }
   // Existing allied-health contacts remain their recorded type; the added OT is
   // explicitly typed so role-filtered linking exercises have a valid choice.
   data.people.push({id:'person-16',name:'Robin Example',role:'Occupational therapist',email:'robin.example@example.invalid',phone:'0000 000016'},{id:'person-17',name:'Alex Sample',role:'Referrer',email:'alex.sample@example.invalid',phone:'0000 000017'},{id:'person-18',name:'Morgan Example',role:'Administrator',email:'morgan.example@example.invalid',phone:'0000 000018'});
+  for(const p of data.people.filter(p=>!data.profileDetails[p.id])){
+    const details=createProfileDetails();Object.assign(details.contact,{mobilePhone:p.phone,preferredPhone:'mobile',language:'English'});
+    data.profileDetails[p.id]={personId:p.id,version:1,...details};
+  }
   for(const [i,c] of data.clients.entries()) {
     const representative=i%3===0?'person-4':i%3===1?'person-14':null;
     const address=`${101+i} Fictional Client Avenue, Example suburb SA 5000`;

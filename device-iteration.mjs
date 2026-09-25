@@ -34,8 +34,8 @@ installModelExtensions(ctx=>{
   const unique=items=>[...new Map([...items].sort((a,b)=>a.at.localeCompare(b.at)).map(x=>[x.id,x])).values()],created=events.filter(x=>x.fromStatus===null),closed=events.filter(x=>x.toStatus==='closed'),reopened=events.filter(x=>x.fromStatus==='closed'&&x.toStatus!=='closed'),recent=events.slice(0,100),open=projectList.filter(p=>p.status!=='closed'),statusCounts={open:0,review:0,closed:0};
   for(const p of projectList)statusCounts[p.status]++;
   const assignments=new Map();
-  for(const p of d.projects){if(p.status==='closed')continue;for(const id of [p.coordination.technicianId].filter(Boolean)){const value=assignments.get(id)??{projectCount:0,remainingMinutes:0};value.projectCount++;value.remainingMinutes+=d.operations[p.id]?.remainingMinutes??0;assignments.set(id,value);}}
-  const workload=d.people.filter(p=>p.active!==false&&p.roles.includes('Technician')).map(p=>({id:p.id,name:p.name,...(assignments.get(p.id)??{projectCount:0,remainingMinutes:0})})).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,100);
+  for(const p of d.projects){if(p.status==='closed')continue;for(const id of [p.coordination.technicianId].filter(Boolean)){const value=assignments.get(id)??{projectCount:0,remainingMinutes:null,remainingWorkUnrecordedCount:0};value.projectCount++;if(d.operations[p.id]?.remainingMinutes!=null&&d.operations[p.id].workEstimateRecorded!==false)value.remainingMinutes=(value.remainingMinutes??0)+d.operations[p.id].remainingMinutes;else value.remainingWorkUnrecordedCount++;assignments.set(id,value);}}
+  const workload=d.people.filter(p=>p.active!==false&&p.roles.includes('Technician')).map(p=>({id:p.id,name:p.name,...(assignments.get(p.id)??{projectCount:0,remainingMinutes:null,remainingWorkUnrecordedCount:0})})).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,100);
   const invoices=[],payments=[];let invoicedCents=0,receivedCents=0;
   for(const p of d.projects){
    const invoiceRows=d.operations[p.id]?.invoices??[],numbers=new Map(invoiceRows.map(i=>[i.id,i.number]));
