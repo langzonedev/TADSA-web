@@ -6,7 +6,7 @@ import {validateBackup} from '../device-backups.mjs';
 import '../device-extensions.mjs';
 const value=()=>({requestId:crypto.randomUUID(),name:'Synthetic organisation QA',role:'Community service',description:'Synthetic description',category:'School',email:'organisation@example.invalid'});
 test('organisation create/edit replay, validation, references and backup roundtrip',async()=>{
- const d=normalise(seed()),input=value(),created=dispatch(d,'organisations','POST',input);
+ const d=normalise(seed({enriched:false})),input=value(),created=dispatch(d,'organisations','POST',input);
  assert.equal(created.version,1);assert.equal(dispatch(d,'organisations','POST',input).id,created.id);
  const update={...input,requestId:crypto.randomUUID(),version:1,name:'Renamed organisation',role:'Funder',description:'Updated description',category:'NDIS',email:'updated@example.invalid'};
  const changed=dispatch(d,'organisations/'+created.id+'/profile','PUT',update);assert.equal(changed.version,2);

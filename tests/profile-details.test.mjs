@@ -4,7 +4,7 @@ import {seed} from '../seed.mjs';
 import {normalise,dispatch} from '../device-model.mjs';
 import '../device-extensions.mjs';
 import {validateBackup} from '../device-backups.mjs';
-function fixture(){const d=normalise(seed()),tech=d.people.find(p=>p.roles.includes('Technician')),path=`people/${tech.id}/profile-details`,call=(method='GET',body)=>dispatch(d,path,method,body??{},new URLSearchParams(),{id:crypto.randomUUID(),displayName:'Synthetic operator',role:'administrator'});return {d,tech,path,call};}
+function fixture(){const d=normalise(seed({enriched:false})),tech=d.people.find(p=>p.roles.includes('Technician')),path=`people/${tech.id}/profile-details`,call=(method='GET',body)=>dispatch(d,path,method,body??{},new URLSearchParams(),{id:crypto.randomUUID(),displayName:'Synthetic operator',role:'administrator'});return {d,tech,path,call};}
 test('device profile saves preserve independent sections, replay safely and reject stale writes',()=>{
  const {d,tech,call}=fixture(),initial=call(),request={requestId:crypto.randomUUID(),version:0,section:'contact',details:{...initial.contact,homePhone:'123',preferredPhone:'home'}};
  assert.equal(call('PUT',request).version,1);assert.equal(call('PUT',request).version,1);

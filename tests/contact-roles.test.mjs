@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {seed} from '../seed.mjs';
 import {normalise,dispatch} from '../device-model.mjs';
 test('contacts enforce exact roles, preserve existing links on rejected replacement, and permit unlink after role changes',()=>{
- const d=normalise(seed()),run=(path,input)=>dispatch(d,path,'POST',input);
+ const d=normalise(seed({enriched:false})),run=(path,input)=>dispatch(d,path,'POST',input);
  const c=d.clients[0];
  const make=role=>{const p={id:crypto.randomUUID(),name:'Fictional '+role,roles:[role],version:1,email:'',phone:''};d.people.push(p);return p;};
  const ot=make('Occupational therapist'),allied=make('Allied-health contact');

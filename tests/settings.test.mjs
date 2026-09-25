@@ -4,7 +4,7 @@ import {seed} from '../seed.mjs';
 import {normalise,dispatch} from '../device-model.mjs';
 import '../device-extensions.mjs';
 test('device settings retain old project prices and capture new rates immediately',()=>{
- const data=normalise(seed()),call=(path,method='GET',body={})=>dispatch(data,path,method,body);
+ const data=normalise(seed({enriched:false})),call=(path,method='GET',body={})=>dispatch(data,path,method,body);
  const before=call('projects/project-1/work-plan');assert.equal(before.labourRateCents,5000);
  const payload={requestId:crypto.randomUUID(),version:1,labourRateCents:6550};
  const updated=call('settings','PUT',payload);assert.equal(updated.version,2);assert.equal(updated.audit.length,1);assert.deepEqual(call('settings','PUT',payload),updated);

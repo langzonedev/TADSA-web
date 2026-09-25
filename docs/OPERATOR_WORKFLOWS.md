@@ -84,3 +84,12 @@ Legacy projects can resume after a client stop by recording client consent, an A
 Receipts can be recorded after Finance finalisation until the project closes. Invoice edits remain locked after finalisation. An outstanding internal draft balance is shown with a direct Costs link; the final closure policy still needs customer confirmation. Tax-unconfirmed records remain non-issuable internal drafts and retain their original settings.
 
 Overview payers reflect saved contributions, which are distinct from payment receipts. Audit and stale-draft comparisons use readable fields. People/client breadcrumbs return to People, contact editors use current shared person details, and allocation screens distinguish general status from dated calendar availability. People and projects are fictional; published organisation/issuer details may be real.
+
+
+## Mobile regression follow-up — 25 September 2026
+
+Shared person/intake editors preserve newer untouched contacts across stale drafts, retain deliberate clearing and keep explicit version review. New invoice composers select the sole saved contributor or require a choice. Activity shows domain stages, named people/funders and invoice numbers; guided actions no longer create unrelated administrator-review flags. Explicit existing review requests remain.
+
+Fresh workspaces include twelve additional guided practice projects, complete fictional contact/technician data, current/next-week availability and August/September reporting examples. Existing saved device workspaces are preserved. Do not reset an existing workspace merely to activate a code update.
+
+Final device tests: 60 passed, zero skipped. Independent mobile browser checks covered contact preservation in both directions, invoice defaults, audit values and the complete lifecycle through Finance finalisation, receipt and closure, with zero console errors. The original blank-on-first-open contact symptom was not reproduced; the stale-draft overwrite risk was corrected and verified.

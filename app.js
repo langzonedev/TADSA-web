@@ -1,5 +1,5 @@
 import {renderInvoiceReferences} from './invoice-references.js';
-import {auditChanges,formatValue as displayValue} from './record-values.js';
+import {auditReferenceIds,auditAction,auditChanges,formatValue as displayValue} from './record-values.js';
 import {renderProfileDetails} from './profile-details.js';
 import {renderProjectDetails,renderProjectCoordinator,renderProjectFeedback} from './project-details.js';
 import {renderAccounts} from './accounts.js';
@@ -148,12 +148,23 @@ async function client(view, id) {
   const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel('Contact details'); info.append(details([['Email', c.person.email], ['Phone', c.person.phone]]), link('Edit profile & roles', 'edit-person/' + c.person.id, 'text-button'));
   const contacts = panel('Client contacts'); addClientContactActions(contacts, c); left.append(projectLinks(c.projects),clientDetailsSummary(c),info,contacts);await renderProfileDetails(left,c.person); const related = relationships(c.relationships); related.querySelector('h2').textContent = 'People linked through projects'; grid.append(left, related); view.append(el('div', undefined, 'heading-rule'), grid);
 }
-function auditPanel(p) {
-  const box = panel('Project activity'); box.append(el('p', 'Saved changes, newest first. Development activity is not an authenticated staff audit trail.', 'muted'));
-  if (!p.audit.length) box.append(empty('No changes recorded yet', 'Updates to this project will appear here after saving.'));
-  for (const a of p.audit) { const row = el('div', undefined, 'audit'); row.append(el('strong', a.action), el('small', `${a.actor} · ${new Date(a.at).toLocaleString('en-AU',{timeZone:'Australia/Adelaide'})}`)); for (const change of auditChanges(a.changes)) row.append(el('p', `${change.label}: ${change.value}`)); box.append(row); }
+function auditPanel(p,operationsPromise) {
+  const names=new Map([[p.id,p.reference+' · '+p.title],[p.clientId,p.clientName],...p.relationships.map(r=>[r.id,r.name])]);
+  const ids=auditReferenceIds(p.audit).filter(id=>!names.has(id));
+  const resolve=(id,key)=>names.get(id)??(/^(person|client|organisation|org|project)-/.test(id)?({person:'Person',client:'Client',organisation:'Organisation',org:'Organisation',project:'Project'}[id.split('-')[0]]+' no longer available'):/^[a-f0-9-]{36}$/i.test(id)?(key==='invoiceId'?'Recorded invoice': 'Recorded item')+' (reference unavailable)':id);
+  const box = panel('Audit trail');
+  const render=()=>{
+    box.replaceChildren(el('h2','Audit trail'),el('p','Saved changes, newest first. Development activity is not an authenticated staff audit trail.','muted'));
+    if (!p.audit.length) box.append(empty('No changes recorded yet','Updates to this project will appear here after saving.'));
+    for (const a of p.audit) { const row=el('div',undefined,'audit'); row.append(el('strong',auditAction(a.action)),el('small',`${a.actorDisplayName||a.actor} · ${new Date(a.at).toLocaleString('en-AU',{timeZone:'Australia/Adelaide'})}`));for(const change of auditChanges(a.changes,resolve))row.append(el('p',`${change.label}: ${change.value}`));box.append(row); }
+  };
+  render();
+  void operationsPromise.then(operations=>{for(const invoice of operations.invoices??[])names.set(invoice.id,invoice.number||invoice.invoiceNumber||'Recorded invoice');render();}).catch(()=>{});
+  // Resolve only referenced names, without delaying the project or moving focus.
+  void (async()=>{for(let i=0;i<ids.length;i+=4){await Promise.all(ids.slice(i,i+4).map(async id=>{try{const record=await api(pathOf(id.startsWith('org-')?'organisation':id.split('-')[0])+'/'+id);names.set(id,nameOf(record));}catch{}}));render();}})();
   return box;
 }
+
 async function project(view, id) {
   let p = await api(`projects/${id}`); let tab = location.hash.split('/')[2]==='costs'?'Costs & invoices':projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
   const destinations=['Overview','Files','Costs & invoices','Workflow history'];
@@ -164,12 +175,12 @@ async function project(view, id) {
   const tabs=el('div',undefined,'record-tabs project-nav');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Project detail');view.append(tabs);
   const subnav=el('div',undefined,'project-subnav');subnav.setAttribute('role','tablist');subnav.setAttribute('aria-label','Project section');view.append(subnav);view.insertBefore(tabs,header);view.insertBefore(subnav,header);
   const overview=el('section',undefined,'project-overview'),task=el('section',undefined,'project-task'),filesPane=el('section'),costsPane=el('section'),recordPane=el('section'),editPane=el('section');
-  const content=el('div'),auditPane=el('section'),caseNotesPane=el('section');editPane.append(content);await renderProjectDetails(editPane,id);auditPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),auditPanel(p));caseNotesPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'));auditPane.querySelector('h2').textContent='Audit trail';
+  const content=el('div'),auditPane=el('section'),caseNotesPane=el('section');editPane.append(content);await renderProjectDetails(editPane,id);const operationsPromise=api(`projects/${id}/operations`);auditPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),auditPanel(p,operationsPromise));caseNotesPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'));auditPane.querySelector('h2').textContent='Audit trail';
   const taskForm=el('div',undefined,'project-task-form'),taskContext=el('aside',undefined,'project-task-context'),taskGrid=el('div',undefined,'project-task-grid');taskGrid.append(taskContext,taskForm);
   task.append(button('← Project overview',()=>navigate('Overview'),'secondary'),taskGrid);
   view.append(overview,task,filesPane,costsPane,recordPane,editPane,auditPane,caseNotesPane);
   const actionSource=el('div'),care=el('div'),fundingReference=el('div');
-  const [projectOperations,projectLocation,adminDetails,adminOptions,workPlan]=await Promise.all([api(`projects/${id}/operations`),api(`projects/${id}/location`),api(`projects/${id}/admin-details`),api('project-admin-options'),api(`projects/${id}/work-plan`)]);
+  const [projectOperations,projectLocation,adminDetails,adminOptions,workPlan]=await Promise.all([operationsPromise,api(`projects/${id}/location`),api(`projects/${id}/admin-details`),api('project-admin-options'),api(`projects/${id}/work-plan`)]);
   const lifecycle=await renderLifecycle(taskForm,p,{operations:projectOperations,recordTarget:recordPane,actionsTarget:actionSource,contextTarget:taskContext,onSaved:()=>projectTabs.set(id,'Overview'),openFiles:()=>{navigate('Files');filesPane.querySelector('input[type=file]')?.focus();}});
   await renderProjectCare(care,id);
   function flatten(section){for(const d of [...section.querySelectorAll('details')].reverse()){if(d.closest('.file-row'))continue;const summary=d.querySelector(':scope > summary'),replacement=el('section',undefined,'project-record-section');if(summary){replacement.append(el('h2',summary.textContent));summary.remove();}replacement.append(...d.childNodes);d.replaceWith(replacement);}}

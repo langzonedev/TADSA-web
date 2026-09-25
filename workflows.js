@@ -1,3 +1,4 @@
+import {reconcileContactDraft} from './contact-draft.js';
 // Call-intake workflows. All records in this development workspace are fictional.
 const drafts = new Map();
 let host;
@@ -265,6 +266,7 @@ async function personProfile(view, id) {
   const [catalogue, person] = await Promise.all([request('person-options'), id ? request('people/' + id) : null]);
   const key = id ? 'person/' + id : 'new-person';
   const d = getDraft(key, { name:person?.name ?? '', email:person?.email ?? '', phone:person?.phone ?? '', roles:person?.roles ?? [], skills:person?.technician?.skills ?? [], availability:person?.technician?.availability ?? 'unavailable', version:person?.version, allowDuplicate:false });
+  if(person)reconcileContactDraft(d,person);
   title(view, id ? 'Edit person' : 'New person', 'Choose one profile type. A technician may also be an administrator; other types use separate profiles.');
   view.append(link('← Back to people', 'people', 'breadcrumb'));
   const box = panel('Person details'), form = el('form', null, 'form-grid');

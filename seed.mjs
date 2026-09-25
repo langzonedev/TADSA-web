@@ -1,5 +1,6 @@
+import {enrichSeed} from './seed-enrichment.mjs';
 // All identities and narratives are fictional, authored only for development.
-export function seed() {
+export function seed({enriched=true,asOf=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Adelaide'}).format(new Date())}={}) {
   const people = [
     ['person-1','Eleanor Walsh','Client'], ['person-2','Daniel Chen','Client'],
     ['person-3','James Whitfield','Technician'], ['person-4','Olivia Walsh','Carer'],
@@ -36,9 +37,10 @@ export function seed() {
     {projectId:'project-7',type:'person',id:'person-14',role:'Carer'},
     {projectId:'project-9',type:'organisation',id:'org-3',role:'Funder'}
   );
-  return {people,clients,projects,relationships,audit:[],organisations:[
+  const data = {people,clients,projects,relationships,audit:[],organisations:[
     {id:'org-1',name:'Westhaven Community Foundation',role:'Funder',description:'Community support for individually adapted equipment.'},
     {id:'org-2',name:'Harbour Allied Health',role:'Allied-health organisation',description:'Assessment and allied-health referral coordination.'},
     {id:'org-3',name:'Southern Access Network',role:'Funder',description:'Support for practical accessibility projects.'}
   ]};
+  return enriched?enrichSeed(data,asOf):data;
 }
