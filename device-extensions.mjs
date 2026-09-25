@@ -40,12 +40,30 @@ installModelExtensions(ctx=>{const {d,parts,method,input,find,version,bump,proje
  }
  if(kind==='availability-options')return {serviceAreas};
  if(kind==='availability'){
-  const person=find('people',id);if(!person.roles.includes('Technician'))fail('Select a technician.');const calendar=d.calendars[id]??{personId:id,version:0,serviceAreas:[],entries:[]};
+  const person=find('people',id);if(!person.roles.includes('Technician'))fail('Select a technician.');const calendar={baseAddress:'',suburb:'',postcode:'',...(d.calendars[id]??{personId:id,version:0,serviceAreas:[],entries:[]})};
   if(method==='GET')return {baseAddress:'',suburb:'',postcode:'',...calendar};
   if(sub==='areas'&&method==='PUT'){if(!Number.isInteger(input.version)||input.version!==calendar.version)fail('This calendar changed.',409,{code:'VERSION_CONFLICT'});if(!Array.isArray(input.serviceAreas)||new Set(input.serviceAreas).size!==input.serviceAreas.length||input.serviceAreas.some(s=>!serviceAreas.some(a=>a.id===s)))fail('Select known distinct service areas.');const areas=[...input.serviceAreas].sort();if(JSON.stringify(areas)===JSON.stringify([...calendar.serviceAreas].sort()))return calendar;calendar.serviceAreas=areas;calendar.version++;}
   else if(sub==='entries'&&method==='POST'){
+   if('calendarVersion' in input){if(!Number.isSafeInteger(input.calendarVersion)||input.calendarVersion<0)fail('Supply the current calendar version.');if(input.calendarVersion!==calendar.version)fail('This calendar changed. Reload and compare before saving.',409,{code:'VERSION_CONFLICT'});}
    if(action==='remove'){const entry=calendar.entries.find(x=>x.id===subid)??fail('Calendar entry not found.',404);version(entry,input.version);calendar.entries=calendar.entries.filter(x=>x.id!==subid);}
-   else{const startDate=validDate(input.startDate),endDate=validDate(input.endDate);if(endDate<startDate)fail('End date must be on or after start date.');if(!['available','limited','unavailable'].includes(input.status))fail('Choose an availability status.');const entry=input.id?calendar.entries.find(x=>x.id===input.id)??fail('Calendar entry not found.',404):null;if(entry)version(entry,input.version);else if(input.version!==0)fail('New entries use version zero.');const value={id:entry?.id??crypto.randomUUID(),version:(entry?.version??0)+1,startDate,endDate,status:input.status,note:str(input.note,500)};if(calendar.entries.some(e=>e.id!==value.id&&e.startDate<=endDate&&e.endDate>=startDate))fail('Availability entries cannot overlap.');if(entry)Object.assign(entry,value);else calendar.entries.push(value);}
+   else{
+    const startDate=validDate(input.startDate),endDate=validDate(input.endDate);if(endDate<startDate)fail('End date must be on or after start date.');if(!['available','limited','unavailable','unknown'].includes(input.status))fail('Choose an availability status.');
+    const entry=input.id?calendar.entries.find(x=>x.id===input.id)??fail('Calendar entry not found.',404):null;if(entry)version(entry,input.version);else if(input.version!==0)fail('New entries use version zero.');
+    const value={id:entry?.id??crypto.randomUUID(),version:(entry?.version??0)+1,startDate,endDate,status:input.status,note:str(input.note,500)};
+    const shift=(date,n)=>{const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+    calendar.entries=calendar.entries.flatMap(old=>{
+     if(old.id===entry?.id)return [];
+     if(old.startDate>endDate||old.endDate<startDate)return [old];
+     const fragments=[];
+     if(old.startDate<startDate)fragments.push({...old,version:old.version+1,endDate:shift(startDate,-1)});
+     if(old.endDate>endDate)fragments.push({...old,id:fragments.length?crypto.randomUUID():old.id,version:fragments.length?1:old.version+1,startDate:shift(endDate,1)});
+     return fragments;
+    });
+    if(input.status!=='unknown')calendar.entries.push(value);
+    calendar.entries.sort((a,b)=>a.startDate.localeCompare(b.startDate));
+   }
+   calendar.version++;
+
   }else return;
   d.calendars[id]=calendar;event('people',id,'Availability calendar updated',{action:sub});return calendar;
  }

@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "5fb07145a84ff18d561783834f91de0d4f651cb4",
+  "sourceRevision": "f841f5a82cce57341f4bbd49704df5cc0eb3301c",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "contact-draft.js": {
@@ -94,7 +94,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "635bdeb86bb13bc0f6a2459eb3e823f2051bbf13c43eec28cf3194055d9de41a",
+      "sha256": "b46e76f9783aed025f6200cd44b446f170fcf40e719a49ea99397ada1b4dfb28",
       "transform": null
     },
     "settings.js": {
@@ -129,7 +129,7 @@
     },
     "availability.js": {
       "source": "public/availability.js",
-      "sha256": "1bdd4cb537ea64688ba63f0dbef30a25a6b7a998cc4347eed184d194e4ece12d",
+      "sha256": "18aa8f045d4d7ee032e26dcf4392222db96ead4cd4fda0967ed5bb8287f6ebd3",
       "transform": null
     },
     "technician-location.js": {
@@ -139,12 +139,12 @@
     },
     "project-care.js": {
       "source": "public/project-care.js",
-      "sha256": "eb9c1e76afcf4ff48125201e76d34f1adf933d9b999405163b4e0c858fc8cd16",
+      "sha256": "aac9ef283664e3d82e6c25d9ea3a823adfbfbb3d28d8ef43deb530875d1c5abd",
       "transform": null
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "bbeedfe66dd6ba23bdfac5f1c65b63caaf71a4a018a63d13bab236bb3c9edd26",
+      "sha256": "a514e5af7cc2683d9dd8bd3416a7249326f4d18021c7c640fe7702f36c476be7",
       "transform": null
     },
     "boot.js": {
@@ -175,5 +175,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "b39a60c3dff3965c73328fc84a10349406564784859ffcb18668f28d21c357f6"
+  "shellHash": "6b99ee425b592540e7119b03f9bbc0090541d921416b5be3a4f6b609bb586648"
 }

@@ -63,6 +63,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   if(action==='payments')keys=['requestId','version','amountCents','receivedOn','reference'];
   if(sub==='attachments')keys=subid?['requestId','version']:['requestId','name','mime','dataBase64'];
   if(kind==='availability')keys=sub==='location'?['requestId','version','baseAddress','suburb','postcode']:sub==='areas'?['requestId','version','serviceAreas']:action==='remove'?['requestId','version']:['requestId','id','version','startDate','endDate','status','note'];
+  if(kind==='availability'&&sub==='entries'&&Object.hasOwn(input,'calendarVersion'))keys.push('calendarVersion');
   if(keys&&Object.hasOwn(input,'technicianIds')&&kind==='projects'&&(!id||sub==='coordination'))keys.push('technicianIds');
   if(keys&&(Object.keys(input).length!==keys.length||keys.some(k=>!Object.hasOwn(input,k))))fail('Supply exactly the required fields.');
   if(keys?.includes('requestId')&&!input.requestId)fail('Supply a valid request identifier.');

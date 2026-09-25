@@ -38,8 +38,8 @@ export function editor(parent,key,initial,title,fields,path,method,payload,optio
    if(error.status===401)feedback.append(action('Sign in and keep draft',()=>host.refresh()));
    if(error.status===409){
     let review;try{review=await options.reviewConflict?.(d);}catch{/* Keep the draft if the latest record cannot be read. */}
-    if(review)feedback.append(notice(review.message),action('Review latest project and keep draft',async()=>{
-     d.version=review.version;d.requestId=crypto.randomUUID();remember();await host.refresh();
+    if(review)feedback.append(notice(review.message),action(options.reviewLabel??'Review latest project and keep draft',async()=>{
+     d.version=review.version;options.onAcceptReview?.(d,review);d.requestId=crypto.randomUUID();remember();await host.refresh();
     }));
     else feedback.append(notice('Discard this draft to load the latest saved version, then reapply your change.'));
    }

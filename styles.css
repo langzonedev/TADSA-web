@@ -269,3 +269,26 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 .management-report-group h3{margin-top:0}
 @media(max-width:600px){.management-report-group{padding:14px!important}.management-report-table th:first-child{width:62%}.management-report-table td,.management-report-table th{padding:12px 6px}.management-metric-value{font-size:14px}}
 @media print{.management-report-group{break-inside:avoid}.management-report-table summary::marker{content:''}}
+
+/* Selection is a separate interaction state, never an availability status. */
+.availability-workspace .availability-table button.availability-cell:is(.range-selected,[aria-pressed=true]),.availability-key.selected-dates{background:#e7eaff;color:#283889;box-shadow:inset 0 0 0 2px #5365c7;outline:0}
+.availability-workspace .availability-table button.availability-cell:focus-visible{outline:3px solid #343f99;outline-offset:-5px}
+html[data-theme=dark] .availability-workspace .availability-table button.availability-cell:is(.range-selected,[aria-pressed=true]),html[data-theme=dark] .availability-key.selected-dates{background:#303969;color:#f0f2ff;box-shadow:inset 0 0 0 2px #a4b0ff;outline:0}
+html[data-theme=dark] .availability-workspace .availability-table button.availability-cell:focus-visible{outline:3px solid #d9dfff;outline-offset:-5px}
+/* Project identity is prominent without making read-only data resemble inputs. */
+.project-workspace .record-header .project-identity{display:grid;grid-template-columns:minmax(140px,max-content) minmax(0,1fr);align-items:center;gap:24px}
+.project-identity .eyebrow{display:flex;flex-direction:column;gap:8px;padding:14px 18px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}
+.project-identity .eyebrow small{font-size:11px;font-weight:600;letter-spacing:.8px;color:var(--muted)}
+.project-identity .project-number{font-size:clamp(21px,2vw,28px);font-weight:750;letter-spacing:.06em;line-height:1.2;color:var(--text);overflow-wrap:anywhere}
+.project-workspace .record-header .project-identity h1{margin:0;line-height:1.22}
+.project-header-fact{padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft)}
+.project-workspace .record-header>.record-meta{gap:10px}
+@media(max-width:800px){.project-workspace .record-header .project-identity{grid-template-columns:minmax(0,1fr);gap:14px}.project-identity .eyebrow{justify-self:start;padding:10px 14px}.project-identity .project-number{font-size:24px}.project-header-fact{padding:10px}.project-workspace .record-header>.record-meta{gap:8px}}
+
+@media(max-width:800px){
+ .project-workspace .record-header .project-identity{display:contents}
+ .project-identity .eyebrow{grid-column:1;grid-row:1;min-width:0;max-width:100%}
+ .project-workspace .record-header .project-identity h1{grid-column:1 / -1;grid-row:2}
+ .project-workspace .record-header>.record-meta{grid-row:3}
+ .project-workspace .record-header>.record-meta>.project-header-fact:last-child{grid-column:1 / -1}
+}

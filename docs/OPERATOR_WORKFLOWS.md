@@ -93,3 +93,7 @@ Shared person/intake editors preserve newer untouched contacts across stale draf
 Fresh workspaces include twelve additional guided practice projects, complete fictional contact/technician data, current/next-week availability and August/September reporting examples. Existing saved device workspaces are preserved. Do not reset an existing workspace merely to activate a code update.
 
 Final device tests: 60 passed, zero skipped. Independent mobile browser checks covered contact preservation in both directions, invoice defaults, audit values and the complete lifecycle through Finance finalisation, receipt and closure, with zero console errors. The original blank-on-first-open contact symptom was not reproduced; the stale-draft overwrite risk was corrected and verified.
+
+## Availability date corrections - 25 September 2026
+
+Select one day or a range and save its new status: existing overlaps are replaced only within those dates. Outside dates and notes remain intact. Choose Not recorded to clear selected dates. Indigo indicates selection separately from green/yellow/red availability. Concurrent changes show the latest calendar and retain your draft for review. The project header now emphasizes its number and uses subtle summary cards, with a full-width title on mobile. Both apps independently browser-tested; see the main repository docs/availability-range-20260925/QA.md.
