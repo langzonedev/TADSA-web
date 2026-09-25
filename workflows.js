@@ -9,7 +9,7 @@ const button = (text, action, cls = 'secondary') => { const n = el('button', tex
 const note = (text, error = false) => { const n = el('div', text, error ? 'message error' : 'message'); n.setAttribute('role', error ? 'alert' : 'status'); return n; };
 const title = (view, text, sub, back) => { if (back) view.append(link('← Back to '+(back.startsWith('project/')?'project':'client'), back, 'breadcrumb')); view.append(el('h1', text), el('p', sub, 'subtitle workflow-intro')); };
 const panel = text => { const n = el('section', null, 'panel workflow-panel'); if (text) n.append(el('h2', text)); return n; };
-const getDraft = (key, initial) => { if (!drafts.has(key)) drafts.set(key, { ...initial, requestId: crypto.randomUUID(), dirty: false }); return drafts.get(key); };
+const getDraft = (key, initial) => { const previous=drafts.get(key);if(previous&&!previous.dirty&&!previous.pending&&initial.version!==undefined&&initial.version!==previous.version)drafts.delete(key); if (!drafts.has(key)) drafts.set(key, { ...initial, requestId: crypto.randomUUID(), dirty: false }); return drafts.get(key); };
 const touch = d => { d.dirty = true; };
 const options = (items, value) => items.map(([id, name]) => { const n = el('option', name); n.value = id; n.selected = id === value; return n; });
 function field(form, label, d, key, { type = 'text', required = false, max = 120, help = '' } = {}) {
@@ -86,7 +86,7 @@ async function newClient(view, arg) {
 function coordinationValues(d) { return { requiredSkills: d.requiredSkills, technicianId: d.technicianId || null, technicianIds: d.technicianIds ?? (d.technicianId?[d.technicianId]:[]), fundingStatus: d.fundingStatus, payerId: ['person', 'organisation'].includes(d.fundingStatus) ? d.payerId || null : null, fundingNotes: d.fundingNotes.trim() }; }
 function coordinationFields(form, d, directories, focus) {
   if (focus !== 'team') {
-  const funding = el('fieldset'); funding.append(el('legend', 'Who is expected to pay?'));
+  const funding = el('fieldset'); funding.append(el('legend', 'Who is expected to pay?'),el('p','This is the expected funding contact. Agreed dollar contributions and the invoice recipient are recorded under Costs. Once contributions are saved, they are shown as the payers on the overview.','field-help'));
   selectField(funding, 'Payer', d, 'fundingStatus', [['unknown','Not known yet'],['self','The client'],['organisation','An organisation'],['person','Another person']], () => { d.payerId = ''; drawPayer(); });
   const payerSlot = el('div'); funding.append(payerSlot);
   function drawPayer() { payerSlot.replaceChildren(); if (['organisation', 'person'].includes(d.fundingStatus)) {
@@ -112,8 +112,9 @@ function coordinationFields(form, d, directories, focus) {
     for (const t of rows) {
       const l = el('label', null, 'choice-card'); const radio = el('input'); radio.type = 'checkbox'; radio.name = 'technician'; radio.value = t.id; radio.checked = d.technicianIds.includes(t.id);
       const text = el('span'); text.append(el('strong', t.name));
-      if (t.id) text.append(el('small', `${t.skills.join(' · ')}. ${t.openCount} open projects. ${Math.round((t.remainingMinutes??0)/60*100)/100} hours remaining. General availability: ${t.availability}. Base: ${[t.suburb,t.postcode].filter(Boolean).join(' ')||'Not recorded'}. Service areas: ${(t.serviceAreas||[]).map(a=>({western:'Western suburbs',southern:'Southern suburbs',northern:'Northern suburbs',eastern:'Eastern suburbs','adelaide-hills':'Adelaide Hills',metro:'Metropolitan Adelaide',regional:'Regional South Australia'}[a]||a)).join(', ')||'Not recorded'}.`));
+      if (t.id) text.append(el('small', `${t.skills.join(' · ')}. ${t.openCount} open projects. ${Math.round((t.remainingMinutes??0)/60*100)/100} hours remaining. General allocation status: ${t.availability}. Base: ${[t.suburb,t.postcode].filter(Boolean).join(' ')||'Not recorded'}. Service areas: ${(t.serviceAreas||[]).map(a=>({western:'Western suburbs',southern:'Southern suburbs',northern:'Northern suburbs',eastern:'Eastern suburbs','adelaide-hills':'Adelaide Hills',metro:'Metropolitan Adelaide',regional:'Regional South Australia'}[a]||a)).join(', ')||'Not recorded'}.`));
       else text.append(el('small', 'Save the request now and allocate someone later.'));
+      const calendarText=el('small',`Calendar today (${directories.calendarDay}): ${t.calendarToday??'Loading…'}. Check future dates in the calendar.`);calendarText.dataset.calendarPerson=t.id;text.append(calendarText);
       radio.addEventListener('change', () => { d.technicianIds=radio.checked?[...d.technicianIds,t.id]:d.technicianIds.filter(id=>id!==t.id);if(!d.technicianIds.includes(d.technicianId))d.technicianId=d.technicianIds[0]||'';d.assignmentAcknowledged = false; touch(d); drawTechnicians(); [...technicians.querySelectorAll('input[name=technician]')].find(input=>input.value===t.id)?.focus({preventScroll:true}); }); l.append(radio,text); technicians.append(l);
     }
     if (!visible.length) technicians.append(note('No technicians match every selected skill. Save unassigned, or show other technicians to review their skills.'));
@@ -121,13 +122,14 @@ function coordinationFields(form, d, directories, focus) {
     const selected = directories.technicians.find(t => t.id === d.technicianId);
     if(selected)technicians.append(link('View '+selected.name+' — qualifications & clearances','person/'+selected.id));
     d.needsAcknowledgement = team.some(t=>t.availability !== 'available'||!d.requiredSkills.every(s=>t.skills.includes(s))||!locationMatches(t));
-    if (d.needsAcknowledgement) { technicians.append(note('Check this allocation: the recorded skills, availability or location need a conversation. This is not an eligibility or safety assessment.')); check(technicians, 'I have reviewed the skill / availability / location warning', d.assignmentAcknowledged ?? false, on => { d.assignmentAcknowledged = on; touch(d); }); }
+    if (d.needsAcknowledgement) { technicians.append(note('Check this allocation: the recorded skills, general allocation status or location need a conversation. This is not an eligibility or safety assessment.')); check(technicians, 'I have reviewed the skill / availability / location warning', d.assignmentAcknowledged ?? false, on => { d.assignmentAcknowledged = on; touch(d); }); }
   }
-  drawTechnicians();
+  drawTechnicians();directories.calendarReady?.then(()=>{for(const label of technicians.querySelectorAll('[data-calendar-person]')){const t=directories.technicians.find(t=>t.id===label.dataset.calendarPerson);label.textContent=`Calendar today (${directories.calendarDay}): ${t?.calendarToday??'Not recorded'}. Check future dates in the calendar.`;}});
 }
-async function directories() {
+async function directories(loadCalendars=true) {
   const [technicians, people, organisations,areas] = await Promise.all([request('technicians'),request('people'),request('organisations'),request('availability-options')]);
-  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU');return { serviceAreas:[...areas.serviceAreas].sort((a,b)=>a.label.localeCompare(b.label,'en-AU')),technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort(), people: [...people.items].sort(byName), organisations: [...organisations.items].sort(byName) };
+  const calendarDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Adelaide'}).format(new Date());const queue=loadCalendars?[...technicians.items]:[];const calendarReady=Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{while(queue.length){const t=queue.shift();try{const calendar=await request('availability/'+t.id);t.calendarToday=calendar.entries.find(e=>e.startDate<=calendarDay&&e.endDate>=calendarDay)?.status??'Not recorded';}catch{t.calendarToday='Could not load';}}}));
+  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU');return { calendarDay,calendarReady,serviceAreas:[...areas.serviceAreas].sort((a,b)=>a.label.localeCompare(b.label,'en-AU')),technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort(), people: [...people.items].sort(byName), organisations: [...organisations.items].sort(byName) };
 }
 function allocationValid(form, d, notice) { if (!valid(form)) return false; if (d.needsAcknowledgement && !d.assignmentAcknowledged) { notice.replaceChildren(note('Review the technician warning and tick the acknowledgement, or leave the request unassigned.', true)); notice.scrollIntoView({block:'nearest'}); return false; } return true; }
 function reviewList(items) { const dl = el('dl', null, 'review-list'); for (const [label,value] of items) { dl.append(el('dt',label),el('dd',value)); } return dl; }
@@ -175,7 +177,7 @@ async function newProject(view, clientId) {
 }
 async function editCoordination(view,id,options={}) {
   const focus=['team','funding'].includes(options.focus)?options.focus:null;
-  const [project,dirs,projectLocation]=await Promise.all([request('projects/'+id),directories(),request('projects/'+id+'/location')]);
+  const [project,dirs,projectLocation]=await Promise.all([request('projects/'+id),directories(options.focus!=='funding'),request('projects/'+id+'/location')]);
   const key='coordination/'+id+(focus?'/'+focus:'');
   const previous=drafts.get(key);
   if(previous&&!previous.dirty&&!previous.pending)drafts.delete(key);
@@ -229,7 +231,7 @@ async function linkContact(view,id) {
     if(d.personId&&!eligible.some(p=>p.id===d.personId))d.personId='';
     slot.replaceChildren();
     if(d.mode==='new'&&!d.personId){field(slot,'Full name',d,'name',{required:true});field(slot,'Phone number',d,'phone',{type:'tel',max:40});field(slot,'Email address',d,'email',{type:'email',max:200});slot.append(el('p',`A ${d.role.toLowerCase()} profile will be created and linked to this client. This does not create a sign-in account.`,'field-help'));}
-    else{const picker=selectField(slot,'Existing person',d,'personId',[['',eligible.length?'Choose a '+d.role.toLowerCase():'No matching people'],...eligible.map(p=>[p.id,p.name])]);picker.required=true;slot.append(el('p',eligible.length?`Only people with the ${d.role} role are shown.`:`No ${d.role.toLowerCase()} profiles are available in this directory. Create a new contact or update an existing person's role first.`,'field-help'));}
+    else{const picker=selectField(slot,'Existing person',d,'personId',[['',eligible.length?'Choose '+(/^[aeiou]/i.test(d.role)?'an ':'a ')+d.role.toLowerCase():'No matching people'],...eligible.map(p=>[p.id,p.name])]);picker.required=true;slot.append(el('p',eligible.length?`Only people with the ${d.role} role are shown.`:`No ${d.role.toLowerCase()} profiles are available in this directory. Create a new contact or update an existing person's role first.`,'field-help'));}
   }
   drawPerson();const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Link contact');actions.append(submit,cancel(form,d,key,'client/'+id));form.append(notice,actions);box.append(form);view.append(box);
   form.addEventListener('submit',async e=>{e.preventDefault();if(!valid(form)||host.isSaving())return;
@@ -254,7 +256,7 @@ export async function renderWorkflow(view,route,arg,options={}) {
   else if(route==='new-project')await newProject(view,arg);
   else if(route==='link-contact')await linkContact(view,arg);
   else if(route==='coordination')await editCoordination(view,arg,options);
-  else if(route==='organisation-category')await organisationCategory(view,arg);
+  else if(['organisation-category','edit-organisation','new-organisation'].includes(route))await organisationCategory(view,route==='new-organisation'?null:arg);
   else return false;
   return true;
 }
@@ -268,11 +270,11 @@ async function personProfile(view, id) {
   const box = panel('Person details'), form = el('form', null, 'form-grid');
   field(form,'Full name',d,'name',{required:true}); field(form,'Phone number',d,'phone',{type:'tel',max:40}); field(form,'Email address',d,'email',{type:'email',max:200});
   const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Profile type'),el('p','Choose one type. Client and occupational therapist records stay separate from technician profiles.','field-help'));
-  const tech = el('fieldset'); tech.append(el('legend','Technician details'),el('p','Record skills and current availability to help allocate projects. These details do not establish clearance or permission to start work.','field-help'));
+  const tech = el('fieldset'); tech.append(el('legend','Technician details'),el('p','Record skills and general allocation status. Dated calendar availability is recorded separately and does not change this status. These details do not establish clearance or permission to start work.','field-help'));
   const skills = el('div',null,'skill-options');
   for (const skill of catalogue.skills) check(skills,skill,d.skills.includes(skill),on=>{d.skills=on?[...d.skills,skill]:d.skills.filter(s=>s!==skill);touch(d);});
   tech.append(el('span','Skills','field-label'),skills);
-  selectField(tech,'Availability',d,'availability',catalogue.availability.map(v=>[v,v==='unavailable'?'Not available / not confirmed':v==='limited'?'Limited availability':'Available']));
+  selectField(tech,'General allocation status',d,'availability',catalogue.availability.map(v=>[v,v==='unavailable'?'Not available / not confirmed':v==='limited'?'Limited availability':'Available']));
   const compatible=d.roles.length===1||(d.roles.length===2&&d.roles.includes('Technician')&&d.roles.includes('Administrator'));
   d.profileType??=compatible?(d.roles.includes('Technician')?'Technician':d.roles[0]):'';
   if(!compatible&&d.roles.length)roles.append(note('This existing profile combines '+d.roles.join(', ')+'. Select its correct type before saving. Linked projects and history remain recorded; reassign current technician work before removing that role.',true));
@@ -292,7 +294,7 @@ async function personProfile(view, id) {
     notice.append(button('These details are correct — save anyway',()=>{d.allowDuplicate=true;d.requestId=crypto.randomUUID();form.requestSubmit();}));
   }
   if(id&&d.version!==person.version&&!d.pending) {
-    notice.append(note('This profile changed since you started. Compare the latest details before saving your draft.',true),reviewList([['Name',person.name],['Phone',person.phone||'None'],['Email',person.email||'None'],['Roles',person.roles.join(', ')],['Skills',person.technician?.skills.join(', ')||'None'],['Availability',person.technician?.availability||'Not a technician']]));
+    notice.append(note('This profile changed since you started. Compare the latest details before saving your draft.',true),reviewList([['Name',person.name],['Phone',person.phone||'None'],['Email',person.email||'None'],['Roles',person.roles.join(', ')],['Skills',person.technician?.skills.join(', ')||'None'],['General allocation status',person.technician?.availability||'Not a technician']]));
     notice.append(button('Use latest version with my draft',()=>{d.version=person.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));
   }
   form.addEventListener('submit',async e=>{
@@ -306,10 +308,17 @@ async function personProfile(view, id) {
 }
 
 async function organisationCategory(view,id){
- const item=await request('organisations/'+id),key='organisation-category/'+id,d=getDraft(key,{category:item.category||'',email:item.email||'',version:item.version});
- title(view,'Organisation contact & category',item.name);view.append(link('Back to organisation','organisation/'+id,'breadcrumb'));
- const box=panel('Organisation details'),form=el('form',null,'form-grid');const input=field(form,'Category',d,'category',{max:80,help:'Choose a suggestion or enter a category used by your team.'});const suggestions=el('datalist');suggestions.id='organisation-categories';for(const value of ['School','NDIS','Health service','Government','Community organisation','Supplier','Other']){const option=el('option');option.value=value;suggestions.append(option);}input.setAttribute('list',suggestions.id);form.append(suggestions);field(form,'Organisation email',d,'email',{type:'email',max:254,help:'The organisation’s own contact address, used in reports.'});
- const notice=el('div'),actions=el('div',null,'actions'),submit=saveButton('Save organisation details');actions.append(submit,cancel(form,d,key,'organisation/'+id));form.append(notice,actions);box.append(form);view.append(box);
- if(d.version!==item.version)notice.append(note('This organisation changed. Latest category: '+(item.category||'Not categorised'),true),button('Use latest version with my draft',()=>{d.version=item.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Review your category, then save.'));}));
- form.addEventListener('submit',e=>{e.preventDefault();if(!valid(form))return;save(form,d,notice,submit,'organisations/'+id+'/category','PUT',{requestId:d.requestId,version:d.version,category:d.category.trim(),email:d.email.trim()},()=>{drafts.delete(key);host.announce('Organisation category saved.');location.hash='organisation/'+id;});});
+ const item=id?await request('organisations/'+id):null,directory=await request('organisations'),key=id?'edit-organisation/'+id:'new-organisation',d=getDraft(key,{name:item?.name||'',role:item?.role||'',description:item?.description||'',category:item?.category||'',email:item?.email||'',...(id?{version:item.version}:{})});
+ title(view,id?'Edit organisation':'New organisation',id?item.name:'Record an organisation once, then link it to projects as needed.');view.append(link(id?'Back to organisation':'Back to organisations',id?'organisation/'+id:'organisations','breadcrumb'));
+ const box=panel('Organisation details'),form=el('form',null,'form-grid');
+ field(form,'Organisation name',d,'name',{required:true,max:200});
+ const suggest=(label,key,values,help)=>{const input=field(form,label,d,key,{required:key==='role',max:key==='role'?120:80,help});const list=el('datalist');list.id='organisation-'+key+'-options';for(const value of [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'en-AU'))){const option=el('option');option.value=value;list.append(option);}input.setAttribute('list',list.id);form.append(list);};
+ suggest('Organisation type','role',['Funder','Allied-health organisation',...directory.items.map(o=>o.role)],'Choose a suggestion or enter the organisation type used by your team.');
+ field(form,'Description',d,'description',{type:'textarea',max:2000});
+ suggest('Category','category',['School','NDIS','Health service','Government','Community organisation','Supplier','Other',...directory.items.map(o=>o.category)],'Optional grouping, such as School or NDIS. Organisation type describes its role; category helps your team organise records.');
+ field(form,'Organisation email',d,'email',{type:'email',max:254,help:'The organisation contact address, used in reports.'});
+ const notice=el('div'),actions=el('div',null,'actions'),submit=saveButton(id?'Save organisation details':'Create organisation');actions.append(submit,cancel(form,d,key,id?'organisation/'+id:'organisations'));form.append(notice,actions);box.append(form);view.append(box);
+ if(id&&d.version!==item.version){notice.append(note('This organisation changed. Compare the latest saved details before retaining your draft.',true));const latest=el('dl',null,'record-details');for(const [label,k] of [['Name','name'],['Type','role'],['Description','description'],['Category','category'],['Email','email']])latest.append(el('dt',label),el('dd',item[k]||'Not recorded'));notice.append(latest,button('Use latest version with my draft',()=>{d.version=item.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review all organisation details, then save.'));}));}
+ form.addEventListener('submit',e=>{e.preventDefault();if(!valid(form))return;const payload={requestId:d.requestId,...(id?{version:d.version}:{}),...Object.fromEntries(['name','role','description','category','email'].map(k=>[k,d[k].trim()]))};save(form,d,notice,submit,id?'organisations/'+id+'/profile':'organisations',id?'PUT':'POST',payload,result=>{drafts.delete(key);host.announce(id?'Organisation details saved.':'Organisation created.');location.hash='organisation/'+result.id;});});
+ if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';notice.append(note('A previous save could not be confirmed. Retry it before changing these details.'));}
 }

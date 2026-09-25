@@ -50,7 +50,7 @@ export async function renderLifecycle(parent,project,options={}){
    if(!ops.invoices.length)financial.append(node('p','No draft invoice recorded.'));
    for(const invoice of ops.invoices){const total=invoice.snapshot?.totalCents??invoice.totalCents??0,paid=(plan.payments??[]).filter(p=>p.invoiceId===invoice.id).reduce((sum,p)=>sum+p.amountCents,0);financial.append(node('p',`${invoice.number} · ${money(total)} · Received ${money(paid)} · Outstanding ${money(total-paid)}`));}
    if(s.costReturns?.length){const actual=s.costReturns.at(-1);financial.append(node('p','Actual cost return: '+money(actual.totalCents)),node('p','Difference from quote: '+money(actual.totalCents-(quote?.totalCents??0))));}
-   financial.append(node('p','External Finance clearance and recorded receipts are separate records.','field-help'));context.append(financial);
+   const outstanding=ops.invoices.reduce((sum,invoice)=>sum+Math.max(0,(invoice.snapshot?.totalCents??invoice.totalCents??0)-(plan.payments??[]).filter(p=>p.invoiceId===invoice.id).reduce((n,p)=>n+p.amountCents,0)),0);if(outstanding>0){financial.append(notice(money(outstanding)+' remains unmatched by recorded receipts against draft invoices. Check Finance’s reconciliation before finalising or closing; record its reference and explanation. A draft balance is not proof of an unpaid debt.'),link('Review invoices and record receipts','project/'+id+'/costs'));}financial.append(node('p','External Finance clearance and recorded receipts are separate records. Receipts can still be recorded after Finance finalisation while the project is open.','field-help'));context.append(financial);
   }
  }
 

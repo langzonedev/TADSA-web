@@ -15,8 +15,9 @@ export function clientDetailsSummary(client) {
 }
 export async function renderClientDetails(view,id,host) {
   const client=await host.request('clients/'+id);const current=client.details;
-  if(!drafts.has(id))drafts.set(id,{...current,dirty:false,pending:false});
-  const d=drafts.get(id);view.append(el('h1','Client contact and addresses'),el('p','Required intake details. Existing records remain incomplete until these details are supplied.'));
+  const previous=drafts.get(id);if(previous&&!previous.dirty&&!previous.pending&&previous.version!==current.version)drafts.delete(id);
+  if(!drafts.has(id))drafts.set(id,{...current,name:client.person.name,email:client.person.email,phone:client.person.phone,dirty:false,pending:false});
+  const d=drafts.get(id);view.append(el('h1','Client contact and addresses'),el('p','Phone, email and name are shared with the person profile. Saving here updates that same contact record. Complete the address and preferred-contact details for intake.'));
   const form=el('form');form.className='panel workflow-panel form-grid';const status=el('div');status.setAttribute('role','status');
   const controls={};
   function field(key,label,max,type='text'){

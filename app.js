@@ -1,4 +1,5 @@
 import {renderInvoiceReferences} from './invoice-references.js';
+import {auditChanges,formatValue as displayValue} from './record-values.js';
 import {renderProfileDetails} from './profile-details.js';
 import {renderProjectDetails,renderProjectCoordinator,renderProjectFeedback} from './project-details.js';
 import {renderAccounts} from './accounts.js';
@@ -40,7 +41,7 @@ function projectStatus(p){const group=el('span',undefined,'project-status');grou
 const nameOf = item => item.person?.name ?? item.name ?? item.title;
 const typeOf = kind => ({ projects: 'project', clients: 'client', people: 'person', organisations: 'organisation' })[kind];
 const pathOf = type => ({ project: 'projects', client: 'clients', person: 'people', organisation: 'organisations' })[type];
-let toastTimer;function announce(text) { announcement.textContent = text;if(/\b(saved|created|linked|removed)\b/i.test(text)){document.querySelector('.save-toast')?.remove();const toast=el('div',text,'save-toast');toast.setAttribute('aria-hidden','true');document.body.append(toast);clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.remove(),2800);} }
+let announcementRoute='';let toastTimer;function announce(text) { announcement.textContent = text;announcementRoute=location.hash||'#projects';queueMicrotask(()=>{if(announcement.textContent===text)announcementRoute=location.hash||'#projects';});if(/\b(saved|created|linked|removed)\b/i.test(text)){document.querySelector('.save-toast')?.remove();const toast=el('div',text,'save-toast');toast.setAttribute('aria-hidden','true');document.body.append(toast);clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast.remove();if(announcement.textContent===text)announcement.textContent='';},2800);} }
 window.addEventListener('tadsa-saved',()=>announce('Changes saved.'));
 async function api(path, body) {
   const response = await fetch(`/api/${path}`, { ...(body ? { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(10000) });
@@ -92,7 +93,7 @@ async function register(view, kind) {
   const state = registers.get(kind) ?? { query: '', filter: 'all', sort: kind === 'projects' ? 'reference' : 'name', selected: null };
   registers.set(kind, state); returnRoute = kind;
   const descriptions = { projects: 'Projects in progress, the people involved, and the work to be done.', clients: 'A connected view of each person and the work supporting them.', people: 'Clients, technical members and the people supporting each request.', organisations: 'The organisations connected to our work.' };
-  const head = heading(cap(kind), descriptions[kind], 'Administration'); head.append(el('span', `${items.length} ${kind === 'people' ? 'people' : kind}`, 'meta-note')); if (kind === 'projects') head.append(link('New project', 'new-project', 'button primary')); if (kind === 'people') head.append(link('New person', 'new-person', 'button primary')); if (kind === 'clients') head.append(link('New client', 'new-client', 'button primary')); view.append(head);
+  const head = heading(cap(kind), descriptions[kind], 'Administration'); head.append(el('span', `${items.length} ${kind === 'people' ? 'people' : kind}`, 'meta-note')); if (kind === 'projects') head.append(link('New project', 'new-project', 'button primary')); if(kind==='organisations')head.append(link('New organisation','new-organisation','button primary')); if (kind === 'people') head.append(link('New person', 'new-person', 'button primary')); if (kind === 'clients') head.append(link('New client', 'new-client', 'button primary')); view.append(head);
   const tabs = el('div', undefined, 'filter-tabs'); tabs.setAttribute('aria-label', `Filter ${kind}`);
   const filters = kind === 'projects' ? [['all', 'All projects', () => true], ['open', 'Open', p => p.status === 'open'], ['review', 'Review', p => p.status === 'review'], ['closed', 'Closed', p => p.status === 'closed'], ['feedback', 'Feedback', p => p.feedbackRequired], ['invoice', 'Invoice', p => p.invoiceRequired]] : [['all', `All ${kind}`, () => true], ...(kind === 'people' ? [...new Set(items.flatMap(p => p.roles ?? [p.role]))].sort().map(role => [role, role, p => (p.roles ?? [p.role]).includes(role)]) : [])];
   const layout = el('div', undefined, 'register-layout'); const box = el('section', undefined, 'register-panel'); box.setAttribute('aria-label', `${cap(kind)} register`); const inspector = el('aside', undefined, 'inspector'); inspector.setAttribute('aria-label', 'Selected record');
@@ -111,7 +112,7 @@ async function register(view, kind) {
     visible.sort((a, b) => String(key(a)).localeCompare(String(key(b)), 'en-AU', { numeric: true }) * (state.sort === 'reverse' ? -1 : 1));
     if (!visible.some(i => i.id === state.selected)) state.selected = visible[0]?.id ?? null;
     const table = el('table', undefined, kind + '-table'); const thead = el('thead'); const tr = el('tr');
-    const columns = kind === 'projects' ? ['Project', 'Client', 'Status', 'Target'] : kind === 'clients' ? ['Client', 'Projects'] : kind === 'people' ? ['Person', 'Role', 'Projects'] : ['Organisation', 'Category', 'Projects'];
+    const columns = kind === 'projects' ? ['Project', 'Client', 'Status', 'Target'] : kind === 'clients' ? ['Client', 'Projects'] : kind === 'people' ? ['Person', 'Role', 'Projects'] : ['Organisation', 'Type', 'Category', 'Projects'];
     columns.forEach((label, i) => { const th = el('th', label); th.scope = 'col'; if ((kind === 'projects' && i === 3)) th.className = 'optional-col'; tr.append(th); }); thead.append(tr); table.append(thead);
     const tbody = el('tbody');
     for (const item of visible) {
@@ -121,7 +122,7 @@ async function register(view, kind) {
       if (kind === 'clients' || kind === 'people') { const identity = el('span', undefined, 'name-cell'); identity.append(avatar(nameOf(item)), text); control.append(identity); } else control.append(text); first.append(control); {const previewButton=button('Quick view',()=>choose(item),'text-button row-preview');previewButton.setAttribute('aria-label','Preview '+nameOf(item));first.append(previewButton);} row.append(first);
       if (kind === 'projects') { row.append(el('td', item.clientName)); const s = el('td'); s.append(projectStatus(item)); row.append(s, el('td', date(item.dueDate), 'optional-col')); }
       else if (kind === 'clients') row.append(el('td', String(item.projects.length)));
-      else row.append(el('td', kind==='organisations'?(item.category||'Uncategorised'):item.role), el('td', String(item.projects.length)));
+      else if(kind==='organisations')row.append(el('td',item.role||'Not recorded'),el('td',item.category||'Not specified'),el('td',String(item.projects.length))); else row.append(el('td',item.role),el('td',String(item.projects.length)));
       row.addEventListener('click', event => { if (!event.target.closest('button,a')) {location.hash=typeOf(kind)+'/'+item.id;} }); tbody.append(row);
     }
     table.append(tbody); tableSlot.replaceChildren(visible.length ? table : empty('No matching records', 'Try another filter or clear your search.'));
@@ -142,21 +143,19 @@ async function search(view, term) {
 }
 function recordHeader(view, eyebrow, title, meta, action) { const header = el('div', undefined, 'record-header'); const text = el('div'); text.append(el('div', eyebrow, 'eyebrow'), el('h1', title)); if (meta) text.append(meta); header.append(text); if (action) header.append(action); view.append(header); return header; }
 async function client(view, id) {
-  const c = await api(`clients/${id}`); view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
+  const c = await api(`clients/${id}`); view.append(link('← Back to people', 'people', 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); meta.append(el('span', 'Client'), el('span', `${c.projects.length} linked projects`)); recordHeader(view, 'Client record', c.person.name, meta, link('New project', `new-project/${c.id}`, 'button primary'));
   const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel('Contact details'); info.append(details([['Email', c.person.email], ['Phone', c.person.phone]]), link('Edit profile & roles', 'edit-person/' + c.person.id, 'text-button'));
   const contacts = panel('Client contacts'); addClientContactActions(contacts, c); left.append(projectLinks(c.projects),clientDetailsSummary(c),info,contacts);await renderProfileDetails(left,c.person); const related = relationships(c.relationships); related.querySelector('h2').textContent = 'People linked through projects'; grid.append(left, related); view.append(el('div', undefined, 'heading-rule'), grid);
 }
-const fieldNames = { title: 'Project title', status: 'Status', feedbackRequired: 'Feedback required', invoiceRequired: 'Invoice required' };
-const displayValue = value => typeof value === 'boolean' ? value ? 'Required' : 'Not required' : String(value ?? 'Not recorded');
 function auditPanel(p) {
   const box = panel('Project activity'); box.append(el('p', 'Saved changes, newest first. Development activity is not an authenticated staff audit trail.', 'muted'));
   if (!p.audit.length) box.append(empty('No changes recorded yet', 'Updates to this project will appear here after saving.'));
-  for (const a of p.audit) { const row = el('div', undefined, 'audit'); row.append(el('strong', a.action), el('small', `${a.actor} · ${new Date(a.at).toLocaleString('en-AU')}`)); for (const [key, value] of Object.entries(a.changes).filter(([key])=>!['primaryRecordId','primaryReference','primary_record_id'].includes(key))) row.append(el('p', `${fieldNames[key] ?? key}: ${displayValue(value?.from)} → ${displayValue(value&&typeof value==='object'&&'to' in value?value.to:value)}`)); box.append(row); }
+  for (const a of p.audit) { const row = el('div', undefined, 'audit'); row.append(el('strong', a.action), el('small', `${a.actor} · ${new Date(a.at).toLocaleString('en-AU',{timeZone:'Australia/Adelaide'})}`)); for (const change of auditChanges(a.changes)) row.append(el('p', `${change.label}: ${change.value}`)); box.append(row); }
   return box;
 }
 async function project(view, id) {
-  let p = await api(`projects/${id}`); let tab = projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
+  let p = await api(`projects/${id}`); let tab = location.hash.split('/')[2]==='costs'?'Costs & invoices':projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
   const destinations=['Overview','Files','Costs & invoices','Workflow history'];
   if(!destinations.includes(tab)&&!['Task','Edit details','Audit trail','Case-note history','Hold or resume work','Record hours','Prepare invoices','Print documents','Team','Funding','Feedback'].includes(tab)&&!tab.startsWith('Action:'))tab='Overview';
   view.classList.add('project-workspace');
@@ -197,9 +196,11 @@ async function project(view, id) {
   const quote=state?.quotes?.at(-1);if(quote)next.append(el('p',`Quote revision ${quote.version} · ${new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(quote.totalCents/100)}`,'project-next-evidence'));
   next.append(button(info[2]+' →',()=>navigate(held?'Hold or resume work':'Task'),'primary'));left.append(next);
   const brief=panel('The work');brief.append(el('p',p.summary||p.title,'record-summary'));
+  const payerNames=new Map([[`client:${p.clientId}`,p.clientName]]);if(projectOperations.fundingContributors.length){const [people,organisations,clients]=await Promise.all([api('people'),api('organisations'),api('clients')]);for(const [type,items] of [['person',people.items],['organisation',organisations.items],['client',clients.items]])for(const item of items)payerNames.set(type+':'+item.id,item.person?.name??item.name);}
   const facts=el('div',undefined,'project-facts');const client=el('div');client.append(el('small','CLIENT'),link(p.clientName,`client/${p.clientId}`));facts.append(client);
   for(const [label,roles] of [['CONTACTS',['Carer','OT','Occupational therapist','Allied-health contact']],['REFERRER',['Referrer']],['FUNDER / PAYER',['Funder']],['TECHNICAL TEAM',['Technician']]]){
     const group=el('div');group.append(el('small',label));const members=p.relationships.filter(r=>roles.includes(r.role));
+    if(label==='FUNDER / PAYER'&&projectOperations.fundingContributors.length){for(const c of projectOperations.fundingContributors)group.append(link((payerNames.get(c.type+':'+c.id)||'Recorded payer')+' · '+new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(c.amountCents/100),c.type+'/'+c.id));group.append(el('small','Agreed contributions · not receipts','field-help'));facts.append(group);continue;}
     if(label==='FUNDER / PAYER'&&p.coordination?.fundingStatus==='self'){group.append(link(p.clientName+' · Client pays',`client/${p.clientId}`));facts.append(group);continue;}
     if(!members.length)group.append(el('span',label==='TECHNICAL TEAM'?'Not assigned':'Not recorded','muted'));
     for(const member of members)group.append(link(member.name+(label==='CONTACTS'?' · '+member.role:member.id===p.coordination?.technicianId?' · Lead':''),(member.type==='organisation'?'organisation/':'person/')+member.id));facts.append(group);
@@ -279,19 +280,20 @@ async function project(view, id) {
       } finally { saving = false; save.disabled = false; cancel.disabled = false; input.disabled = false; select.disabled = Boolean(lifecycle.managed); Object.values(checks).forEach(c => c.disabled = false); tabs.querySelectorAll('button').forEach(b => b.disabled = false); save.textContent = 'Save changes'; }
     });
   }
+  view.addEventListener('click',event=>{const a=event.target.closest('a');if(a?.getAttribute('href')==='#project/'+id+'/costs'){event.preventDefault();navigate('Costs & invoices');}});
   draw();await loadEmbedded(tab);
 }
 async function entity(view, type, id) {
-  const item = await api(`${pathOf(type)}/${id}`); view.append(link('← Back to workspace', returnRoute, 'breadcrumb'));
+  const item = await api(`${pathOf(type)}/${id}`); view.append(link(type==='person'?'← Back to people':'← Back to organisations',type==='person'?'people':'organisations','breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); meta.append(el('span', item.roles?.join(' · ') ?? item.role)); recordHeader(view, type === 'person' ? 'Person record' : 'Organisation record', item.name, meta, type === 'person' ? link('Edit profile & roles', 'edit-person/' + id, 'button primary') : undefined);
   const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
   info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role]]) : el('p', item.description, 'record-summary'));
   if (item.clientId) info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));
-  if(type==='organisation'){info.append(details([['Category',item.category||'Not categorised'],['Email',item.email||'Not recorded']]),link('Edit contact & category','organisation-category/'+id,'button secondary'));}
+  if(type==='organisation'){info.append(details([['Type',item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded']]),link('Edit organisation','edit-organisation/'+id,'button secondary'));}
   left.append(info);
   if(type==='person')await renderProfileDetails(left,item);
   if (item.technician) {await renderTechnicianLocation(left,id);try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}
-  if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['Availability', cap(item.technician.availability)]])); left.append(tech); } left.append(projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted')); grid.append(left, context); view.append(el('div', undefined, 'heading-rule'), grid);
+  if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['General allocation status', cap(item.technician.availability)]])); tech.append(el('p','General allocation status is separate from dated calendar entries. Check the dates before assigning work.','field-help'),link('View calendar availability','availability/'+id,'text-button')); left.append(tech); } left.append(projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted')); grid.append(left, context); view.append(el('div', undefined, 'heading-rule'), grid);
 }
 async function render() {
   if (saving) { announce('Please wait for the save to finish.'); return; }
@@ -299,7 +301,7 @@ async function render() {
   try{if(!await requireLocalSession(main,render,()=>ticket===renderVersion,()=>Boolean(drafts.size||workflowHasDrafts()||operationsHaveDrafts()||careHasDrafts()||clientDetailsHasDrafts()||saving)))return;if(ticket!==renderVersion)return;}catch{if(ticket!==renderVersion)return;showAuthFailure(render);return;}
   const [route = 'projects', raw = ''] = (location.hash.slice(1) || 'projects').split('/'); const view = el('div');
   main.replaceChildren(el('p', 'Loading workspace…', 'loading')); main.setAttribute('aria-busy', 'true');
-  const active = ({ project: 'projects', client: 'people', person: 'people', organisation: 'organisations', 'organisation-category':'organisations', clients:'people', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'people', 'new-project': 'projects', coordination: 'projects', operations:'projects',documents:'projects','client-details':'people' })[route] ?? route;
+  const active = ({ project: 'projects', client: 'people', person: 'people', organisation: 'organisations', 'organisation-category':'organisations','new-organisation':'organisations','edit-organisation':'organisations', clients:'people', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'people', 'new-project': 'projects', coordination: 'projects', operations:'projects',documents:'projects','client-details':'people' })[route] ?? route;
   document.querySelectorAll('[data-nav]').forEach(a => { if (a.dataset.nav === active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   try {
     const arg = decodeURIComponent(raw);
@@ -334,7 +336,7 @@ searchForm.addEventListener('focusout',()=>setTimeout(()=>{if(!searchForm.contai
 document.querySelector('#global-search').addEventListener('submit', event => { event.preventDefault(); closeSearchPreview(); if (saving) { announce('Please wait for the save to finish.'); return; } const target = `#search/${encodeURIComponent(globalInput.value.trim())}`; if (location.hash === target) render(); else location.hash = target; });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); main.focus(); });
 window.addEventListener('keydown', event => { if (document.documentElement.dataset.authState==='ready' && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if(drawerOpen)setDrawer(false,false);globalInput.focus(); globalInput.select(); } });
-window.addEventListener('hashchange', event => { if (saving) { history.replaceState(null, '', new URL(event.oldURL).hash || '#projects'); announce('Your changes are saving. Please wait before leaving this record.'); const pending = main.querySelector('.message'); if (pending) pending.textContent = 'Your changes are saving. Please wait before leaving this record.'; return; } render(); });
+window.addEventListener('hashchange', event => { if (saving) { history.replaceState(null, '', new URL(event.oldURL).hash || '#projects'); announce('Your changes are saving. Please wait before leaving this record.'); const pending = main.querySelector('.message'); if (pending) pending.textContent = 'Your changes are saving. Please wait before leaving this record.'; return; } if(announcementRoute!==(location.hash||'#projects')){announcement.textContent='';document.querySelector('.save-toast')?.remove();clearTimeout(toastTimer);} render(); });
 window.addEventListener('beforeunload', event => { if(sessionEnded||workspaceRestored)return; if (drafts.size || workflowHasDrafts() || operationsHaveDrafts() || careHasDrafts() || clientDetailsHasDrafts() || saving) { event.preventDefault(); event.returnValue = ''; } });
 render();
 // The desktop rail becomes a focus-contained navigation drawer on small screens.

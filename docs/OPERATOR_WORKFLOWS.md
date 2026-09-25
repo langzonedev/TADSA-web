@@ -74,3 +74,13 @@ Corrections include accurate client-owned project counts in the database app, cl
 The exception pass also corrected zero-versus-unknown bike cancellations and Adelaide opening/quote dates. Zero cancelled bikes is valid explicit evidence; blank remains unknown, and delivered bike quantity still must be positive. Opening dates use recorded creation evidence when present, preserving stored historical dates otherwise.
 
 Customer confirmation remains necessary for Finance/deposit authority, reporting formulas and GST, partial bike deliveries, historical active-member counts, revision limits, closure/feedback requirements and post-delivery rectification. Missing historical facts are shown as unknown, not reconstructed from guesses.
+
+## Follow-up browser feedback — 25 September
+
+Organisations now supports New organisation and full editing of name, type, description, optional category and email. The register distinguishes type from category. Existing links survive edits; a stale form requires review before resaving.
+
+Legacy projects can resume after a client stop by recording client consent, an Administrator profile as approver and the approval date, then clearing the stop/hold flags. Guided projects retain their existing account-authorised consent workflow. The hold form explains the difference.
+
+Receipts can be recorded after Finance finalisation until the project closes. Invoice edits remain locked after finalisation. An outstanding internal draft balance is shown with a direct Costs link; the final closure policy still needs customer confirmation. Tax-unconfirmed records remain non-issuable internal drafts and retain their original settings.
+
+Overview payers reflect saved contributions, which are distinct from payment receipts. Audit and stale-draft comparisons use readable fields. People/client breadcrumbs return to People, contact editors use current shared person details, and allocation screens distinguish general status from dated calendar availability. People and projects are fictional; published organisation/issuer details may be real.

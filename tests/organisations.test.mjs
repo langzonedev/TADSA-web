@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {seed} from '../seed.mjs';
+import {normalise,dispatch} from '../device-model.mjs';
+import {validateBackup} from '../device-backups.mjs';
+import '../device-extensions.mjs';
+const value=()=>({requestId:crypto.randomUUID(),name:'Synthetic organisation QA',role:'Community service',description:'Synthetic description',category:'School',email:'organisation@example.invalid'});
+test('organisation create/edit replay, validation, references and backup roundtrip',async()=>{
+ const d=normalise(seed()),input=value(),created=dispatch(d,'organisations','POST',input);
+ assert.equal(created.version,1);assert.equal(dispatch(d,'organisations','POST',input).id,created.id);
+ const update={...input,requestId:crypto.randomUUID(),version:1,name:'Renamed organisation',role:'Funder',description:'Updated description',category:'NDIS',email:'updated@example.invalid'};
+ const changed=dispatch(d,'organisations/'+created.id+'/profile','PUT',update);assert.equal(changed.version,2);
+ for(const key of ['name','role','description','category','email'])assert.equal(changed[key],update[key]);
+ assert.equal(dispatch(d,'organisations/'+created.id+'/profile','PUT',{...update,version:2,requestId:crypto.randomUUID()}).version,2);
+ assert.throws(()=>dispatch(d,'organisations/'+created.id+'/profile','PUT',{...update,requestId:crypto.randomUUID()}),e=>e.status===409);
+ for(const patch of [{name:''},{role:''},{email:'invalid'},{description:'x'.repeat(2001)},{name:'bad\nname'}])assert.throws(()=>dispatch(d,'organisations','POST',{...value(),...patch}),e=>e.status===422);
+ const old=dispatch(d,'organisations/org-1'),profile=Object.fromEntries(['name','role','description','category','email'].map(k=>[k,old[k]]));
+ const renamed=dispatch(d,'organisations/org-1/profile','PUT',{...profile,name:'Updated linked organisation',version:old.version,requestId:crypto.randomUUID()});
+ assert.deepEqual(renamed.projects.map(p=>p.id),old.projects.map(p=>p.id));assert.ok(dispatch(d,'projects/'+old.projects[0].id).relationships.some(r=>r.id==='org-1'&&r.name===renamed.name));
+ const restored=await validateBackup(d);assert.equal(restored.organisations.find(o=>o.id===created.id).email,update.email);assert.equal(restored.organisations.find(o=>o.id==='org-1').name,renamed.name);
+});

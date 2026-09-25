@@ -17,7 +17,7 @@ export async function renderAvailability(view,personId,isCurrent=()=>true){
  const people=[...technicians.items].sort((a,b)=>a.name.localeCompare(b.name,'en-AU'));
  if(state.technician!=='all'&&!people.some(t=>t.id===state.technician))state.technician='all';
  view.classList.add('availability-workspace');
- view.append(node('h1','Technician availability'),node('p','Choose a technician and time scale. Select a day to record availability. Location and service areas are managed in each technician’s profile.','subtitle'));
+ view.append(node('h1','Calendar availability'),node('p','Select a day to record dated availability. Calendar entries do not change the general allocation status on the person profile. Check both before assigning work.','subtitle'));
  const controls=node('div',null,'availability-controls'),board=node('section',null,'availability-timeline'),forms=node('section',null,'availability-editor');view.append(controls,board,forms);
  const person=field(controls,'Technician',state,'technician','text',[['all','All technicians'],...people.map(t=>[t.id,t.name])]);
  const scale=field(controls,'View',state,'scale','text',[['week','Week'],['month','Month'],['year','Year']]);
@@ -45,7 +45,7 @@ export async function renderAvailability(view,personId,isCurrent=()=>true){
   const head=node('thead'),hr=node('tr'),corner=node('th','Technician');corner.scope='col';hr.append(corner);
   for(const day of days){const th=node('th');th.scope='col';th.append(node('span',dateOf(day).toLocaleDateString('en-AU',{month:'short'})),node('strong',dateOf(day).toLocaleDateString('en-AU',{day:'numeric'})),node('small',dateOf(day).toLocaleDateString('en-AU',{weekday:'short'})));if(day===localDay(new Date()))th.className='today';hr.append(th);}head.append(hr);table.append(head);
   const body=node('tbody');let first=true;
-  for(const t of visible){const row=node('tr'),name=node('th');name.scope='row';name.append(link(t.name,'person/'+t.id));row.append(name);const calendar=calendars.get(t.id);
+  for(const t of visible){const row=node('tr'),name=node('th');name.scope='row';name.append(link(t.name,'person/'+t.id),node('small','General allocation: '+t.availability));row.append(name);const calendar=calendars.get(t.id);
    if(!calendar){const cell=node('td','Calendar unavailable');cell.colSpan=days.length;row.append(cell);body.append(row);continue;}
    let entryIndex=0;const entries=[...calendar.entries].sort((a,b)=>a.startDate.localeCompare(b.startDate));
    for(const day of days){while(entryIndex<entries.length&&entries[entryIndex].endDate<day)entryIndex++;const candidate=entries[entryIndex],entry=candidate&&candidate.startDate<=day&&candidate.endDate>=day?candidate:null,key=entry?.status||'unknown',[symbol,label]=statuses[key]||statuses.unknown;

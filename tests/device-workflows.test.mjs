@@ -5,6 +5,17 @@ import {normalise,dispatch} from '../device-model.mjs';
 import '../device-extensions.mjs';
 const req=()=>crypto.randomUUID();
 
+test('client intake always reads contact identity from the linked person after profile edits',()=>{
+ const d=normalise(seed()),call=(path,method='GET',body={})=>dispatch(d,path,method,body);
+ const person=call('people','POST',{requestId:req(),name:'Synthetic contact authority',email:'initial@example.invalid',phone:'0400000001',roles:['Client'],technician:null,allowDuplicate:false});
+ call('clients/'+person.clientId+'/details','PUT',{version:person.version,name:person.name,email:person.email,phone:person.phone,residentialAddress:'1 Fictional Street',workAddress:'',sameAsResidential:true,preferredContact:'client',representativePersonId:null,contactNeeds:''});
+ const latest=call('people/'+person.id);
+ call('people/'+person.id+'/profile','PUT',{requestId:req(),version:latest.version,name:'Synthetic revised contact',email:'updated@example.invalid',phone:'0400000002',roles:latest.roles,technician:null,allowDuplicate:false});
+ const client=call('clients/'+person.clientId);
+ for(const key of ['name','email','phone'])assert.equal(client.details[key],client.person[key]);
+ assert.equal(client.details.email,'updated@example.invalid');assert.equal(client.details.residentialAddress,'1 Fictional Street');
+});
+
 test('opening day and project year follow Adelaide midnight, retaining legacy date fallback',t=>{
  t.mock.timers.enable({apis:['Date'],now:new Date('2026-12-31T13:30:00Z')});
  const d=normalise(seed()),legacy=d.projects[0],legacyDate=legacy.openedAt;
