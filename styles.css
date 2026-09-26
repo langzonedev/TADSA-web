@@ -208,7 +208,7 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 
 .profile-details .detail-list{display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,2fr);gap:10px 18px;margin:16px 0}.profile-details .detail-list dt{color:var(--muted)}.profile-details .detail-list dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}.profile-details fieldset{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.profile-details fieldset legend{font-weight:600}.profile-details .checkbox{display:flex;align-items:center;gap:10px}@media(max-width:500px){.profile-details .detail-list{grid-template-columns:1fr;gap:4px}.profile-details .detail-list dd{margin-bottom:10px}}
 
-/* Customer-guided project overview: identity, context/finance, then notes/action. */
+/* Project overview: identity followed by independent work/notes and finance/action columns. */
 .project-workspace .record-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding:20px 0 6px;gap:20px}
 .project-workspace .record-header>div:first-child{min-width:0}
 .project-workspace .record-header h1{margin:8px 0 0;overflow-wrap:anywhere}
@@ -220,10 +220,9 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 .project-overview-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr);gap:20px;align-items:start}
 .project-overview-grid>*{min-width:0}
 .project-overview-grid .panel{margin:0}
-.project-overview-grid>.project-home-brief{grid-column:1;grid-row:1}
-.project-overview-grid>.project-finance-summary{grid-column:2;grid-row:1}
-.project-overview-grid>.project-home-notes{grid-column:1;grid-row:2}
-.project-overview-grid>.project-overview-action{grid-column:2;grid-row:2;display:grid;gap:16px}
+.project-overview-column{display:flex;flex-direction:column;gap:16px;min-width:0}
+.project-overview-column>*{min-width:0}
+.project-overview-action{display:grid;gap:16px}
 .project-overview-grid .project-facts{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 16px;margin:20px 0}
 .project-overview-grid .project-facts a{overflow-wrap:anywhere;line-height:1.5}
 .project-overview-grid .project-facts>div:last-child{grid-column:span 2}
@@ -250,7 +249,6 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 }
 @media(max-width:800px){
  .project-overview-grid{grid-template-columns:minmax(0,1fr)}
- .project-overview-grid>.project-home-brief,.project-overview-grid>.project-finance-summary,.project-overview-grid>.project-home-notes,.project-overview-grid>.project-overview-action{grid-column:1;grid-row:auto}
  .project-workspace .record-header{gap:16px 8px}
  .project-workspace .record-header>.record-meta{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
  .project-workspace .record-header>.project-more-wrap{max-width:145px}
@@ -308,4 +306,82 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
  .projects-table .project-status .badge::before{display:inline-block;margin-right:4px}
  .projects-table .project-status .badge:not(.invoice){white-space:nowrap}
  .environment-info button{min-height:44px;padding:8px 10px;margin:3px 0;border:1px solid var(--line);border-radius:6px;background:var(--surface-soft,#eef1f9);color:var(--ink)}
+}
+
+/* Compact workspace rhythm: reclaim surrounding space, retaining text and control sizes.
+   Screen-only rules keep invoice and document printing on their existing layouts. */
+@media screen{
+ main{padding:20px 24px}
+ .topbar{min-height:64px;padding:8px 24px;gap:12px}
+ .environment-strip{padding:6px 24px}
+ .page-heading{margin-bottom:16px;gap:12px}
+ .breadcrumb{margin-bottom:8px;min-height:44px;display:inline-flex;align-items:center}
+ .filter-tabs{margin-bottom:12px}
+ .panel{padding:18px;margin-bottom:16px}
+ .panel h2{margin-bottom:12px}
+ .panel .detail-pairs{gap:14px 18px}
+ .record-header{padding:18px 20px;gap:16px}
+ .record-meta{margin-top:8px}
+ .record-tabs{margin-bottom:16px;padding-inline:20px}
+ .detail-layout,.register-layout{gap:16px}
+ .register-tools{padding:10px 14px}
+ .register-panel td{padding-block:10px}
+ .register-panel th{padding-block:10px}
+ .inspector-body{padding:16px}
+ .inspector-section{margin-top:16px;padding-top:14px}
+ .inspector .button{margin-top:12px}
+ .form-grid,.workflow-panel .form-grid{gap:16px}
+ .form-grid fieldset,.workflow-panel fieldset{padding:16px;gap:12px}
+ .workflow-intro{margin-bottom:16px}
+ .workflow-steps{margin-bottom:16px}
+ .workflow-panel .actions{padding-top:12px}
+ .heading-rule{margin:16px 0}
+ .report-controls{gap:12px;margin:16px 0}
+ .report-columns{gap:12px 20px;margin:16px 0;padding:14px}
+ .report-saved{padding-bottom:12px}
+ .report-output{margin-top:16px}
+ .availability-controls{margin-block:14px}
+ .project-workspace .breadcrumb{margin-bottom:0}
+ .project-workspace .project-nav{margin-top:0;gap:4px 18px;padding-inline:0}
+ .project-workspace .project-nav button{padding-block:9px}
+ .project-subnav{padding:8px 0}
+ .project-workspace .record-header{padding:12px 0 0;gap:12px 16px}
+ .project-workspace .record-header>.record-meta{margin-top:0}
+ .project-workspace .record-header .project-identity{gap:16px}
+ .project-identity .eyebrow{padding:10px 14px;gap:5px;margin-bottom:0}
+ .project-header-fact{padding:10px 12px;gap:5px}
+ .project-workspace>.project-overview,.project-workspace>#project-focused-pane{margin-top:12px}
+ .project-overview-grid{gap:16px}
+ .project-workspace .panel{padding:18px}
+ .project-overview-grid .project-facts{margin:12px 0;gap:12px 16px}
+ .project-context-details{padding-top:6px}
+ .project-context-details>summary{min-height:44px;display:list-item;align-content:center}
+ .project-overview-links{margin-top:0}
+ .project-finance-summary .detail-pairs{margin:12px 0;gap:8px}
+ .project-finance-summary .detail-pairs dd{margin-top:0}
+ .project-finance-summary .field-help{margin-top:10px}
+ .project-task-grid{gap:16px;margin-top:12px}
+ .project-task-form>.lifecycle-panel{padding:18px}
+ .project-record-section{padding-block:16px}
+}
+@media screen and (min-width:801px){
+ .sidebar{padding-block:22px;overflow-y:auto}
+ .sidebar .brand{margin-bottom:24px}
+ .sidebar nav{gap:4px}
+ .sidebar nav a{padding-block:10px}
+ .sidebar-bottom{padding-top:20px}
+ #sidebar-session{padding-block:12px;margin-bottom:14px}
+ .sidebar .attribution{margin-top:18px}
+ main:has(>.project-workspace){padding-top:10px}
+}
+@media screen and (max-width:800px){
+ main{padding:16px}
+ .topbar{padding:8px 16px}
+ .environment-strip{padding:6px 16px}
+ .mobile-navigation{padding:10px 16px;min-height:64px}
+ .project-workspace .record-header{gap:10px 8px}
+ .project-workspace .record-header .project-identity{gap:10px}
+ .project-workspace .panel,.panel{padding:16px}
+ .project-overview-column{gap:14px}
+ .project-header-fact{padding:8px 10px}
 }
