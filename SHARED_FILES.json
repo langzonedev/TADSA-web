@@ -1,7 +1,17 @@
 {
-  "sourceRevision": "e8774f5598db8947bca1b223ffb04db932553424",
+  "sourceRevision": "0ec78461121dd62ca1b43c53cf2eb1644a5b7cd8",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
+    "appliance-updates.js": {
+      "source": "public/appliance-updates.js",
+      "sha256": "438fd91f1fc5f3719a8deeecb3af733eb6f6cf22ea3ab1d152b66efd599b4656",
+      "transform": null
+    },
+    "client-address.js": {
+      "source": "public/client-address.js",
+      "sha256": "4fd8b882f374f1e7257d9f0c3d122bdd5e7cd249a3c3aa8783786f1dd4728686",
+      "transform": null
+    },
     "contact-draft.js": {
       "source": "public/contact-draft.js",
       "sha256": "c7f0615fb815e86ec5c334cdf26d6679062f3c4de566f6d89676a05c631801da",
@@ -59,7 +69,7 @@
     },
     "finance-pack.js": {
       "source": "public/finance-pack.js",
-      "sha256": "180a7c7e99336fdcc8f2be9db2ad7c8b4f308a8f2b7eaaaeb954b27425eec684",
+      "sha256": "728e2775834bc2ba9dc9e989e8be0d2a79fea3b80189e0e881231077127f6856",
       "transform": null
     },
     "technician-credentials.js": {
@@ -79,7 +89,7 @@
     },
     "report-model.js": {
       "source": "public/report-model.js",
-      "sha256": "35c9218d2a59b6bf020c7bd2c81b820a057f57134f24e0c4c681be9d36f9acf3",
+      "sha256": "56535d0ea01fd517f502dd82fcc5d420f6e02bb9231b82ed5ee5a401519ed0c7",
       "transform": null
     },
     "report-builder.js": {
@@ -94,12 +104,12 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "818917671735631509d90695b44068186414faed7866c89efc97adbb4d2350a0",
+      "sha256": "d42fa22afaaea7125cb0eb4ddbd47b6b0067b5c0aaf1dd82efb2b5ee2e66b116",
       "transform": null
     },
     "settings.js": {
       "source": "public/settings.js",
-      "sha256": "bad2be8f7231d7f9d07e7ce1f18f9d872be9b4896dfdb8451894d16ba6430aa5",
+      "sha256": "33a7d1698610502c6a476132dcc5bb84a43cd4b08e435b2fb6c5d548520a319c",
       "transform": null
     },
     "appearance.js": {
@@ -114,12 +124,12 @@
     },
     "operations.js": {
       "source": "public/operations.js",
-      "sha256": "39f56a9d4938c6c605337bc81eb057a03bee3a9e1167a4bf6dfdbfc4cf0fb4bd",
+      "sha256": "3348d9f7e4a93bf707681612b84201252b5ebdc69d3e4bdc0e332157551b5539",
       "transform": null
     },
     "client-details.js": {
       "source": "public/client-details.js",
-      "sha256": "b51ffc48e021e595930b824b2b082a2f9efc13bf351ebb6888ab4cc82ff88474",
+      "sha256": "16322af84a91448a5f21c9b148437ef7031d2568afeea6066011ffb0133b4d7e",
       "transform": null
     },
     "local-login.js": {
@@ -149,7 +159,7 @@
     },
     "boot.js": {
       "source": "public/boot.js",
-      "sha256": "fe3f2f8e8c06826d261cbd1b794b4e105af2440b00725fb1366554ffafcef20e",
+      "sha256": "25da0126de48cc9a418909f44763ebb24c2c063d88a842f031774e1c5a49ad9a",
       "transform": null
     },
     "assets/tadsa-logo.png": {
@@ -175,5 +185,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "546fe5d53617c3251d5d0d1516d0398816ff697feaad11f6e3d583e9b82bfc1c"
+  "shellHash": "c9f3af59b000041fbdf000f9ae46c9f4caab2b567052394c903ab647220def00"
 }

@@ -1,4 +1,5 @@
 import {renderInvoiceReferences} from './invoice-references.js';
+import {residentialAddressText} from './client-address.js';
 import {auditReferenceIds,auditAction,auditChanges,formatValue as displayValue} from './record-values.js';
 import {renderProfileDetails} from './profile-details.js';
 import {renderProjectDetails,renderProjectCoordinator,renderProjectFeedback} from './project-details.js';
@@ -98,6 +99,7 @@ async function register(view, kind) {
   const filters = kind === 'projects' ? [['all', 'All projects', () => true], ['open', 'Open', p => p.status === 'open'], ['review', 'Review', p => p.status === 'review'], ['closed', 'Closed', p => p.status === 'closed'], ['feedback', 'Feedback', p => p.feedbackRequired], ['invoice', 'Invoice', p => p.invoiceRequired]] : [['all', `All ${kind}`, () => true], ...(kind === 'people' ? [...new Set(items.flatMap(p => p.roles ?? [p.role]))].sort().map(role => [role, role, p => (p.roles ?? [p.role]).includes(role)]) : [])];
   const layout = el('div', undefined, 'register-layout'); const box = el('section', undefined, 'register-panel'); box.setAttribute('aria-label', `${cap(kind)} register`); const inspector = el('aside', undefined, 'inspector'); inspector.setAttribute('aria-label', 'Selected record');
   const tools = el('div', undefined, 'register-tools'); const searchLabel = el('label'); const q = el('input'); q.type = 'search'; q.value = state.query; q.placeholder = `Filter ${kind}…`; q.setAttribute('aria-label', `Filter ${kind} by name or reference`); searchLabel.append(q);
+  if(kind==='people'){q.placeholder='Name, suburb or postcode…';q.setAttribute('aria-description','Includes the residential suburb and postcode of linked clients.');}
   const sortLabel = el('label'); sortLabel.append(el('span', 'Sort by')); const sort = el('select'); sort.setAttribute('aria-label', `Sort ${kind}`);
   for (const [value, label] of kind === 'projects' ? [['reference', 'Reference'], ['name', 'Project title'], ['date', 'Target date'], ['client', 'Client name']] : [['name', 'Name A–Z'], ['reverse', 'Name Z–A']]) { const o = el('option', label); o.value = value; sort.append(o); }
   sort.value = state.sort; sortLabel.append(sort); tools.append(searchLabel, sortLabel);
@@ -107,7 +109,7 @@ async function register(view, kind) {
     for (const [key, label, predicate] of filters) { const b = button('', () => { state.filter = key; draw(); tabs.querySelector('[aria-pressed=true]')?.focus(); }, 'filter-tab'); b.setAttribute('aria-pressed', String(state.filter === key)); b.append(el('span', label), el('span', String(items.filter(predicate).length), 'filter-count')); tabs.append(b); }
     const predicate = filters.find(f => f[0] === state.filter)?.[2] ?? (() => true);
     const query = state.query.toLowerCase().trim();
-    const visible = items.filter(item => predicate(item) && [nameOf(item), item.reference, item.clientName, item.role, item.category, item.summary].filter(Boolean).join(' ').toLowerCase().includes(query));
+    const visible = items.filter(item => predicate(item) && [nameOf(item), item.reference, item.clientName, item.role, item.category, item.summary, item.residentialSuburb, item.residentialState, item.residentialPostcode, item.clientSuburb, item.clientState, item.clientPostcode].filter(Boolean).join(' ').toLowerCase().includes(query));
     const key = item => state.sort === 'date' ? item.dueDate ?? '9999' : state.sort === 'client' ? item.clientName : state.sort === 'reference' ? item.reference : nameOf(item);
     visible.sort((a, b) => String(key(a)).localeCompare(String(key(b)), 'en-AU', { numeric: true }) * (state.sort === 'reverse' ? -1 : 1));
     if (!visible.some(i => i.id === state.selected)) state.selected = visible[0]?.id ?? null;
@@ -142,11 +144,14 @@ async function search(view, term) {
   view.append(el('p', `${results.length} matching record${results.length === 1 ? '' : 's'}${results.length === 50 ? ' · showing the first 50' : ''}`, 'muted'), box);
 }
 function recordHeader(view, eyebrow, title, meta, action) { const header = el('div', undefined, 'record-header'); const text = el('div'); text.append(el('div', eyebrow, 'eyebrow'), el('h1', title)); if (meta) text.append(meta); header.append(text); if (action) header.append(action); view.append(header); return header; }
+function clientContactSummary(box, client) {
+  box.append(details([['Residential address', residentialAddressText(client.details)||'Not recorded'], ['National Disability Insurance Scheme (NDIS) number',client.ndis?.number||'Not recorded']]),link('Edit client contact and addresses','client-details/'+client.id,'text-button'));
+}
 async function client(view, id) {
   const c = await api(`clients/${id}`); view.append(link('← Back to people', 'people', 'breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); meta.append(el('span', 'Client'), el('span', `${c.projects.length} linked projects`)); recordHeader(view, 'Client record', c.person.name, meta, link('New project', `new-project/${c.id}`, 'button primary'));
   const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel('Contact details'); info.append(details([['Email', c.person.email], ['Phone', c.person.phone]]), link('Edit profile & roles', 'edit-person/' + c.person.id, 'text-button'));
-  const contacts = panel('Client contacts'); addClientContactActions(contacts, c); left.append(projectLinks(c.projects),clientDetailsSummary(c),info,contacts);await renderProfileDetails(left,c.person); const related = relationships(c.relationships); related.querySelector('h2').textContent = 'People linked through projects'; grid.append(left, related); view.append(el('div', undefined, 'heading-rule'), grid);
+  clientContactSummary(info,c);const contacts = panel('Client contacts'); addClientContactActions(contacts, c); left.append(info);await renderProfileDetails(left,c.person);left.append(clientDetailsSummary(c),contacts);const right=el('div'); const related = relationships(c.relationships); related.querySelector('h2').textContent = 'People linked through projects';right.append(projectLinks(c.projects),related); grid.append(left, right); view.append(el('div', undefined, 'heading-rule'), grid);
 }
 function auditPanel(p,operationsPromise,managed=false) {
   const names=new Map([[p.id,p.reference+' · '+p.title],[p.clientId,p.clientName],...p.relationships.map(r=>[r.id,r.name])]);
@@ -303,12 +308,12 @@ async function entity(view, type, id) {
   const meta = el('div', undefined, 'record-meta'); meta.append(el('span', item.roles?.join(' · ') ?? item.role)); recordHeader(view, type === 'person' ? 'Person record' : 'Organisation record', item.name, meta, type === 'person' ? link('Edit profile & roles', 'edit-person/' + id, 'button primary') : undefined);
   const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
   info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role]]) : el('p', item.description, 'record-summary'));
-  if (item.clientId) info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));
+  if (item.clientId) {const linkedClient=await api('clients/'+item.clientId);clientContactSummary(info,linkedClient);info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));}
   if(type==='organisation'){info.append(details([['Type',item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded']]),link('Edit organisation','edit-organisation/'+id,'button secondary'));}
   left.append(info);
   if(type==='person')await renderProfileDetails(left,item);
   if (item.technician) {await renderTechnicianLocation(left,id);try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}
-  if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['General allocation status', cap(item.technician.availability)]])); tech.append(el('p','General allocation status is separate from dated calendar entries. Check the dates before assigning work.','field-help'),link('View calendar availability','availability/'+id,'text-button')); left.append(tech); } left.append(projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted')); grid.append(left, context); view.append(el('div', undefined, 'heading-rule'), grid);
+  if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['General allocation status', cap(item.technician.availability)]])); tech.append(el('p','General allocation status is separate from dated calendar entries. Check the dates before assigning work.','field-help'),link('View calendar availability','availability/'+id,'text-button')); left.append(tech); } const right=el('div');right.append(projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted'));right.append(context); grid.append(left, right); view.append(el('div', undefined, 'heading-rule'), grid);
 }
 async function render() {
   if (saving) { announce('Please wait for the save to finish.'); return; }

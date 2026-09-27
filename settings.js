@@ -1,3 +1,4 @@
+import {renderUpdates} from './appliance-updates.js';
 import {node,request,field,editor,action,notice} from './project-care.js';
 let host;
 export const configureSettings=value=>{host=value;};
@@ -25,6 +26,7 @@ export async function renderSettings(view){
  const businessSection=node('details',null,'care-details');businessSection.append(node('summary','Invoice issuer and financial details'));view.append(businessSection);
  editor(businessSection,'business-settings',initial,'Invoice issuer',(form,d)=>{field(form,'Legal issuer name',d,'issuerName').required=true;field(form,'ABN',d,'abn');field(form,'Issuer address',d,'address','textarea');field(form,'Issuer contact details',d,'contact','textarea');field(form,'Payment terms',d,'paymentTerms','textarea');field(form,'Bank / payment instructions',d,'bankDetails','textarea');field(form,'GST treatment',d,'gstMode','text',[['unconfirmed','Not confirmed'],['not-registered','Not registered — no GST'],['inclusive','Prices include GST'],['exclusive','Add GST to prices']]);const rate=field(form,'GST rate (%)',d,'gstRate');rate.inputMode='decimal';field(form,'I have confirmed the GST treatment for this organisation',d,'gstConfirmed','checkbox');form.append(node('p','The legal name and ABN are prefilled from TADSA’s published financial report. Confirm all financial settings before issuing invoices. Bank details and tax status are not inferred. Saved invoices retain their original snapshot.','field-help'));},'business-settings','PUT',d=>{if(!/^\d+(\.\d{1,2})?$/.test(d.gstRate))throw Error('Enter a GST percentage with up to two decimal places.');const gstRateBps=d.gstMode==='not-registered'?0:Math.round(Number(d.gstRate)*100);return Object.fromEntries(['requestId','version','issuerName','abn','address','contact','paymentTerms','bankDetails','gstMode','gstConfirmed'].map(k=>[k,k==='abn'?d.abn.replace(/\s/g,''):d[k]]).concat([['gstRateBps',gstRateBps]]));});
  await renderBackups(view);
+ await renderUpdates(view);
 }
 
 async function renderBackups(view){
