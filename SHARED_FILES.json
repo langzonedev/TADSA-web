@@ -1,7 +1,17 @@
 {
-  "sourceRevision": "0ec78461121dd62ca1b43c53cf2eb1644a5b7cd8",
+  "sourceRevision": "263c5a31de8eff5db8bd1d924c0b69f1f7ccdf45",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
+    "address-lookup.js": {
+      "source": "public/address-lookup.js",
+      "sha256": "fd03c0228fa900f589ec9a8f6bf54ae12a023b2e90fcfe9f2b7e6201f95f9307",
+      "transform": null
+    },
+    "location-geocode.js": {
+      "source": "public/location-geocode.js",
+      "sha256": "b48e9fda5e941d53bf34fa41049757f83ade99d628a499cca7c36b4d387eeb89",
+      "transform": null
+    },
     "appliance-updates.js": {
       "source": "public/appliance-updates.js",
       "sha256": "438fd91f1fc5f3719a8deeecb3af733eb6f6cf22ea3ab1d152b66efd599b4656",
@@ -9,7 +19,7 @@
     },
     "client-address.js": {
       "source": "public/client-address.js",
-      "sha256": "4fd8b882f374f1e7257d9f0c3d122bdd5e7cd249a3c3aa8783786f1dd4728686",
+      "sha256": "4962f637ab67d9f93262b0421ce7b1e00eeec8c95818481e925acb3db81f152d",
       "transform": null
     },
     "contact-draft.js": {
@@ -39,12 +49,12 @@
     },
     "profile-details.js": {
       "source": "public/profile-details.js",
-      "sha256": "f67e11da14893a76ffed23a21ebc15400fc7fc3661b7b48a5a8b2c36d19103ba",
+      "sha256": "aa2654b0297dca3d0776ecc68a93c35bacf81eace5b7d78e825c3c0485174743",
       "transform": null
     },
     "profile-details-model.js": {
       "source": "public/profile-details-model.js",
-      "sha256": "c54e71b3d959b1db03e94d77c32922871e51988f35ebdfbf5e18f760385658b9",
+      "sha256": "89bcf95b5fa90055e21cbd9b14b4538e0c04051f87bccc53976e2499ec88ff1e",
       "transform": null
     },
     "project-details.js": {
@@ -109,7 +119,7 @@
     },
     "settings.js": {
       "source": "public/settings.js",
-      "sha256": "33a7d1698610502c6a476132dcc5bb84a43cd4b08e435b2fb6c5d548520a319c",
+      "sha256": "bdbd2d2b2dd676e87657c16e92908b122941b8550d227ce5c30f9fbe378ce611",
       "transform": null
     },
     "appearance.js": {
@@ -119,17 +129,17 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "bffd709033f6b7dc1837a08c1b132b1e1d7c6fc074c0a1fe51a9bbd6237c587a",
+      "sha256": "1570246044fd88e48be79f0b7c4193e31ea69c37a9bb4542b30ad0c8fce0ba1c",
       "transform": null
     },
     "operations.js": {
       "source": "public/operations.js",
-      "sha256": "3348d9f7e4a93bf707681612b84201252b5ebdc69d3e4bdc0e332157551b5539",
+      "sha256": "8b09ca081e3eb016944cbbb021c7a79a3677dc2b87c76f9d889ed13bbbc96beb",
       "transform": null
     },
     "client-details.js": {
       "source": "public/client-details.js",
-      "sha256": "16322af84a91448a5f21c9b148437ef7031d2568afeea6066011ffb0133b4d7e",
+      "sha256": "8f94cf19774b04c2c45664d91003d765686d33319191ad8b57b966231233e766",
       "transform": null
     },
     "local-login.js": {
@@ -144,17 +154,17 @@
     },
     "technician-location.js": {
       "source": "public/technician-location.js",
-      "sha256": "adcf4d49f0667b77cb71b1d9d03066b86230b23e6948f524b9fe5cb1d6f948f0",
+      "sha256": "c823f2581305f10fab9dae1d9c67e322903f731a955660cb779e4a79e440f2b8",
       "transform": null
     },
     "project-care.js": {
       "source": "public/project-care.js",
-      "sha256": "ca0abb210fee0c5c270b61a1a0f703a724b5cff3b99550b6975a1c93ae6be0eb",
+      "sha256": "6fb94c6ca22c176cdad50b2669da08adc39a3df0ac4614214b5b53501aab988e",
       "transform": null
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "0a17229d2818d31881312b55eda222bd34cc829c1ce502bbc762383814074086",
+      "sha256": "f800b6c3de3d8512a677eb7c7942e3b8f7172867255e06fa2e7510b011f8e14d",
       "transform": null
     },
     "boot.js": {
@@ -185,5 +195,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "c9f3af59b000041fbdf000f9ae46c9f4caab2b567052394c903ab647220def00"
+  "shellHash": "1e6d325f1cc6cd4916ef2417ddc5c2c0f21d37396eefb8d0f2423fb1424c2050"
 }

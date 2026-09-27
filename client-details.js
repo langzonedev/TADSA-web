@@ -1,4 +1,5 @@
 import {RESIDENTIAL_FIELDS,AUSTRALIAN_STATES,residentialAddressText} from './client-address.js';
+import {attachAddressLookup} from './address-lookup.js';
 import {reconcileContactDraft} from './contact-draft.js';
 import {fieldLabel,formatValue} from './record-values.js';
 const drafts=new Map();
@@ -31,12 +32,14 @@ export async function renderClientDetails(view,id,host) {
   field('residentialAddress','Residential address',500,'textarea');controls.residentialAddress.required=true;
   const help=el('p','Keep existing address text as recorded. Enter suburb, state and postcode separately when known; these optional fields support search and reports.');help.className='field-help';form.append(help);
   field('residentialSuburb','Residential suburb',100);
-  select('residentialState','Residential state',[['','Not recorded'],...AUSTRALIAN_STATES.map(state=>[state,state])]);
+  controls.residentialState=select('residentialState','Residential state',[['','Not recorded'],...AUSTRALIAN_STATES.map(state=>[state,state])]);
   field('residentialPostcode','Residential postcode',4);controls.residentialPostcode.inputMode='numeric';controls.residentialPostcode.pattern='[0-9]{4}';
   const same=el('label');const checkbox=el('input');checkbox.type='checkbox';checkbox.checked=d.sameAsResidential;same.append(checkbox,el('span','Work address is the same as residential'));form.append(same);
   field('workAddress','Work address',500,'textarea');
+  attachAddressLookup(controls.residentialAddress,{draft:d,geoField:'residentialGeocode',fields:{street:'residentialAddress',suburb:'residentialSuburb',state:'residentialState',postcode:'residentialPostcode',keys:['residentialAddress','residentialSuburb','residentialState','residentialPostcode'],elements:controls}});
+  attachAddressLookup(controls.workAddress,{draft:d,geoField:'workGeocode',fields:{street:'workAddress',keys:['workAddress'],elements:controls}});
   const toggle=()=>{controls.workAddress.disabled=d.sameAsResidential;controls.workAddress.required=!d.sameAsResidential;};toggle();
-  checkbox.addEventListener('change',()=>{d.sameAsResidential=checkbox.checked;d.dirty=true;toggle();});
+  checkbox.addEventListener('change',()=>{d.sameAsResidential=checkbox.checked;d.workGeocode=null;d.dirty=true;toggle();});
   function select(key,label,items){const l=el('label');l.append(el('span',label));const s=el('select');s.setAttribute('aria-label',label);for(const [value,text]of items){const o=el('option',text);o.value=value;s.append(o);}s.value=d[key]||'';s.addEventListener('change',()=>{d[key]=key==='representativePersonId'?(s.value||null):s.value;d.dirty=true;});l.append(s);form.append(l);return s;}
   const preferred=select('preferredContact','Preferred contact',[['client','Client'],['representative','Linked representative']]);
   const rep=select('representativePersonId','Representative',[['','Choose linked contact'],...client.contacts.map(p=>[p.personId,`${p.name} — ${p.role}`])]);
@@ -46,6 +49,7 @@ export async function renderClientDetails(view,id,host) {
   const save=el('button','Save client details');save.type='submit';const cancel=el('button','Discard changes');cancel.type='button';cancel.onclick=()=>{if(d.pending)return;if(d.dirty&&!window.confirm('Discard unsaved client details?'))return;drafts.delete(id);location.hash='client/'+id;};form.append(save,cancel);view.append(form);
   form.addEventListener('submit',async event=>{event.preventDefault();if(d.pending)return;d.pending=true;host.setSaving?.(true);const disabled=[...form.elements].map(n=>[n,n.disabled]);for(const[n]of disabled)n.disabled=true;status.replaceChildren(el('p','Saving…'));
     const body=Object.fromEntries(['version','name','email','phone','residentialAddress','workAddress','sameAsResidential','preferredContact','representativePersonId','contactNeeds',...RESIDENTIAL_FIELDS].map(k=>[k,d[k]]));if(d.preferredContact==='client')body.representativePersonId=null;
+    body.residentialGeocode=d.residentialGeocode??null;if(!d.sameAsResidential)body.workGeocode=d.workGeocode??null;
     try{await host.request(`clients/${id}/details`,'PUT',body);drafts.delete(id);host.announce?.('Client details saved.');location.hash='client/'+id;}
     catch(error){status.replaceChildren(el('p',error.message||'Save was not confirmed. Your draft is retained.'));if(error.status===409){const reload=el('button','Compare latest saved details');reload.type='button';reload.onclick=()=>{view.replaceChildren();renderClientDetails(view,id,host).catch(e=>status.append(el('p',e.message)));};status.append(reload);}}
     finally{d.pending=false;host.setSaving?.(false);for(const[n,state]of disabled)n.disabled=state;}

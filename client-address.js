@@ -1,4 +1,15 @@
+import {preserveGeocode,validateGeocode} from './location-geocode.js';
 export const RESIDENTIAL_FIELDS=['residentialSuburb','residentialState','residentialPostcode'];
+export const CLIENT_GEOCODE_FIELDS=['residentialGeocode','workGeocode'];
+export const residentialGeocodeValues=d=>[d.residentialAddress,d.residentialSuburb,d.residentialState,d.residentialPostcode];
+export function clientGeocodes(input,saved,address){
+ const values=residentialGeocodeValues(address),residentialGeocode=preserveGeocode(input.residentialGeocode,saved?.residentialGeocode,values);
+ if(address.sameAsResidential){
+  if(input.workGeocode!==undefined){const supplied=validateGeocode(input.workGeocode,values);if(Boolean(supplied)!==Boolean(residentialGeocode)||(supplied&&Object.keys(supplied).some(k=>supplied[k]!==residentialGeocode[k])))throw Object.assign(Error('Work coordinates must match the residential address when the addresses are the same.'),{status:422});}
+  return {residentialGeocode,workGeocode:residentialGeocode};
+ }
+ return {residentialGeocode,workGeocode:preserveGeocode(input.workGeocode,saved?.workGeocode,[address.workAddress])};
+}
 export const AUSTRALIAN_STATES=['ACT','NSW','NT','QLD','SA','TAS','VIC','WA'];
 // Legacy address text is never parsed or rewritten. Missing additive fields retain
 // their saved values so older clients can continue to update contact information.

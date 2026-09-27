@@ -1,0 +1,27 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {seed} from '../seed.mjs';
+import {normalise,dispatch} from '../device-model.mjs';
+import '../device-extensions.mjs';
+import '../device-profile-details.mjs';
+import {validateBackup} from '../device-backups.mjs';
+import {addressKey} from '../location-geocode.js';
+import {residentialGeocodeValues} from '../client-address.js';
+import {createProfileDetails,contactGeocodeValues} from '../profile-details-model.js';
+const geo=values=>({latitude:-34.9,longitude:138.6,provider:'photon',matchedAt:'2026-09-27T00:00:00.000Z',addressKey:addressKey(values)});
+test('client/contact geocodes retain on old payloads, clear on edits and round-trip validated backup',async()=>{
+ const d=normalise(seed({enriched:false})),call=(path,method='GET',input={})=>dispatch(d,path,method,input);
+ const c=call('clients/client-1'),body={version:c.details.version,name:c.person.name,email:'synthetic@example.invalid',phone:'',residentialAddress:'1 Synthetic Way',residentialSuburb:'Example',residentialState:'SA',residentialPostcode:'5000',workAddress:'',sameAsResidential:true,preferredContact:'client',representativePersonId:null,contactNeeds:''};
+ const saved=call('clients/client-1/details','PUT',{...body,residentialGeocode:geo(residentialGeocodeValues(body))});assert.deepEqual(saved.details.workGeocode,saved.details.residentialGeocode);
+ const retained=call('clients/client-1/details','PUT',{...body,version:saved.details.version});assert.deepEqual(retained.details.residentialGeocode,saved.details.residentialGeocode);
+ const restored=await validateBackup(d);assert.deepEqual(restored.clients.find(c=>c.id==='client-1').details.residentialGeocode,saved.details.residentialGeocode);
+ const bad=structuredClone(d);bad.clients.find(c=>c.id==='client-1').details.residentialGeocode.latitude=91;await assert.rejects(validateBackup(bad),/Backup rejected/);
+ const changed=call('clients/client-1/details','PUT',{...body,version:retained.details.version,residentialAddress:'2 Synthetic Way'});assert.equal(changed.details.residentialGeocode,null);assert.equal(changed.details.workGeocode,null);
+ const contact={...createProfileDetails().contact,addressLine1:'3 Synthetic Way',suburb:'Example'},payload={requestId:'20000000-0000-4000-8000-000000000001',version:0,section:'contact',details:{...contact,geocode:geo(contactGeocodeValues(contact))}};
+ const initial=call('people/'+c.personId+'/profile-details','PUT',payload);assert.ok(initial.contact.geocode);
+ const kept=call('people/'+c.personId+'/profile-details','PUT',{...payload,requestId:'20000000-0000-4000-8000-000000000002',version:initial.version,details:contact});assert.deepEqual(kept.contact.geocode,initial.contact.geocode);
+ assert.ok((await validateBackup(d)).profileDetails[c.personId].contact.geocode);
+ const invalid=structuredClone(d);invalid.profileDetails[c.personId].contact.geocode.addressKey='wrong';await assert.rejects(validateBackup(invalid),/Backup rejected/);
+ const edited=call('people/'+c.personId+'/profile-details','PUT',{...payload,requestId:'20000000-0000-4000-8000-000000000003',version:kept.version,details:{...contact,postcode:'5001'}});assert.equal(edited.contact.geocode,null);
+ assert.equal((await validateBackup(normalise(seed({enriched:false})))).clients.length,d.clients.length);
+});

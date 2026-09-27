@@ -385,3 +385,4 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
  .project-overview-column{gap:14px}
  .project-header-fact{padding:8px 10px}
 }
+.address-lookup{grid-column:1/-1;min-width:0;margin-top:-8px}.address-suggestions{display:grid;gap:3px}.address-suggestions button{text-align:left;white-space:normal;overflow-wrap:anywhere;min-height:44px;background:var(--panel,#fff);color:var(--text,#24304b);border:1px solid var(--line);padding:10px}.address-suggestions [aria-selected=true]{outline:2px solid #5364a2;background:#edf1fa}.address-lookup .field-help{font-size:12px;margin:5px 0}.travel-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--line);padding:12px 0}.travel-row strong{min-width:150px}.travel-row span:last-child{overflow-wrap:anywhere}.address-lookup a{overflow-wrap:anywhere}@media print{.address-lookup{display:none}}

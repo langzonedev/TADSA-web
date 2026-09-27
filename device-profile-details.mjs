@@ -16,7 +16,7 @@ installModelExtensions(ctx=>{
  const person=find('people',id),before=d.profileDetails?.[id]??{personId:id,version:0,...createProfileDetails()};
  if(method==='GET')return structuredClone(before);
  if(method!=='PUT')fail('Profile action unavailable.',404);
- let value;try{value=validateProfileDetails(input);}catch(error){fail(error.message);}
+ let value;try{value=validateProfileDetails(input,before.contact);}catch(error){fail(error.message);}
  if(input.version!==before.version)fail('Profile details changed. Reload and compare before saving.',409,{code:'VERSION_CONFLICT'});
  if(value.section==='capabilities'&&(person.active===false||!(person.roles??[person.role]).includes('Technician')))fail('Choose a person with an active Technician role.');
  if(value.section==='contact'&&value.details.organisationId&&!d.organisations.some(o=>o.id===value.details.organisationId))fail('Choose an existing organisation.');

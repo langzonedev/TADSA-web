@@ -1,4 +1,5 @@
 import {reconcileContactDraft} from './contact-draft.js';
+import {renderTravelComparison} from './address-lookup.js';
 // Call-intake workflows. All records in this development workspace are fictional.
 const drafts = new Map();
 let host;
@@ -187,6 +188,7 @@ async function editCoordination(view,id,options={}) {
   if(!options.embedded)title(view,focus?label:'Funding & technical team',project.title,'project/'+id);
   if(focus!=='funding')view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location in Project details.')));
   const box=panel(focus?null:'Review the allocation');
+  if(focus!=='funding')renderTravelComparison(box,projectLocation,dirs.technicians);
   const form=el('form',null,'form-grid');coordinationFields(form,d,dirs,focus);
   const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save '+label.toLowerCase());
   actions.append(submit,cancel(form,d,key,options.onCancel??('project/'+id)));form.append(notice,actions);box.append(form);view.append(box);
