@@ -23,3 +23,15 @@ test('backup supports old data and historical account identity without carrying 
 });
 
 test('completed response is persisted explicitly while legacy feedback stays unknown',async()=>{const {d,id,call}=fixture();for(const completed of [undefined,false,true]){const before=call('feedback');call('feedback','POST',{requestId:crypto.randomUUID(),version:before.version,recordedOn:'2026-09-24',comments:'Synthetic response',followUpRequired:'no',...(completed===undefined?{}:{completed})});}const items=call('feedback').items;assert.deepEqual(items.map(i=>i.completed),[true,false,undefined]);assert.equal(Object.hasOwn(items[2],'completed'),false);assert.deepEqual((await validateBackup(d)).projectFeedback,d.projectFeedback);const bad=structuredClone(d);bad.projectFeedback[id][0].completed='yes';await assert.rejects(validateBackup(bad),/Backup rejected/);});
+
+test('bike specification survives programme changes, legacy saves, reload and backup',async()=>{
+ const {d,id,call}=fixture();let current=call('admin-details');
+ const spec={bikeMake:'Synthetic Cycles',bikeSize:'24 inch',bikeSerialNumber:'SYN-001',bikeSource:'Synthetic supplier',notes:'Fitting reviewed separately.'};
+ const save=extra=>{current=call('admin-details','PUT',{...createProjectDetails(),requestId:crypto.randomUUID(),version:current.version,...extra});return current;};
+ save({programme:'FW',freedomWheels:spec});save({programme:'TAD',freedomWheels:spec});
+ current=call('admin-details','PUT',{requestId:crypto.randomUUID(),version:current.version,programme:'TAD',coordinatorAccountId:'',followUpOn:'',enquirySource:'Old client update'});
+ assert.deepEqual(current.freedomWheels,spec);assert.deepEqual(dispatch(normalise(structuredClone(d)),`projects/${id}/admin-details`).freedomWheels,spec);
+ assert.deepEqual((await validateBackup(d)).projectAdminDetails[id].freedomWheels,spec);
+ const bad=structuredClone(d);bad.projectAdminDetails[id].freedomWheels.notes=42;await assert.rejects(validateBackup(bad),/Backup rejected/);
+ const old=structuredClone(d);delete old.projectAdminDetails[id].freedomWheels;assert.equal(Object.hasOwn((await validateBackup(old)).projectAdminDetails[id],'freedomWheels'),false);
+});

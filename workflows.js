@@ -159,6 +159,8 @@ async function newProject(view, clientId) {
       field(form,'Project title',d,'title',{required:true,help:'A short description the client and team will recognise.'});
       field(form,'What does the client need?',d,'summary',{type:'textarea',required:true,max:2000,help:'Describe the goal in the client’s words. Avoid unnecessary sensitive information.'});
       form.append(el('p','Assessment, quote acceptance and technical work will be recorded as stages of this project.','field-help'));
+      form.append(el('p','Use one project for related work on the same item. Create separate projects for different items or independently managed jobs. Staff can decide after assessment when the scope is clearer.','field-help'));
+      form.append(el('p','For a correction to earlier work, check the existing project first and record the follow-up there. A request for different equipment usually needs a new project.','field-help'));
       form.append(el('p','Creating a project does not authorise work or spending. Progress through the project’s assessment, acceptance and Finance checks first.','field-help'));
     } else if (d.step === 3) {form.append(note('Client work location: '+(selected?.details?.workAddress||selected?.details?.residentialAddress||'Not recorded. Open the client record to add an address.')));coordinationFields(form,d,dirs);}
     else {

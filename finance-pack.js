@@ -1,5 +1,6 @@
 import {node,action,field,notice,request} from './project-care.js';
 import {residentialAddressText} from './client-address.js';
+import {lifecycleGate,lifecycleCostLabels} from './lifecycle-model.js';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=c=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format((c??0)/100);
 export function storedZip(files){
@@ -37,7 +38,7 @@ export function invoiceSummary(invoices=[],payments=[]){
  if(!invoices.length)return '<p>No draft invoices recorded in this application.</p>';
  return invoices.map(i=>{const s=i.snapshot??i,receipts=payments.filter(p=>p.invoiceId===i.id),paid=receipts.reduce((n,p)=>n+p.amountCents,0);return `<h3>${escape(i.number)}</h3>`+record('Recipient',s.payerName)+record('Billing address',s.billingAddress)+record('Invoice date',s.invoiceDate)+quoteTable(s,'Draft invoice total',false)+record('GST',s.business?.gstConfirmed?money(s.gstCents??0):'Tax treatment unconfirmed')+record('Recorded receipts',money(paid))+record('Outstanding',money(s.totalCents-paid))+(receipts.length?'<h4>Receipt evidence</h4>'+receipts.map(p=>record(p.receivedOn,`${money(p.amountCents)} · ${p.reference}`)).join(''):'<p>No receipts recorded.</p>');}).join('');
 }
-function quoteTable(quote,totalLabel='Estimate total',showTaxNote=true){return quote?`<table><thead><tr><th>Item</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${quote.lines.map(l=>`<tr><td>${escape(l.description)}${l.type?' ('+escape(l.type)+')':''}</td><td>${escape((l.quantityMilli??1000)/1000)}</td><td>${escape(money(l.unitPriceCents??l.amountCents))}</td><td>${escape(money(l.amountCents??Math.round(l.quantityMilli*l.unitPriceCents/1000)))}</td></tr>`).join('')}</tbody></table>${record(totalLabel,money(quote.totalCents))}${showTaxNote?'<p class="muted">AUD. Tax treatment must be confirmed before issuing a final financial document. Synthetic demonstration only.</p>':''}`:'<p>No quote recorded.</p>';}
+function quoteTable(quote,totalLabel='Estimate total',showTaxNote=true){return quote?`<table><thead><tr><th>Item</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${quote.lines.map(l=>`<tr><td>${escape(l.description)}${l.type?' ('+escape(lifecycleCostLabels[l.type]??l.type)+')':''}</td><td>${escape((l.quantityMilli??1000)/1000)}</td><td>${escape(money(l.unitPriceCents??l.amountCents))}</td><td>${escape(money(l.amountCents??Math.round(l.quantityMilli*l.unitPriceCents/1000)))}</td></tr>`).join('')}</tbody></table>${record(totalLabel,money(quote.totalCents))}${showTaxNote?'<p class="muted">AUD. Tax treatment must be confirmed before issuing a final financial document. Synthetic demonstration only.</p>':''}`:'<p>No quote recorded.</p>';}
 export function assertCurrentClientQuote(current){
  if(current.state?.cancellation||current.state?.revisionRequested)throw Error('This quote is cancelled or awaiting revision. Save a current quote before preparing it for the client.');
  const quote=current.state?.quotes?.at(-1);if(!quote)throw Error('Save a quote revision first.');return quote;
@@ -63,6 +64,35 @@ export function projectCoverDocument(project,current,client,details={}){
  const intake=client.details??{},person=client.person??{},residential=residentialAddressText(intake),representative=client.contacts?.find(c=>c.personId===intake.representativePersonId),preferred=intake.preferredContact==='representative'?representative:person;
  return htmlDocument('Enquiry / project cover sheet — '+project.reference,
  '<p><strong>DRAFT · Fictional development data · Internal saved-record summary</strong></p><p>This cover sheet is not approval or authorisation to commence work.</p>'+record('Project',project.title)+record('Project number',project.reference)+record('Client',person.name||project.clientName)+record('Client email',person.email)+record('Client phone',person.phone)+record('Residential address',residential)+record('Work address',intake.sameAsResidential?residential:intake.workAddress)+record('Preferred contact',intake.preferredContact==='representative'?(representative?.name||'Representative no longer linked — review required'):'Client')+record('Preferred contact email',preferred?.email)+record('Preferred contact phone',preferred?.phone)+record('Contact needs',intake.contactNeeds)+record('Work requested',project.summary)+record('Project status',project.status)+record('Target date',project.dueDate)+record('Programme',details.programme==='FW'?'Freedom Wheels (FW)':details.programme)+record('Enquiry source',details.enquirySource)+record('Next follow-up',details.followUpOn)+record('Technical team',(project.relationships??[]).filter(r=>r.role==='Technician').map(r=>r.name).join(', '))+workflowNotice(current));
+}
+function requestContext(project,client,details){
+ const person=client.person??{},intake=client.details??{},address=residentialAddressText(intake),representative=client.contacts?.find(c=>c.personId===intake.representativePersonId),preferred=intake.preferredContact==='representative'?representative:person;
+ return record('Project number',project.reference)+record('Project',project.title)+record('Client',person.name||project.clientName)+record('Client phone',person.phone)+record('Client email',person.email)+record('Preferred contact',intake.preferredContact==='representative'?(representative?.name||'Representative no longer linked — review required'):'Client')+record('Preferred contact email',preferred?.email)+record('Preferred contact phone',preferred?.phone)+record('Contact needs',intake.contactNeeds)+record('Work address',intake.sameAsResidential?address:intake.workAddress)+record('Requested scope',project.summary)+record('Assigned technical team',(project.relationships??[]).filter(r=>r.role==='Technician').map(r=>r.name).join(', '))+record('Next follow-up',details.followUpOn)+'<p>Assignment does not confirm that a technical member has accepted this request. Review the recipient, scope and contact arrangements before sharing.</p>';
+}
+export function assessmentRequestDocument(project,current,client,details={}){
+ const s=current.state;
+ if(current.workGate?.reasons?.some(reason=>/hold|stop/i.test(reason)))throw Error('Resolve the project hold or client stop before preparing an assessment request.');
+ if(project.status==='closed'||!s||s.closed||s.cancellation||s.revisionRequested||s.stage!=='assessment'||s.assessmentDecision?.required!==true||s.assessment)throw Error('An assessment request is available only while a required assessment is awaiting findings.');
+ return htmlDocument('Assessment request — '+project.reference,'<p><strong>DRAFT · Fictional development data · Review before sharing</strong></p>'+requestContext(project,client,details)+record('Assessment decision reason',s.assessmentDecision.reason)+'<h2>Requested assessment</h2><p>Please assess feasibility, safety and engineering needs, then return findings with estimated hours and costs for parts, travel, consumables and other items. Record the findings in the project before preparing a quote.</p><p>This request is for assessment only. It does not authorise fabrication or other technical work. Confirm client consent and arrangements before any visit; recheck the live project for a later hold or client stop. Preparing this document does not send it or record acceptance.</p>');
+}
+export function technicalTaskRequestDocument(project,current,client,details={}){
+ const s=current.state;
+ if(project.status==='closed'||!s||s.closed||s.cancellation||s.revisionRequested||s.stage!=='work'||(s.work&&!['in_progress'].includes(s.work.status))||current.workGate?.allowed!==true||!lifecycleGate(s).allowed)throw Error('A technical task request requires the current quote, technical review, client acceptance and Finance clearance, with work permitted at the current stage. Resolve any hold or revision first.');
+ const quote=s.quotes.at(-1);
+ return htmlDocument('Technical task request — '+project.reference+' / quote revision '+quote.version,'<p><strong>DRAFT · Fictional development data · Review before sharing</strong></p>'+requestContext(project,client,details)+workflowNotice(current)+record('Approved quote revision',quote.version)+quoteTable(quote)+record('Quote scope / notes',quote.notes)+'<h2>Saved approval evidence</h2>'+decisionSummary(s)+'<p>This draft reflects the saved approvals for the quote revision above. Recheck the live project before work begins; a later hold, cancellation or revision can invalidate this request. Changes to scope or cost require review and renewed approval.</p><p>Return actual costs, client acceptance evidence, receipts and photos as applicable to the work. Preparing this document does not send it, record technical-member acceptance or start work.</p>');
+}
+export function renderWorkflowRequestDownloads(parent,project,{assessment=true,task=true}={}){
+ const buttons=node('div',null,'actions report-toolbar'),feedback=node('div');parent.append(buttons,feedback);
+ const prepare=async(kind)=>{try{
+  const read=async()=>{const p=await request('projects/'+project.id);return Promise.all([Promise.resolve(p),request(`projects/${p.id}/lifecycle`),request('clients/'+p.clientId),request(`projects/${p.id}/admin-details`)]);};
+  const before=await read(),[p,current,client,details]=before;
+  const html=(kind==='assessment'?assessmentRequestDocument:technicalTaskRequestDocument)(p,current,client,details);
+  assertStableDocumentSnapshot(before,await read());
+  download(new Blob([html],{type:'text/html'}),safeName(p.reference)+'-'+kind+'-request'+(kind==='task'?'-quote-'+current.state.quotes.at(-1).version:'')+'.html');
+  feedback.replaceChildren(notice('Draft request downloaded. Review it before printing or sharing. Nothing was sent, accepted or started.'));
+ }catch(e){feedback.replaceChildren(notice(e.message,true));}};
+ if(assessment)buttons.append(action('Download assessment request',()=>prepare('assessment')));
+ if(task)buttons.append(action('Download technical task request',()=>prepare('task')));
 }
 export function renderSavedDocumentDownloads(parent,project,{cover=true,costReturn=true}={}){
  const feedback=node('div',null,'report-toolbar'),buttons=node('div',null,'actions report-toolbar');parent.append(buttons,feedback);
@@ -97,6 +127,7 @@ export function renderFinancePack(parent,project,lifecycle,options={}){
   const a=node('a');a.href=draft.href;a.click();feedback.replaceChildren(notice('Email draft prepared. Review the recipient and quote revision, choose your sending mailbox, and attach the quote manually. Nothing was sent or recorded as sent.'));
  }catch(e){feedback.replaceChildren(notice(e.message,true));}}));
  if(!options.quoteOnly)renderSavedDocumentDownloads(section,project);
+ if(!options.quoteOnly)renderWorkflowRequestDownloads(section,project);
  if(!options.quoteOnly)buttons.append(action('Download Finance pack',async()=>{try{
   feedback.replaceChildren(notice('Preparing saved project details…'));
   const readSnapshot=()=>Promise.all([request('projects/'+project.id),request(`projects/${project.id}/lifecycle`),request(`projects/${project.id}/operations`),request(`projects/${project.id}/attachments`),request(`projects/${project.id}/work-plan`),request('business-settings'),request('people')]);

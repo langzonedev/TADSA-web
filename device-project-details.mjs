@@ -7,7 +7,7 @@ export function validateProjectDetailsBackup(data){
  for(const key of ['projectAdminDetails','projectFeedback']){if(data[key]===undefined)continue;if(!object(data[key]))fail('Backup rejected: invalid '+key+' collection.');for(const [id,value]of Object.entries(data[key])){
   const p=data.projects.find(p=>p.id===id);if(!p)fail('Backup rejected: project details reference a missing project.');
   if(key==='projectAdminDetails'){
-   if(!exact(value,Object.keys(createProjectDetails())))fail('Backup rejected: invalid project administration fields.');
+   if(!exact(value,['programme','coordinatorAccountId','followUpOn','enquirySource',...(Object.hasOwn(value??{},'freedomWheels')?['freedomWheels']:[])]))fail('Backup rejected: invalid project administration fields.');
    try{validateProjectDetails({requestId:'backup-validation',version:p.version,...value});}catch(error){fail('Backup rejected: '+error.message);}
    if(value.coordinatorAccountId&&!uuid(value.coordinatorAccountId))fail('Backup rejected: invalid coordinator account identity.');
   }else{
@@ -27,10 +27,10 @@ installModelExtensions(ctx=>{
  const accounts=actorContext?.coordinatorAccounts??[];
  if(kind==='project-admin-options'&&parts.length===1&&method==='GET')return {coordinators:accounts.filter(a=>a.active).map(a=>({id:a.id,displayName:a.displayName})).sort((a,b)=>a.displayName.localeCompare(b.displayName,'en-AU'))};
  if(kind!=='projects'||parts.length!==3||!['admin-details','feedback'].includes(sub))return;
- const p=find('projects',id),read=()=>({projectId:id,version:p.version,...structuredClone(d.projectAdminDetails?.[id]??createProjectDetails())}),feedback=()=>({projectId:id,version:p.version,items:structuredClone(d.projectFeedback?.[id]??[])});
+ const p=find('projects',id),read=()=>({projectId:id,version:p.version,...createProjectDetails(),...structuredClone(d.projectAdminDetails?.[id]??createProjectDetails())}),feedback=()=>({projectId:id,version:p.version,items:structuredClone(d.projectFeedback?.[id]??[])});
  if(sub==='admin-details'){
   if(method==='GET')return read();if(method!=='PUT')fail('Project details action unavailable.',404);
-  let details;try{details=validateProjectDetails(input);}catch(error){fail(error.message);}version(p,input.version);const before=read();
+  let details;try{details=validateProjectDetails(input);}catch(error){fail(error.message);}version(p,input.version);const before=read();if(!Object.hasOwn(details,'freedomWheels'))details.freedomWheels=before.freedomWheels;
   if(details.coordinatorAccountId&&details.coordinatorAccountId!==before.coordinatorAccountId&&!accounts.some(a=>a.id===details.coordinatorAccountId&&a.active))fail('Choose an active application account as coordinator.');
   d.projectAdminDetails??={};d.projectAdminDetails[id]=details;bump(p,'Project administration updated',{before:Object.fromEntries(Object.keys(createProjectDetails()).map(k=>[k,before[k]])),after:details});return read();
  }

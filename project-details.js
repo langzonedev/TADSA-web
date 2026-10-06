@@ -1,11 +1,17 @@
 import {node,field,editor,request} from './project-care.js';
-import {createProjectDetails} from './project-details-model.js';
+import {createProjectDetails,createFreedomWheelsDetails} from './project-details-model.js';
 const payload=d=>Object.fromEntries(['requestId','version',...Object.keys(createProjectDetails())].map(k=>[k,d[k]]));
 const labelSave=(entry,label)=>{const button=entry.form.querySelector('button[type=submit]');button.dataset.label=label;if(!entry.d.pending)button.textContent=label;};
 export async function renderProjectDetails(view,id){
  const details=await request(`projects/${id}/admin-details`);
  const entry=editor(view,'project-admin/'+id,details,'Programme & follow-up',(form,d)=>{
-  field(form,'Programme',d,'programme','text',[['','Not recorded'],['TAD','TAD'],['FW','Freedom Wheels (FW)']]);
+  const programme=field(form,'Programme',d,'programme','text',[['','Not recorded'],['TAD','TAD'],['FW','Freedom Wheels (FW)']]);
+  d.freedomWheels={...createFreedomWheelsDetails(),...d.freedomWheels};
+  const bike=node('fieldset');bike.append(node('legend','Freedom Wheels bike details'));
+  for(const [key,label] of [['bikeMake','Bike make'],['bikeSize','Bike size (include units)'],['bikeSerialNumber','Bike serial number'],['bikeSource','Bike supplied by'],['notes','Bike specification notes']]){const input=field(bike,label,d.freedomWheels,key,key==='notes'?'textarea':'text');input.maxLength=key==='notes'?2000:200;}
+  bike.append(node('p','Record the supplied bike specification. These details do not replace an assessment or approval.','field-help'));
+  const retained=node('p','Bike details are retained when the programme changes. Clear individual fields only if they are incorrect.','field-help');bike.append(retained);form.append(bike);
+  const showBike=()=>{bike.hidden=d.programme!=='FW'&&!Object.values(d.freedomWheels).some(Boolean);retained.hidden=d.programme==='FW';};programme.addEventListener('change',showBike);showBike();
   field(form,'Next follow-up date',d,'followUpOn','date');
   field(form,'How the client heard of TADSA',d,'enquirySource','textarea');
   form.append(node('p','Optional administration details. A follow-up date does not change the project stage or due date.','field-help'));

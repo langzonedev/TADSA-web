@@ -1,12 +1,13 @@
 import {node,action,link,request,field,editor} from './project-care.js';
 import {attachAddressLookup} from './address-lookup.js';
-import {EQUIPMENT_OPTIONS} from './profile-details-model.js';
+import {EQUIPMENT_OPTIONS,ALLIED_HEALTH_PROFESSIONS,normaliseProfileDetails} from './profile-details-model.js';
 const editing=new Set();
 const yesNo=[['unknown','Not recorded'],['yes','Yes'],['no','No']];
 function summary(parent,entries){const filled=entries.filter(([,value])=>value&&value!=='Not recorded');if(!filled.length){parent.append(node('p','No additional details recorded.','field-help'));return;}const dl=node('dl',null,'detail-list');for(const [label,value]of filled){dl.append(node('dt',label),node('dd',value));}parent.append(dl);}
 function input(form,label,d,key,max,type='text'){const control=field(form,label,d,key,type);control.maxLength=max;return control;}
 export async function renderProfileDetails(parent,person){
  const id=person.id,[profile,organisations]=await Promise.all([request(`people/${id}/profile-details`),request('organisations')]);
+ Object.assign(profile,normaliseProfileDetails(profile));
  const orgs=[...organisations.items].sort((a,b)=>a.name.localeCompare(b.name,'en-AU'));
  function section(key,title,renderSummary,renderFields){
   const box=node('section',null,'panel profile-details'),body=node('div'),forms=node('div'),editKey=id+'/'+key;box.append(node('h2',title),body,forms);parent.append(box);renderSummary(body,profile[key]);
@@ -19,11 +20,15 @@ export async function renderProfileDetails(parent,person){
  section('contact','Additional contact details',(body,d)=>{
   summary(body,[['Home phone',d.homePhone],['Work phone',d.workPhone],['Mobile phone',d.mobilePhone],['Preferred phone',d.preferredPhone?d.preferredPhone[0].toUpperCase()+d.preferredPhone.slice(1):''],['Language',d.language],['Contact address',[d.addressLine1,d.addressLine2,d.suburb,d.state,d.postcode].filter(Boolean).join(', ')]]);
   const org=orgs.find(o=>o.id===d.organisationId);if(org)body.append(link('Organisation: '+org.name,'organisation/'+org.id));
+  if(d.alliedHealthProfession)summary(body,[['Allied health profession',d.alliedHealthProfession==='other'?d.alliedHealthProfessionOther:ALLIED_HEALTH_PROFESSIONS.find(([key])=>key===d.alliedHealthProfession)?.[1]]]);
  },(form,d)=>{
   form.append(node('p','Optional additional contact information. Existing primary phone and client intake addresses remain unchanged. This address does not change the technician base or project worksite.','field-help'));
   input(form,'Home phone',d,'homePhone',40,'tel');input(form,'Work phone',d,'workPhone',40,'tel');input(form,'Mobile phone',d,'mobilePhone',40,'tel');
   field(form,'Preferred phone',d,'preferredPhone','text',[['','Not recorded'],['home','Home'],['work','Work'],['mobile','Mobile']]);
   input(form,'Language',d,'language',120);field(form,'Organisation affiliation',d,'organisationId','text',[['','No organisation recorded'],...orgs.map(o=>[o.id,o.name])]);
+  const profession=field(form,'Allied health profession',d,'alliedHealthProfession','text',ALLIED_HEALTH_PROFESSIONS),other=input(form,'Other allied health profession',d,'alliedHealthProfessionOther',120);
+  const updateProfession=()=>{other.parentElement.hidden=d.alliedHealthProfession!=='other';other.required=d.alliedHealthProfession==='other';if(d.alliedHealthProfession!=='other'){d.alliedHealthProfessionOther='';other.value='';}};profession.addEventListener('change',updateProfession);updateProfession();
+  form.append(node('p','Record a profession when relevant. This does not grant a role or application access.','field-help'));
   const elements={addressLine1:input(form,'Contact address line 1',d,'addressLine1',250),addressLine2:input(form,'Contact address line 2',d,'addressLine2',250),suburb:input(form,'Contact suburb or town',d,'suburb',120),state:input(form,'Contact state or region',d,'state',80),postcode:input(form,'Contact postcode',d,'postcode',20)};
   attachAddressLookup(elements.addressLine1,{draft:d,geoField:'geocode',fields:{street:'addressLine1',suburb:'suburb',state:'state',postcode:'postcode',keys:['addressLine1','addressLine2','suburb','state','postcode'],elements}});
  });

@@ -186,7 +186,7 @@ async function project(view, id) {
   view.append(overview,task,filesPane,costsPane,recordPane,editPane,auditPane,caseNotesPane);
   const actionSource=el('div'),care=el('div'),fundingReference=el('div');
   const [projectOperations,projectLocation,adminDetails,adminOptions,workPlan]=await Promise.all([operationsPromise,api(`projects/${id}/location`),api(`projects/${id}/admin-details`),api('project-admin-options'),api(`projects/${id}/work-plan`)]);
-  const lifecycle=await renderLifecycle(taskForm,p,{operations:projectOperations,recordTarget:recordPane,actionsTarget:actionSource,contextTarget:taskContext,onSaved:()=>projectTabs.set(id,'Overview'),openFiles:()=>{navigate('Files');filesPane.querySelector('input[type=file]')?.focus();}});
+  const lifecycle=await renderLifecycle(taskForm,p,{operations:projectOperations,recordTarget:recordPane,actionsTarget:actionSource,contextTarget:taskContext,onSaved:()=>projectTabs.set(id,'Overview'),openFollowUp:()=>{navigate('Edit details');editPane.querySelector('input[type=date]')?.focus();},openFiles:()=>{navigate('Files');filesPane.querySelector('input[type=file]')?.focus();}});
   auditPane.lastElementChild.replaceWith(auditPanel(p,operationsPromise,lifecycle.managed));
   await renderProjectCare(care,id);
   function flatten(section){for(const d of [...section.querySelectorAll('details')].reverse()){if(d.closest('.file-row'))continue;const summary=d.querySelector(':scope > summary'),replacement=el('section',undefined,'project-record-section');if(summary){replacement.append(el('h2',summary.textContent));summary.remove();}replacement.append(...d.childNodes);d.replaceWith(replacement);}}
