@@ -5,7 +5,9 @@ const contactDefaults={homePhone:'',workPhone:'',mobilePhone:'',preferredPhone:'
 export const ALLIED_HEALTH_PROFESSIONS=[['','Not recorded'],['occupational-therapist','Occupational therapist (OT)'],['physiotherapist','Physiotherapist'],['psychologist','Psychologist'],['other','Other']];
 const professionDefaults={alliedHealthProfession:'',alliedHealthProfessionOther:''};
 const capabilityDefaults={visitClients:'unknown',drives:'unknown',vehicle:'',interests:'',equipment:[],equipmentNotes:''};
-export const createProfileDetails=()=>({contact:{...contactDefaults,...professionDefaults},capabilities:{...capabilityDefaults,equipment:[]}});
+export const DIRECTORY_STATUSES=[['current','Current'],['inactive','Inactive'],['review','Needs review']];
+export const recordDirectoryStatus=record=>record.directoryStatus??record.person?.directoryStatus??(record.active===false?'inactive':record.role==='Unclassified'?'review':'current');
+export const createProfileDetails=()=>({contact:{...contactDefaults,...professionDefaults,directoryStatus:'current'},capabilities:{...capabilityDefaults,equipment:[]}});
 export function normaliseProfileDetails(saved={}){const defaults=createProfileDetails();return {contact:{...defaults.contact,...saved.contact},capabilities:{...defaults.capabilities,...saved.capabilities}};}
 const fail=message=>{throw Error(message);};
 function exact(value,keys){if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==keys.length||Object.keys(value).some(k=>!keys.includes(k)))fail('Supply exactly the fields for this profile section.');}
@@ -15,11 +17,13 @@ export function validateProfileDetails(input,savedContact={}){
  if(typeof input.requestId!=='string'||!/^[a-zA-Z0-9-]{8,100}$/.test(input.requestId))fail('A valid save request identifier is required.');
  if(!Number.isSafeInteger(input.version)||input.version<0)fail('A current profile version is required.');
  if(!['contact','capabilities'].includes(input.section))fail('Choose contact details or technician capabilities.');
- const d=input.details,result={},hasProfession=input.section==='contact'&&Object.hasOwn(d??{},'alliedHealthProfession');exact(d,[...Object.keys(input.section==='contact'?contactDefaults:capabilityDefaults),...(hasProfession?Object.keys(professionDefaults):[]),...(input.section==='contact'&&Object.hasOwn(d??{},'geocode')?['geocode']:[])]);
+ const d=input.details,result={},hasProfession=input.section==='contact'&&Object.hasOwn(d??{},'alliedHealthProfession');exact(d,[...Object.keys(input.section==='contact'?contactDefaults:capabilityDefaults),...(hasProfession?Object.keys(professionDefaults):[]),...(input.section==='contact'&&Object.hasOwn(d??{},'directoryStatus')?['directoryStatus']:[]),...(input.section==='contact'&&Object.hasOwn(d??{},'geocode')?['geocode']:[])]);
  if(input.section==='contact'){
   for(const [key,max]of Object.entries({homePhone:40,workPhone:40,mobilePhone:40,language:120,addressLine1:250,addressLine2:250,suburb:120,state:80,postcode:20,organisationId:120}))result[key]=text(d[key],max);
   if(!['','home','work','mobile'].includes(d.preferredPhone))fail('Choose a preferred phone channel.');result.preferredPhone=d.preferredPhone;
   if(result.preferredPhone&&!result[result.preferredPhone+'Phone'])fail('Enter the selected preferred phone number or clear the preference.');
+  result.directoryStatus=Object.hasOwn(d,'directoryStatus')?d.directoryStatus:savedContact.directoryStatus??'current';
+  if(!DIRECTORY_STATUSES.some(([key])=>key===result.directoryStatus))fail('Choose Current, Inactive or Needs review for this record.');
   const profession=hasProfession?d:savedContact;
   result.alliedHealthProfession=hasProfession?profession.alliedHealthProfession:profession.alliedHealthProfession??'';
   result.alliedHealthProfessionOther=text(hasProfession?profession.alliedHealthProfessionOther:profession.alliedHealthProfessionOther??'',120);

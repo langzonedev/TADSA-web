@@ -2,6 +2,7 @@ import {renderInvoiceReferences} from './invoice-references.js';
 import {residentialAddressText} from './client-address.js';
 import {auditReferenceIds,auditAction,auditChanges,formatValue as displayValue} from './record-values.js';
 import {renderProfileDetails} from './profile-details.js';
+import {recordDirectoryStatus,DIRECTORY_STATUSES} from './profile-details-model.js';
 import {renderProjectDetails,renderProjectCoordinator,renderProjectFeedback} from './project-details.js';
 import {renderAccounts} from './accounts.js';
 import {renderReports} from './reports.js';
@@ -91,12 +92,12 @@ function inspect(item, kind, slot) {
 }
 async function register(view, kind) {
   const { items, limit } = await api(kind);
-  const state = registers.get(kind) ?? { query: '', filter: 'all', sort: kind === 'projects' ? 'reference' : 'name', selected: null };
+  const state = registers.get(kind) ?? { query: '', filter: ['people','clients','organisations'].includes(kind) ? 'current' : 'all', sort: kind === 'projects' ? 'reference' : 'name', selected: null };
   registers.set(kind, state); returnRoute = kind;
   const descriptions = { projects: 'Projects in progress, the people involved, and the work to be done.', clients: 'A connected view of each person and the work supporting them.', people: 'Clients, technical members and the people supporting each request.', organisations: 'The organisations connected to our work.' };
   const head = heading(cap(kind), descriptions[kind], 'Administration'); head.append(el('span', `${items.length} ${kind === 'people' ? 'people' : kind}`, 'meta-note')); if (kind === 'projects') head.append(link('New project', 'new-project', 'button primary')); if(kind==='organisations')head.append(link('New organisation','new-organisation','button primary')); if (kind === 'people') head.append(link('New person', 'new-person', 'button primary')); if (kind === 'clients') head.append(link('New client', 'new-client', 'button primary')); view.append(head);
   const tabs = el('div', undefined, 'filter-tabs'); tabs.setAttribute('aria-label', `Filter ${kind}`);
-  const filters = kind === 'projects' ? [['all', 'All projects', () => true], ['open', 'Open', p => p.status === 'open'], ['review', 'Review', p => p.status === 'review'], ['closed', 'Closed', p => p.status === 'closed'], ['feedback', 'Feedback', p => p.feedbackRequired], ['invoice', 'Invoice', p => p.invoiceRequired]] : [['all', `All ${kind}`, () => true], ...(kind === 'people' ? [...new Set(items.flatMap(p => p.roles ?? [p.role]))].sort().map(role => [role, role, p => (p.roles ?? [p.role]).includes(role)]) : [])];
+  const filters = kind === 'projects' ? [['all', 'All projects', () => true], ['open', 'Open', p => p.status === 'open'], ['review', 'Review', p => p.status === 'review'], ['closed', 'Closed', p => p.status === 'closed'], ['feedback', 'Feedback', p => p.feedbackRequired], ['invoice', 'Invoice', p => p.invoiceRequired]] : [['all', `All ${kind}`, () => true], ...(['people','clients','organisations'].includes(kind)?[['current','Current',p=>recordDirectoryStatus(p)!=='inactive'],['inactive','Inactive',p=>recordDirectoryStatus(p)==='inactive'],['needs-review','Needs review',p=>recordDirectoryStatus(p)==='review']]:[]), ...(kind === 'people' ? [...new Set(items.flatMap(p => p.roles ?? [p.role]))].sort().map(role => [role, role, p => (p.roles ?? [p.role]).includes(role)]) : [])];
   const layout = el('div', undefined, 'register-layout'); const box = el('section', undefined, 'register-panel'); box.setAttribute('aria-label', `${cap(kind)} register`); const inspector = el('aside', undefined, 'inspector'); inspector.setAttribute('aria-label', 'Selected record');
   const tools = el('div', undefined, 'register-tools'); const searchLabel = el('label'); const q = el('input'); q.type = 'search'; q.value = state.query; q.placeholder = `Filter ${kind}…`; q.setAttribute('aria-label', `Filter ${kind} by name or reference`); searchLabel.append(q);
   if(kind==='people'){q.placeholder='Name, suburb or postcode…';q.setAttribute('aria-description','Includes the residential suburb and postcode of linked clients.');}
@@ -120,7 +121,7 @@ async function register(view, kind) {
     for (const item of visible) {
       const row = el('tr'); row.dataset.id = item.id; row.classList.toggle('selected', !matchMedia('(max-width:800px)').matches && item.id === state.selected);
       const first = el('td'); const control = link('',`${typeOf(kind)}/${item.id}`,'row-open'); control.setAttribute('aria-label', `Open ${nameOf(item)}`);
-      const text = el('span'); text.append(el('span', nameOf(item), 'row-title'), el('span', kind === 'projects' ? `${item.reference}` : kind === 'clients' ? item.person.email : kind === 'people' ? item.email : item.description, 'row-sub'));
+      const text = el('span'); text.append(el('span', nameOf(item), 'row-title'), ...(['people','clients','organisations'].includes(kind)&&recordDirectoryStatus(item)!=='current'?[el('small',recordDirectoryStatus(item)==='inactive'?'Inactive':'Needs review')]:[]), el('span', kind === 'projects' ? `${item.reference}` : kind === 'clients' ? item.person.email : kind === 'people' ? item.email : item.description, 'row-sub'));
       if (kind === 'clients' || kind === 'people') { const identity = el('span', undefined, 'name-cell'); identity.append(avatar(nameOf(item)), text); control.append(identity); } else control.append(text); first.append(control); {const previewButton=button('Quick view',()=>choose(item),'text-button row-preview');previewButton.setAttribute('aria-label','Preview '+nameOf(item));first.append(previewButton);} row.append(first);
       if (kind === 'projects') { row.append(el('td', item.clientName)); const s = el('td'); s.append(projectStatus(item)); row.append(s, el('td', date(item.dueDate), 'optional-col')); }
       else if (kind === 'clients') row.append(el('td', String(item.projects.length)));
@@ -307,9 +308,9 @@ async function entity(view, type, id) {
   const item = await api(`${pathOf(type)}/${id}`); view.append(link(type==='person'?'← Back to people':'← Back to organisations',type==='person'?'people':'organisations','breadcrumb'));
   const meta = el('div', undefined, 'record-meta'); meta.append(el('span', item.roles?.join(' · ') ?? item.role)); recordHeader(view, type === 'person' ? 'Person record' : 'Organisation record', item.name, meta, type === 'person' ? link('Edit profile & roles', 'edit-person/' + id, 'button primary') : undefined);
   const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
-  info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role]]) : el('p', item.description, 'record-summary'));
+  info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]) : el('p', item.description, 'record-summary'));
   if (item.clientId) {const linkedClient=await api('clients/'+item.clientId);clientContactSummary(info,linkedClient);info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));}
-  if(type==='organisation'){info.append(details([['Type',item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded']]),link('Edit organisation','edit-organisation/'+id,'button secondary'));}
+  if(type==='organisation'){info.append(details([['Type',item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded'],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]),link('Edit organisation','edit-organisation/'+id,'button secondary'));}
   left.append(info);
   if(type==='person')await renderProfileDetails(left,item);
   if (item.technician) {await renderTechnicianLocation(left,id);try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}

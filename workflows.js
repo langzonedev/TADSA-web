@@ -225,9 +225,10 @@ async function editCoordination(view,id,options={}) {
 }
 
 async function linkContact(view,id) {
-  const [client,people]=await Promise.all([request('clients/'+id),request('people')]);const key='contact/'+id;const d=getDraft(key,{mode:'existing',personId:'',role:'Occupational therapist',name:'',phone:'',email:'',allowDuplicate:false,personRequestId:crypto.randomUUID()});
+  const [client,people]=await Promise.all([request('clients/'+id),request('people')]);const key='contact/'+id;const d=getDraft(key,{mode:'existing',personId:'',role:'Occupational therapist',relationshipLabel:'',name:'',phone:'',email:'',allowDuplicate:false,personRequestId:crypto.randomUUID()});
   title(view,'Link a contact',`Client: ${client.person.name}. This links a person to the client, not to every project.`, 'client/'+id);
   const box=panel('Contact details');const form=el('form',null,'form-grid');selectField(form,'Relationship to client',d,'role',[['Occupational therapist','Occupational therapist (OT)'],['Carer','Carer'],['Referrer','Referrer']],()=>drawPerson());
+  field(form,'Relationship description (optional)',d,'relationshipLabel',{max:120});form.append(el('p','For example: parent, guardian or support coordinator. Multiple contacts can be linked; the preferred contact is selected separately in Client details.','field-help'));
   const mode=el('div',null,'actions');const slot=el('div');
   mode.append(button('Choose existing person',()=>{d.mode='existing';drawPerson();}),button('Create new contact',()=>{d.mode='new';d.personId='';drawPerson();}));form.append(mode,slot);
   const matchesRelationship=p=>p.active!==false&&p.id!==client.person.id&&(p.roles??[p.role]).includes(d.role);
@@ -245,14 +246,14 @@ async function linkContact(view,id) {
       catch(error){if(error.status){d.personPending=null;d.personRequestId=crypto.randomUUID();}notice.replaceChildren(note(error.status?error.message:'Contact save was not confirmed. Retry safely using the same details.',true));if(error.data?.candidates){for(const p of error.data.candidates){const candidateId=p.type==='client'?p.personId:p.id;const candidate=people.items.find(person=>person.id===candidateId);if(candidate&&matchesRelationship(candidate))notice.append(button(`Use ${p.name}`,()=>{d.personId=candidateId;d.mode='existing';drawPerson();notice.replaceChildren();}));else notice.append(el('p',`${p.name} already exists but is not available as a ${d.role.toLowerCase()}. Review their profile in People before linking.`,'field-help'));}notice.append(button('This is a different person — create separate contact',()=>{d.allowDuplicate=true;d.personRequestId=crypto.randomUUID();form.requestSubmit();}));}host.setSaving(false);return;}
       finally{host.setSaving(false);lock(form,Boolean(d.personPending),submit);if(d.personPending)submit.textContent='Retry save safely';}
     }
-    await save(form,d,notice,submit,`clients/${id}/contacts`,'POST',{requestId:d.requestId,personId:d.personId,role:d.role},()=>{drafts.delete(key);host.announce('Contact linked.');location.hash='client/'+id;});
+    await save(form,d,notice,submit,`clients/${id}/contacts`,'POST',{requestId:d.requestId,personId:d.personId,role:d.role,relationshipLabel:d.relationshipLabel??''},()=>{drafts.delete(key);host.announce('Contact linked.');location.hash='client/'+id;});
   });
   if(d.pending||d.personPending){notice.append(note('A previous save was not confirmed. Retry using the same details.'));lock(form,true,submit);submit.textContent='Retry save safely';}
 }
 export function addClientContactActions(box,client) {
   box.append(link('Link a contact','link-contact/'+client.id,'button secondary'));
   if(!client.contacts?.length)box.append(el('p','No client contacts linked yet. Add an occupational therapist, carer or referrer.','muted'));
-  for(const c of client.contacts??[]){const row=el('div',null,'contact-row');const text=el('div');text.append(link(c.name,'person/'+c.personId,'row-title'),el('p',c.role,'muted'));row.append(text);
+  for(const c of client.contacts??[]){const row=el('div',null,'contact-row');const text=el('div');text.append(link(c.name,'person/'+c.personId,'row-title'),el('p',[c.role,c.relationshipLabel].filter(Boolean).join(' · '),'muted'));row.append(text);
     row.append(button(`Unlink ${c.name}`,()=>{const prompt=note(`Remove ${c.name} from this client’s contacts? The person record and project links will remain.`);const d={requestId:crypto.randomUUID()};const form=el('form');const submit=saveButton('Unlink contact');form.append(submit,button('Keep contact',()=>prompt.remove()));const feedback=el('div');form.append(feedback);prompt.append(form);row.append(prompt);form.addEventListener('submit',e=>{e.preventDefault();save(form,d,feedback,submit,`clients/${client.id}/contacts/remove`,'POST',{requestId:d.requestId,personId:c.personId,role:c.role},()=>{host.refresh();});});},'text-button'));box.append(row);}
 }
 export async function renderWorkflow(view,route,arg,options={}) {
@@ -314,17 +315,20 @@ async function personProfile(view, id) {
 }
 
 async function organisationCategory(view,id){
- const item=id?await request('organisations/'+id):null,directory=await request('organisations'),key=id?'edit-organisation/'+id:'new-organisation',d=getDraft(key,{name:item?.name||'',role:item?.role||'',description:item?.description||'',category:item?.category||'',email:item?.email||'',...(id?{version:item.version}:{})});
+ const item=id?await request('organisations/'+id):null,directory=await request('organisations'),key=id?'edit-organisation/'+id:'new-organisation',d=getDraft(key,{name:item?.name||'',role:item?.role||'',description:item?.description||'',category:item?.category||'',email:item?.email||'',directoryStatus:item?.directoryStatus??'current',...(id?{version:item.version}:{})});
+ d.directoryStatus??=item?.directoryStatus??'current';
  title(view,id?'Edit organisation':'New organisation',id?item.name:'Record an organisation once, then link it to projects as needed.');view.append(link(id?'Back to organisation':'Back to organisations',id?'organisation/'+id:'organisations','breadcrumb'));
  const box=panel('Organisation details'),form=el('form',null,'form-grid');
  field(form,'Organisation name',d,'name',{required:true,max:200});
  const suggest=(label,key,values,help)=>{const input=field(form,label,d,key,{required:key==='role',max:key==='role'?120:80,help});const list=el('datalist');list.id='organisation-'+key+'-options';for(const value of [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'en-AU'))){const option=el('option');option.value=value;list.append(option);}input.setAttribute('list',list.id);form.append(list);};
+ selectField(form,'Directory status',d,'directoryStatus',[['current','Current'],['inactive','Inactive'],['review','Needs review']]);
+ form.append(el('p','Inactive organisations remain available in history and can be made current again. Needs review flags a record for checking; it does not merge or delete it.','field-help'));
  suggest('Organisation type','role',['Funder','Allied-health organisation',...directory.items.map(o=>o.role)],'Choose a suggestion or enter the organisation type used by your team.');
  field(form,'Description',d,'description',{type:'textarea',max:2000});
  suggest('Category','category',['School','NDIS','Health service','Government','Community organisation','Supplier','Other',...directory.items.map(o=>o.category)],'Optional grouping, such as School or NDIS. Organisation type describes its role; category helps your team organise records.');
  field(form,'Organisation email',d,'email',{type:'email',max:254,help:'The organisation contact address, used in reports.'});
  const notice=el('div'),actions=el('div',null,'actions'),submit=saveButton(id?'Save organisation details':'Create organisation');actions.append(submit,cancel(form,d,key,id?'organisation/'+id:'organisations'));form.append(notice,actions);box.append(form);view.append(box);
- if(id&&d.version!==item.version){notice.append(note('This organisation changed. Compare the latest saved details before retaining your draft.',true));const latest=el('dl',null,'record-details');for(const [label,k] of [['Name','name'],['Type','role'],['Description','description'],['Category','category'],['Email','email']])latest.append(el('dt',label),el('dd',item[k]||'Not recorded'));notice.append(latest,button('Use latest version with my draft',()=>{d.version=item.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review all organisation details, then save.'));}));}
- form.addEventListener('submit',e=>{e.preventDefault();if(!valid(form))return;const payload={requestId:d.requestId,...(id?{version:d.version}:{}),...Object.fromEntries(['name','role','description','category','email'].map(k=>[k,d[k].trim()]))};save(form,d,notice,submit,id?'organisations/'+id+'/profile':'organisations',id?'PUT':'POST',payload,result=>{drafts.delete(key);host.announce(id?'Organisation details saved.':'Organisation created.');location.hash='organisation/'+result.id;});});
+ if(id&&d.version!==item.version){notice.append(note('This organisation changed. Compare the latest saved details before retaining your draft.',true));const latest=el('dl',null,'record-details');for(const [label,k] of [['Name','name'],['Type','role'],['Description','description'],['Category','category'],['Email','email'],['Directory status','directoryStatus']])latest.append(el('dt',label),el('dd',item[k]||'Not recorded'));notice.append(latest,button('Use latest version with my draft',()=>{d.version=item.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review all organisation details, then save.'));}));}
+ form.addEventListener('submit',e=>{e.preventDefault();if(!valid(form))return;const payload={requestId:d.requestId,...(id?{version:d.version}:{}),...Object.fromEntries(['name','role','description','category','email','directoryStatus'].map(k=>[k,d[k].trim()]))};save(form,d,notice,submit,id?'organisations/'+id+'/profile':'organisations',id?'PUT':'POST',payload,result=>{drafts.delete(key);host.announce(id?'Organisation details saved.':'Organisation created.');location.hash='organisation/'+result.id;});});
  if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';notice.append(note('A previous save could not be confirmed. Retry it before changing these details.'));}
 }

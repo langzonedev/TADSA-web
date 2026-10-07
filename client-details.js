@@ -8,7 +8,7 @@ export const clientDetailsHasDrafts=()=>[...drafts.values()].some(d=>d.dirty||d.
 export function clientDetailsSummary(client) {
   const box=el('section');box.className='panel workflow-panel';box.append(el('h2','Client details'));
   const d=client.details;box.append(el('p',`${d.reference} · ${d.complete?'Contact and addresses recorded':'Intake details incomplete'}`));
-  box.append(el('p','NDIS number: '+(client.ndis?.number||'Not recorded')));
+  box.append(el('p','National Disability Insurance Scheme (NDIS) participant number: '+(client.ndis?.number||'Not recorded')));
   box.append(el('p',`Residential: ${residentialAddressText(d)||'Not recorded'}`),el('p',`Work: ${d.sameAsResidential?residentialAddressText(d)||'Not recorded':d.workAddress||'Not recorded'}`));
   box.append(el('p',`Preferred contact: ${d.preferredContact==='representative'?(client.contacts.find(p=>p.personId===d.representativePersonId)?.name||'Representative no longer linked — review required'):'Client'}`));
   if(d.contactNeeds)box.append(el('p',d.contactNeeds));
@@ -42,7 +42,7 @@ export async function renderClientDetails(view,id,host) {
   checkbox.addEventListener('change',()=>{d.sameAsResidential=checkbox.checked;d.workGeocode=null;d.dirty=true;toggle();});
   function select(key,label,items){const l=el('label');l.append(el('span',label));const s=el('select');s.setAttribute('aria-label',label);for(const [value,text]of items){const o=el('option',text);o.value=value;s.append(o);}s.value=d[key]||'';s.addEventListener('change',()=>{d[key]=key==='representativePersonId'?(s.value||null):s.value;d.dirty=true;});l.append(s);form.append(l);return s;}
   const preferred=select('preferredContact','Preferred contact',[['client','Client'],['representative','Linked representative']]);
-  const rep=select('representativePersonId','Representative',[['','Choose linked contact'],...client.contacts.map(p=>[p.personId,`${p.name} — ${p.role}`])]);
+  const rep=select('representativePersonId','Representative',[['','Choose linked contact'],...client.contacts.map(p=>[p.personId,`${p.name} — ${p.relationshipLabel||p.role}`])]);
   const repToggle=()=>{rep.disabled=d.preferredContact!=='representative';rep.required=!rep.disabled;};repToggle();preferred.addEventListener('change',repToggle);
   field('contactNeeds','Contact needs or preferences',1000,'textarea');form.append(status);
   if(d.version!==current.version){status.append(el('p','Saved details changed. Your draft is retained. Compare current values before retrying.'));const latest=el('dl');latest.className='review-list';const resolve=value=>client.contacts.find(c=>c.personId===value)?.name??value;for(const key of ['name','email','phone','residentialAddress','workAddress','sameAsResidential','preferredContact','representativePersonId','contactNeeds',...RESIDENTIAL_FIELDS]){const saved=['name','email','phone'].includes(key)?client.person[key]:current[key];if(JSON.stringify(saved)===JSON.stringify(d[key]))continue;latest.append(el('dt',fieldLabel(key)),el('dd',`Latest saved: ${formatValue(saved,key,resolve)}. Your draft: ${formatValue(d[key],key,resolve)}.`));}status.append(latest);const accept=el('button','Use latest version with my reviewed draft');accept.type='button';accept.onclick=()=>{d.version=current.version;status.replaceChildren(el('p','Latest version acknowledged. Review and save.'));};status.append(accept);}
