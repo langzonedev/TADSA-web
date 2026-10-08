@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyLifecycle} from '../lifecycle-model.js';
-const context={at:'2026-09-24T01:00:00.000Z',programme:'FW',actor:{id:null,displayName:'Synthetic test',role:'administrator'}};
+const context={lifecycleSchema:1,at:'2026-09-24T01:00:00.000Z',programme:'FW',actor:{id:null,displayName:'Synthetic test',role:'administrator'}};
 const apply=(s,action,data={},ctx=context)=>applyLifecycle(s,action,data,ctx);
 function reviewed(){let s=apply(null,'begin');s=apply(s,'assessmentDecision',{required:false,reason:'Simple adjustment'});s=apply(s,'quote',{lines:[{type:'labour',description:'Adjustment',quantityMilli:1000,unitPriceCents:5000}],notes:''});return apply(s,'peerReview',{quoteVersion:1,reviewerId:'tech',approved:true,notes:'Reviewed'});}
 function cleared(){let s=reviewed();s=apply(s,'acceptQuote',{quoteVersion:1,acceptedBy:'Synthetic client',reference:'Recorded',date:'2026-09-20'});return apply(s,'financeClearance',{quoteVersion:1,status:'exempt',reference:'Approved',notes:'Synthetic exemption',confirmedOn:'2026-09-20'});}

@@ -12,9 +12,9 @@ export async function renderProjectDetails(view,id){
   bike.append(node('p','Record the supplied bike specification. These details do not replace an assessment or approval.','field-help'));
   const retained=node('p','Bike details are retained when the programme changes. Clear individual fields only if they are incorrect.','field-help');bike.append(retained);form.append(bike);
   const showBike=()=>{bike.hidden=d.programme!=='FW'&&!Object.values(d.freedomWheels).some(Boolean);retained.hidden=d.programme==='FW';};programme.addEventListener('change',showBike);showBike();
-  field(form,'Next follow-up date',d,'followUpOn','date');
+  field(form,'Review date',d,'followUpOn','date');
   field(form,'How the client heard of TADSA',d,'enquirySource','textarea');
-  form.append(node('p','Optional administration details. A follow-up date does not change the project stage or due date.','field-help'));
+  form.append(node('p','The review date is shared with the project team. After following up, add a case note and choose the next review date. Around two weeks is a useful starting point for assessment, quote responses and technical work; adjust it to the circumstances. This date does not change the project stage or target date.','field-help'));
  },`projects/${id}/admin-details`,'PUT',payload);labelSave(entry,'Save project details');
 }
 export async function renderProjectCoordinator(view,id){

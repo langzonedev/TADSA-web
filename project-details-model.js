@@ -1,5 +1,8 @@
 export const createFreedomWheelsDetails=()=>({bikeMake:'',bikeSize:'',bikeSerialNumber:'',bikeSource:'',notes:''});
 export const createProjectDetails=()=>({programme:'',coordinatorAccountId:'',followUpOn:'',enquirySource:'',freedomWheels:createFreedomWheelsDetails()});
+export const reviewDay=(at=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Adelaide'}).format(new Date(at));
+export const projectNeedsReview=(project,today=reviewDay())=>project.status!=='closed'&&!project.cancelled&&Boolean(project.followUpOn)&&project.followUpOn<=today;
+export const validateReviewDate=value=>date(value,true);
 const fail=message=>{throw Object.assign(Error(message),{status:422});};
 function text(value,max){if(typeof value!=='string'||value.length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))fail('Enter valid text within the field limits.');return value.trim();}
 function envelope(input,keys){if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length!==keys.length+2||Object.keys(input).some(k=>!['requestId','version',...keys].includes(k)))fail('Supply exactly the required fields.');if(typeof input.requestId!=='string'||!/^[a-zA-Z0-9-]{8,100}$/.test(input.requestId))fail('A valid request identifier is required.');if(!Number.isSafeInteger(input.version)||input.version<1)fail('A current project version is required.');}

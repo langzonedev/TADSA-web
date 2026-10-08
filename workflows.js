@@ -1,5 +1,6 @@
 import {reconcileContactDraft} from './contact-draft.js';
 import {renderTravelComparison} from './address-lookup.js';
+import {reviewDay} from './project-details-model.js';
 // Call-intake workflows. All records in this development workspace are fictional.
 const drafts = new Map();
 let host;
@@ -136,7 +137,7 @@ async function directories(loadCalendars=true) {
 function allocationValid(form, d, notice) { if (!valid(form)) return false; if (d.needsAcknowledgement && !d.assignmentAcknowledged) { notice.replaceChildren(note('Review the technician warning and tick the acknowledgement, or leave the request unassigned.', true)); notice.scrollIntoView({block:'nearest'}); return false; } return true; }
 function reviewList(items) { const dl = el('dl', null, 'review-list'); for (const [label,value] of items) { dl.append(el('dt',label),el('dd',value)); } return dl; }
 async function newProject(view, clientId) {
-  const key = 'new-project'; const d = getDraft(key, { step: clientId ? 2 : 1, clientId: clientId || '', title: '', summary: '', kind: 'Assessment', fundingStatus:'unknown',payerId:'',fundingNotes:'',requiredSkills:[],technicianId:'' });
+  const key = 'new-project'; const d = getDraft(key, { step: clientId ? 2 : 1, clientId: clientId || '', title: '', summary: '', kind: 'Assessment', followUpOn:reviewDay(),fundingStatus:'unknown',payerId:'',fundingNotes:'',requiredSkills:[],technicianId:'' });
   const [clients, dirs] = await Promise.all([request('clients'),directories()]);
   if (clientId && !d.clientId) { d.clientId = clientId; d.step = 2; }
   let selected = clients.items.find(c => c.id === d.clientId);
@@ -158,10 +159,11 @@ async function newProject(view, clientId) {
       form.append(note(`Client: ${selected?.person.name ?? 'Choose a client first'}`));
       field(form,'Project title',d,'title',{required:true,help:'A short description the client and team will recognise.'});
       field(form,'What does the client need?',d,'summary',{type:'textarea',required:true,max:2000,help:'Describe the goal in the client’s words. Avoid unnecessary sensitive information.'});
+      field(form,'Review date',d,'followUpOn',{type:'date',help:'Starts at today. Change it to when the team should review this enquiry.'});
       form.append(el('p','Assessment, quote acceptance and technical work will be recorded as stages of this project.','field-help'));
       form.append(el('p','Use one project for related work on the same item. Create separate projects for different items or independently managed jobs. Staff can decide after assessment when the scope is clearer.','field-help'));
       form.append(el('p','For a correction to earlier work, check the existing project first and record the follow-up there. A request for different equipment usually needs a new project.','field-help'));
-      form.append(el('p','Creating a project does not authorise work or spending. Progress through the project’s assessment, acceptance and Finance checks first.','field-help'));
+      form.append(el('p','Creating a project does not authorise work or spending. Complete assessment review and quote approval, then record the project request before technical work begins.','field-help'));
     } else if (d.step === 3) {form.append(note('Client work location: '+(selected?.details?.workAddress||selected?.details?.residentialAddress||'Not recorded. Open the client record to add an address.')));coordinationFields(form,d,dirs);}
     else {
       const payer = d.fundingStatus==='unknown' ? 'Not known yet — follow up' : d.fundingStatus==='self' ? `Client: ${selected?.person.name}` : (d.fundingStatus==='organisation'?dirs.organisations:dirs.people).find(p=>p.id===d.payerId)?.name;
@@ -173,7 +175,7 @@ async function newProject(view, clientId) {
     actions.append(next,cancel(form,d,key,d.clientId?'client/'+d.clientId:'projects','Cancel new project'));form.append(notice,actions);box.append(form);slot.append(box);
     form.addEventListener('submit',e=>{e.preventDefault();if(d.step===1&&!d.clientId){notice.replaceChildren(note('Choose the existing client or create a new client to continue.',true));return;}if(!allocationValid(form,d,notice))return;
       if(d.step<4){d.step++;draw();slot.querySelector('h2').tabIndex=-1;slot.querySelector('h2').focus({preventScroll:true});window.scrollTo(0,0);return;}
-      save(form,d,notice,next,'projects','POST',{requestId:d.requestId,clientId:d.clientId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,...coordinationValues(d)},result=>{drafts.delete(key);host.announce('Project created.');location.hash='project/'+result.id;});
+      save(form,d,notice,next,'projects','POST',{requestId:d.requestId,clientId:d.clientId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,followUpOn:d.followUpOn??reviewDay(),...coordinationValues(d)},result=>{drafts.delete(key);host.announce('Project created.');location.hash='project/'+result.id;});
     });
     if(d.pending){notice.append(note('A previous save was not confirmed. Retry the same request safely.'));lock(form,true,next);next.textContent='Retry save safely';}
   }

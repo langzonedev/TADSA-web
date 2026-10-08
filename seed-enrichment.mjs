@@ -50,7 +50,7 @@ export function enrichSeed(data, asOf='2026-09-25') {
     project.coordination={technicianId:'person-3',technicianIds:['person-3'],requiredSkills:['Assessment'],fundingStatus:agreedFunding?'organisation':'unknown',payerId:agreedFunding?'org-1':null,fundingNotes:agreedFunding?'Fictional funder contribution agreed for the full quote.':''};
     if(agreedFunding)data.relationships.push({projectId:id,type:'organisation',id:'org-1',role:'Funder'});
     data.projectAdminDetails[id]={programme,coordinatorAccountId:'',followUpOn:target==='enquiry'?new Date(Date.parse(asOf+'T00:00:00Z')+7*86400000).toISOString().slice(0,10):'',enquirySource:'Synthetic operator practice'};
-    let state=null;const context={at,actor:{id:null,displayName:'Synthetic fixture author',role:'administrator'},projectStatus:'open',programme};
+    let state=null;const context={lifecycleSchema:1,at,actor:{id:null,displayName:'Synthetic fixture author',role:'administrator'},projectStatus:'open',programme};
     const act=(action,values)=>{state=applyLifecycle(state,action,values,context);};act('begin',{});
     if(target!=='enquiry')act('assessmentDecision',{required:true,reason:'Synthetic assessment recommended at enquiry.'});
     if(!['enquiry','assessment'].includes(target))act('assessmentComplete',{notes:'Fictional measurements and access needs reviewed.'});
