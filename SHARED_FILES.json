@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "5e06d92b494a33e18f689f1dca65e19c767d6ea0",
+  "sourceRevision": "585c57bee804dc11f8937156295ac8b05c2e815b",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "address-lookup.js": {
@@ -59,32 +59,32 @@
     },
     "project-details.js": {
       "source": "public/project-details.js",
-      "sha256": "c344b5fa1aefb9c095d59f8a0955f7cc9eeef63aef3652ebc87d36f22212b7d0",
+      "sha256": "80e6e651a3331490f880baa6598657481edbe26c61156519cf7474f41fd8004f",
       "transform": null
     },
     "project-details-model.js": {
       "source": "public/project-details-model.js",
-      "sha256": "95d65d961db5167428728d8d32f884300bc8271ff45106e8d9d812f0de3117c9",
+      "sha256": "9ef030795a82d84cd5d4a13158bf11fd8f33d0bc9e6b123963988fcf4bd5fb49",
       "transform": null
     },
     "lifecycle-model.js": {
       "source": "public/lifecycle-model.js",
-      "sha256": "7dabc6055c119d74393cc78f73c61de9c286971937c03728f4ee0dbbcc964024",
+      "sha256": "a72236f4f0965a8311d6d1a699eed01f06c266987d23281fc14d14fbd57edd01",
       "transform": null
     },
     "lifecycle-validation.js": {
       "source": "public/lifecycle-validation.js",
-      "sha256": "1851e3db88bb31a957cdbb536608ab00f9e9d83b8d0ba8b62edf5f8bc09aabd0",
+      "sha256": "39917901f41e0658e3cbb8b89578d82435db6a9f3a416548768e1222b7b92879",
       "transform": null
     },
     "project-lifecycle.js": {
       "source": "public/project-lifecycle.js",
-      "sha256": "9e63d4107521ad9f921a09d4052d6b916d90f46669fd5dafc51dd79e33b4675f",
+      "sha256": "1297a84541cb5387008eb496d87fff8238082beca55106d85940b84998292912",
       "transform": null
     },
     "finance-pack.js": {
       "source": "public/finance-pack.js",
-      "sha256": "ea1b2928dc2a492225a60c105acce5909976044dcdcef103a9508f1e6c1c5514",
+      "sha256": "4989742154f6f2643ddbe7b28a4e4350c94fbc3145314f9806e120aa2290e95d",
       "transform": null
     },
     "technician-credentials.js": {
@@ -119,7 +119,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "e252e1a9cad0d7df14226695e9daf57c4e452e97c38bdf784497071be833d6e2",
+      "sha256": "b1d909d9908c5a76d5821f37ea470ed8d07662401ac6bb493d78b3b8779776ca",
       "transform": null
     },
     "settings.js": {
@@ -200,5 +200,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "81f815a9a3c63006b1ce019361f274f238f552ecea20de8e70d1b0d6c1788844"
+  "shellHash": "e84e9af64d488260bc76ad895fd61ad1b18580c885dda7166afff0f053d6e713"
 }

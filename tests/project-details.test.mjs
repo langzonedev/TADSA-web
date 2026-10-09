@@ -30,8 +30,8 @@ test('bike specification survives programme changes, legacy saves, reload and ba
  const save=extra=>{current=call('admin-details','PUT',{...createProjectDetails(),requestId:crypto.randomUUID(),version:current.version,...extra});return current;};
  save({programme:'FW',freedomWheels:spec});save({programme:'TAD',freedomWheels:spec});
  current=call('admin-details','PUT',{requestId:crypto.randomUUID(),version:current.version,programme:'TAD',coordinatorAccountId:'',followUpOn:'',enquirySource:'Old client update'});
- assert.deepEqual(current.freedomWheels,spec);assert.deepEqual(dispatch(normalise(structuredClone(d)),`projects/${id}/admin-details`).freedomWheels,spec);
- assert.deepEqual((await validateBackup(d)).projectAdminDetails[id].freedomWheels,spec);
+ assert.deepEqual(current.freedomWheels,{...createProjectDetails().freedomWheels,...spec});assert.deepEqual(dispatch(normalise(structuredClone(d)),`projects/${id}/admin-details`).freedomWheels,{...createProjectDetails().freedomWheels,...spec});
+ assert.deepEqual((await validateBackup(d)).projectAdminDetails[id].freedomWheels,{...createProjectDetails().freedomWheels,...spec});
  const bad=structuredClone(d);bad.projectAdminDetails[id].freedomWheels.notes=42;await assert.rejects(validateBackup(bad),/Backup rejected/);
  const old=structuredClone(d);delete old.projectAdminDetails[id].freedomWheels;assert.equal(Object.hasOwn((await validateBackup(old)).projectAdminDetails[id],'freedomWheels'),false);
 });

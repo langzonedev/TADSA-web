@@ -8,10 +8,15 @@ export async function renderProjectDetails(view,id){
   const programme=field(form,'Programme',d,'programme','text',[['','Not recorded'],['TAD','TAD'],['FW','Freedom Wheels (FW)']]);
   d.freedomWheels={...createFreedomWheelsDetails(),...d.freedomWheels};
   const bike=node('fieldset');bike.append(node('legend','Freedom Wheels bike details'));
-  for(const [key,label] of [['bikeMake','Bike make'],['bikeSize','Bike size (include units)'],['bikeSerialNumber','Bike serial number'],['bikeSource','Bike supplied by'],['notes','Bike specification notes']]){const input=field(bike,label,d.freedomWheels,key,key==='notes'?'textarea':'text');input.maxLength=key==='notes'?2000:200;}
+  for(const [key,label] of [['bikeMake','Bike make'],['bikeSize','Bike size (include units)'],['bikeSerialNumber','Bike serial number'],['bikeSource','Bike supplied by'],['cycleType','Bike or trike'],['colour','Colour'],['pedalClips','Pedal clips'],['linkedPedals','Linked pedals'],['rearSteering','Rear steering'],['handlebars','Handlebars'],['backSupport','Back support'],['seat','Seat'],['notes','Bike specification notes']]){const input=field(bike,label,d.freedomWheels,key,key==='notes'?'textarea':'text');input.maxLength=key==='notes'?2000:200;}
   bike.append(node('p','Record the supplied bike specification. These details do not replace an assessment or approval.','field-help'));
   const retained=node('p','Bike details are retained when the programme changes. Clear individual fields only if they are incorrect.','field-help');bike.append(retained);form.append(bike);
   const showBike=()=>{bike.hidden=d.programme!=='FW'&&!Object.values(d.freedomWheels).some(Boolean);retained.hidden=d.programme==='FW';};programme.addEventListener('change',showBike);showBike();
+  const instructions=field(form,'Assessment instructions for the technical team',d,'assessmentInstructions','textarea');instructions.maxLength=2000;
+  form.append(node('p','These instructions appear on the assessment request. Include access arrangements and known safety concerns; an assessment does not authorise building or modifying equipment.','field-help'));
+  const folder=field(form,'Project document folder link',d,'documentFolderUrl','url');folder.maxLength=2000;
+  form.append(node('p','Paste the SharePoint folder link for this project. Documents stay in SharePoint; this link does not copy files or change access permissions. Check the project number before saving.','field-help'));
+  if(details.documentFolderUrl){const a=node('a','Open project document folder','button secondary');a.href=details.documentFolderUrl;a.target='_blank';a.rel='noopener noreferrer';form.append(a);}
   field(form,'Review date',d,'followUpOn','date');
   field(form,'How the client heard of TADSA',d,'enquirySource','textarea');
   form.append(node('p','The review date is shared with the project team. After following up, add a case note and choose the next review date. Around two weeks is a useful starting point for assessment, quote responses and technical work; adjust it to the circumstances. This date does not change the project stage or target date.','field-help'));
