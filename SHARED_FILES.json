@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "585c57bee804dc11f8937156295ac8b05c2e815b",
+  "sourceRevision": "4194575ab18a72692512c5efbc28e9b2c125c85c",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "address-lookup.js": {
@@ -69,22 +69,22 @@
     },
     "lifecycle-model.js": {
       "source": "public/lifecycle-model.js",
-      "sha256": "a72236f4f0965a8311d6d1a699eed01f06c266987d23281fc14d14fbd57edd01",
+      "sha256": "f4514931c5f4681b5ceb9d4cf1e67de07294ec75290719001bbd13a3dbfbe263",
       "transform": null
     },
     "lifecycle-validation.js": {
       "source": "public/lifecycle-validation.js",
-      "sha256": "39917901f41e0658e3cbb8b89578d82435db6a9f3a416548768e1222b7b92879",
+      "sha256": "642858bb6c272212e82b45c1c475485f5ddcc69127512e18dcc2c73957321f2c",
       "transform": null
     },
     "project-lifecycle.js": {
       "source": "public/project-lifecycle.js",
-      "sha256": "1297a84541cb5387008eb496d87fff8238082beca55106d85940b84998292912",
+      "sha256": "79cb95f1a572ecddcc141a4836f1d413b6da936a167e15ba67d38f97631c31bb",
       "transform": null
     },
     "finance-pack.js": {
       "source": "public/finance-pack.js",
-      "sha256": "4989742154f6f2643ddbe7b28a4e4350c94fbc3145314f9806e120aa2290e95d",
+      "sha256": "85431fedfb2db9cf5aa40bc4998cd3e740c5d924078c09d1223de65707e07a95",
       "transform": null
     },
     "technician-credentials.js": {
@@ -200,5 +200,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "e84e9af64d488260bc76ad895fd61ad1b18580c885dda7166afff0f053d6e713"
+  "shellHash": "561ef7abf901f5d486a82cdb6161505b0fbdd244c2b5f5802c67f998283ec11b"
 }
