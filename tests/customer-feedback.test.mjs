@@ -15,7 +15,7 @@ test('multi technician membership, assignments, workload, numbering and category
  for(const id of techs)assert.ok(run('people/'+id).projects.some(x=>x.id===p.id));
  assert.throws(()=>run('projects/'+p.id+'/coordination','PUT',{version:updated.version,...updated.coordination,technicianIds:[techs[1]]}),/lead/);
  const create=()=>run('projects','POST',{requestId:crypto.randomUUID(),clientId:p.clientId,title:'Fictional new work',summary:'Synthetic',kind:'Assessment',requiredSkills:[],technicianId:techs[0],technicianIds:techs,fundingStatus:'unknown',payerId:null,fundingNotes:''});
- const a=create();run('people','POST',{requestId:crypto.randomUUID(),name:'Fictional Person',email:'',phone:'',allowDuplicate:true,roles:['Carer'],technician:null});const b=create();assert.equal(Number(b.reference.split('-').at(-1)),Number(a.reference.split('-').at(-1))+1);assert.match(a.reference,/^P-\d{4}-5703$/);
+ const a=create();run('people','POST',{requestId:crypto.randomUUID(),name:'Fictional Person',email:'',phone:'',allowDuplicate:true,roles:['Carer'],technician:null});const b=create();assert.equal(Number(b.reference.split('-').at(-1)),Number(a.reference.split('-').at(-1))+1);assert.equal(a.reference,'6000');
  const org=run('organisations').items[0];run('organisations/'+org.id+'/category','PUT',{requestId:crypto.randomUUID(),version:org.version,category:'School'});
  d=normalise(JSON.parse(JSON.stringify(d)));assert.equal(run('organisations/'+org.id).category,'School');assert.deepEqual(run('projects/'+p.id).coordination.technicianIds,techs);
 });

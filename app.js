@@ -126,7 +126,7 @@ async function register(view, kind) {
       if (kind === 'clients' || kind === 'people') { const identity = el('span', undefined, 'name-cell'); identity.append(avatar(nameOf(item)), text); control.append(identity); } else control.append(text); first.append(control); {const previewButton=button('Quick view',()=>choose(item),'text-button row-preview');previewButton.setAttribute('aria-label','Preview '+nameOf(item));first.append(previewButton);} row.append(first);
       if (kind === 'projects') { row.append(el('td', item.clientName)); const s = el('td'); s.append(projectStatus(item)); row.append(s, el('td', date(item.dueDate), 'optional-col')); }
       else if (kind === 'clients') row.append(el('td', String(item.projects.length)));
-      else if(kind==='organisations')row.append(el('td',item.role||'Not recorded'),el('td',item.category||'Not specified'),el('td',String(item.projects.length))); else row.append(el('td',item.role),el('td',String(item.projects.length)));
+      else if(kind==='organisations')row.append(el('td',item.roles?.join(', ')||item.role||'Not recorded'),el('td',item.category||'Not specified'),el('td',String(item.projects.length))); else row.append(el('td',item.role),el('td',String(item.projects.length)));
       row.addEventListener('click', event => { if (!event.target.closest('button,a')) {location.hash=typeOf(kind)+'/'+item.id;} }); tbody.append(row);
     }
     table.append(tbody); tableSlot.replaceChildren(visible.length ? table : empty('No matching records', 'Try another filter or clear your search.'));
@@ -318,7 +318,7 @@ async function entity(view, type, id) {
   const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
   info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]) : el('p', item.description, 'record-summary'));
   if (item.clientId) {const linkedClient=await api('clients/'+item.clientId);clientContactSummary(info,linkedClient);info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));}
-  if(type==='organisation'){info.append(details([['Type',item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded'],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]),link('Edit organisation','edit-organisation/'+id,'button secondary'));}
+  if(type==='organisation'){info.append(details([['Roles',item.roles?.join(', ')||item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded'],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]),link('Edit organisation','edit-organisation/'+id,'button secondary'));}
   left.append(info);
   if(type==='person')await renderProfileDetails(left,item);
   if (item.technician) {await renderTechnicianLocation(left,id);try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}

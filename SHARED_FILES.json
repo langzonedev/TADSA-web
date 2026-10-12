@@ -1,7 +1,12 @@
 {
-  "sourceRevision": "4194575ab18a72692512c5efbc28e9b2c125c85c",
+  "sourceRevision": "1a10c52bed2a39be9d557996f9dd6b69e2a189dc",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
+    "organisation-model.js": {
+      "source": "public/organisation-model.js",
+      "sha256": "23d6d931275c493f0a05eb0958a0ad77cbbf84fd80e3af75b42c277bb17338b4",
+      "transform": null
+    },
     "address-lookup.js": {
       "source": "public/address-lookup.js",
       "sha256": "fd03c0228fa900f589ec9a8f6bf54ae12a023b2e90fcfe9f2b7e6201f95f9307",
@@ -84,7 +89,7 @@
     },
     "finance-pack.js": {
       "source": "public/finance-pack.js",
-      "sha256": "85431fedfb2db9cf5aa40bc4998cd3e740c5d924078c09d1223de65707e07a95",
+      "sha256": "4c557cb147ab8c744ffe2fb8120db10fad7a21fe0d39d4efe626022264e4ea8e",
       "transform": null
     },
     "technician-credentials.js": {
@@ -104,7 +109,7 @@
     },
     "report-model.js": {
       "source": "public/report-model.js",
-      "sha256": "56535d0ea01fd517f502dd82fcc5d420f6e02bb9231b82ed5ee5a401519ed0c7",
+      "sha256": "3f7d7e0c3a907e7fa4b71fdec2772bf7b21fff572353c2931168b3be0f3c1287",
       "transform": null
     },
     "report-builder.js": {
@@ -119,7 +124,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "b1d909d9908c5a76d5821f37ea470ed8d07662401ac6bb493d78b3b8779776ca",
+      "sha256": "f0caa70fb4a9691e01b0fbaba469eb8b934f81bc4faef1787af76717d3cf1452",
       "transform": null
     },
     "settings.js": {
@@ -134,7 +139,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "7d4f29292d02f85c3d35570865a03f924bbd0d543de259295b7a5e43b55fe311",
+      "sha256": "39ad3ae6d62170800195cd42700091dc523d370d59caa456203382388b903d9f",
       "transform": null
     },
     "operations.js": {
@@ -200,5 +205,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "561ef7abf901f5d486a82cdb6161505b0fbdd244c2b5f5802c67f998283ec11b"
+  "shellHash": "e15854f246895b160cda23f297c7781cf6e76e985c447c42062b412249ccd83f"
 }

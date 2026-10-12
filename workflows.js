@@ -1,3 +1,4 @@
+import {organisationRoleSuggestions} from './organisation-model.js';
 import {reconcileContactDraft} from './contact-draft.js';
 import {renderTravelComparison} from './address-lookup.js';
 import {reviewDay} from './project-details-model.js';
@@ -274,25 +275,18 @@ async function personProfile(view, id) {
   const key = id ? 'person/' + id : 'new-person';
   const d = getDraft(key, { name:person?.name ?? '', email:person?.email ?? '', phone:person?.phone ?? '', roles:person?.roles ?? [], skills:person?.technician?.skills ?? [], availability:person?.technician?.availability ?? 'unavailable', version:person?.version, allowDuplicate:false });
   if(person)reconcileContactDraft(d,person);
-  title(view, id ? 'Edit person' : 'New person', 'Choose one profile type. A technician may also be an administrator; other types use separate profiles.');
+  title(view, id ? 'Edit person' : 'New person', 'Record each person once and select all of their directory roles.');
   view.append(link('← Back to people', 'people', 'breadcrumb'));
   const box = panel('Person details'), form = el('form', null, 'form-grid');
   field(form,'Full name',d,'name',{required:true}); field(form,'Phone number',d,'phone',{type:'tel',max:40}); field(form,'Email address',d,'email',{type:'email',max:200});
-  const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Profile type'),el('p','Choose one type. Client and occupational therapist records stay separate from technician profiles.','field-help'));
+  const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Directory roles'),el('p','Select all roles that apply. These roles do not grant account access.','field-help'));
   const tech = el('fieldset'); tech.append(el('legend','Technician details'),el('p','Record skills and general allocation status. Dated calendar availability is recorded separately and does not change this status. These details do not establish clearance or permission to start work.','field-help'));
   const skills = el('div',null,'skill-options');
   for (const skill of catalogue.skills) check(skills,skill,d.skills.includes(skill),on=>{d.skills=on?[...d.skills,skill]:d.skills.filter(s=>s!==skill);touch(d);});
   tech.append(el('span','Skills','field-label'),skills);
   selectField(tech,'General allocation status',d,'availability',catalogue.availability.map(v=>[v,v==='unavailable'?'Not available / not confirmed':v==='limited'?'Limited availability':'Available']));
-  const compatible=d.roles.length===1||(d.roles.length===2&&d.roles.includes('Technician')&&d.roles.includes('Administrator'));
-  d.profileType??=compatible?(d.roles.includes('Technician')?'Technician':d.roles[0]):'';
-  if(!compatible&&d.roles.length)roles.append(note('This existing profile combines '+d.roles.join(', ')+'. Select its correct type before saving. Linked projects and history remain recorded; reassign current technician work before removing that role.',true));
-  const typePicker=selectField(roles,'Profile type',d,'profileType',[['','Choose a profile type'],...catalogue.roles.map(r=>[r,r])]);typePicker.required=true;
-  if(person&&!person.clientId)roles.append(el('p','Choosing Client creates the linked client record for this person. Reassign technician work before changing their profile type.','field-help'));
-  if(person?.clientId){for(const option of typePicker.options)if(option.value&&option.value!=='Client')option.disabled=true;roles.append(el('p','This profile has a linked client record. Retain Client here; create a separate profile for another type.','field-help'));}
-  const alsoAdmin=el('div');const adminCheck=check(alsoAdmin,'Also an administrator',d.roles.includes('Administrator')&&d.roles.includes('Technician'),on=>{d.roles=on?['Technician','Administrator']:['Technician'];touch(d);});roles.append(alsoAdmin);
-  const chooseType=()=>{d.roles=d.profileType==='Technician'?(adminCheck.checked?['Technician','Administrator']:['Technician']):d.profileType?[d.profileType]:[];tech.hidden=d.profileType!=='Technician';alsoAdmin.hidden=d.profileType!=='Technician';touch(d);};
-  typePicker.addEventListener('change',chooseType);alsoAdmin.hidden=d.profileType!=='Technician';
+  for(const role of catalogue.roles){const input=check(roles,role,d.roles.includes(role),on=>{d.roles=on?[...d.roles,role]:d.roles.filter(r=>r!==role);tech.hidden=!d.roles.includes('Technician');touch(d);});if(role==='Client'&&person?.clientId){input.disabled=true;input.dataset.keepDisabled='true';}}
+  if(person?.clientId)roles.append(el('p','The linked client role is retained. Other roles can be recorded on this same person.','field-help'));
   tech.hidden=!d.roles.includes('Technician');
   form.append(roles,tech,el('p','Administrator is a recorded role only. It does not create a login or grant access to this application.','field-help'));
   const notice=el('div'), actions=el('div',null,'actions'), submit=saveButton(id?'Save profile':'Save person');
@@ -318,19 +312,22 @@ async function personProfile(view, id) {
 
 async function organisationCategory(view,id){
  const item=id?await request('organisations/'+id):null,directory=await request('organisations'),key=id?'edit-organisation/'+id:'new-organisation',d=getDraft(key,{name:item?.name||'',role:item?.role||'',description:item?.description||'',category:item?.category||'',email:item?.email||'',directoryStatus:item?.directoryStatus??'current',...(id?{version:item.version}:{})});
- d.directoryStatus??=item?.directoryStatus??'current';
+ d.directoryStatus??=item?.directoryStatus??'current';d.roles??=item?.roles?.length?[...item.roles]:d.role?[d.role]:[];d.allowDuplicate??=false;
  title(view,id?'Edit organisation':'New organisation',id?item.name:'Record an organisation once, then link it to projects as needed.');view.append(link(id?'Back to organisation':'Back to organisations',id?'organisation/'+id:'organisations','breadcrumb'));
  const box=panel('Organisation details'),form=el('form',null,'form-grid');
  field(form,'Organisation name',d,'name',{required:true,max:200});
  const suggest=(label,key,values,help)=>{const input=field(form,label,d,key,{required:key==='role',max:key==='role'?120:80,help});const list=el('datalist');list.id='organisation-'+key+'-options';for(const value of [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'en-AU'))){const option=el('option');option.value=value;list.append(option);}input.setAttribute('list',list.id);form.append(list);};
  selectField(form,'Directory status',d,'directoryStatus',[['current','Current'],['inactive','Inactive'],['review','Needs review']]);
  form.append(el('p','Inactive organisations remain available in history and can be made current again. Needs review flags a record for checking; it does not merge or delete it.','field-help'));
- suggest('Organisation type','role',['Funder','Allied-health organisation',...directory.items.map(o=>o.role)],'Choose a suggestion or enter the organisation type used by your team.');
+ const roleBox=el('fieldset');roleBox.append(el('legend','Organisation roles'));
+ for(const role of [...new Set([...organisationRoleSuggestions,...directory.items.flatMap(o=>o.roles??[o.role]),...d.roles].filter(Boolean))])check(roleBox,role,d.roles.includes(role),on=>{d.roles=on?[...d.roles,role]:d.roles.filter(r=>r!==role);d.role=d.roles[0]??'';touch(d);});form.append(roleBox);
+ const custom=el('input');custom.maxLength=120;custom.setAttribute('aria-label','Additional organisation role');const customLabel=el('label','Additional organisation role');customLabel.append(custom);form.append(customLabel,button('Add role',()=>{const role=custom.value.trim();if(role&&!d.roles.some(r=>r.toLowerCase()===role.toLowerCase())){d.roles.push(role);d.role=d.roles[0];check(roleBox,role,true,on=>{d.roles=on?[...d.roles,role]:d.roles.filter(r=>r!==role);d.role=d.roles[0]??'';touch(d);});touch(d);}custom.value='';}));
  field(form,'Description',d,'description',{type:'textarea',max:2000});
  suggest('Category','category',['School','NDIS','Health service','Government','Community organisation','Supplier','Other',...directory.items.map(o=>o.category)],'Optional grouping, such as School or NDIS. Organisation type describes its role; category helps your team organise records.');
  field(form,'Organisation email',d,'email',{type:'email',max:254,help:'The organisation contact address, used in reports.'});
  const notice=el('div'),actions=el('div',null,'actions'),submit=saveButton(id?'Save organisation details':'Create organisation');actions.append(submit,cancel(form,d,key,id?'organisation/'+id:'organisations'));form.append(notice,actions);box.append(form);view.append(box);
  if(id&&d.version!==item.version){notice.append(note('This organisation changed. Compare the latest saved details before retaining your draft.',true));const latest=el('dl',null,'record-details');for(const [label,k] of [['Name','name'],['Type','role'],['Description','description'],['Category','category'],['Email','email'],['Directory status','directoryStatus']])latest.append(el('dt',label),el('dd',item[k]||'Not recorded'));notice.append(latest,button('Use latest version with my draft',()=>{d.version=item.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review all organisation details, then save.'));}));}
- form.addEventListener('submit',e=>{e.preventDefault();if(!valid(form))return;const payload={requestId:d.requestId,...(id?{version:d.version}:{}),...Object.fromEntries(['name','role','description','category','email','directoryStatus'].map(k=>[k,d[k].trim()]))};save(form,d,notice,submit,id?'organisations/'+id+'/profile':'organisations',id?'PUT':'POST',payload,result=>{drafts.delete(key);host.announce(id?'Organisation details saved.':'Organisation created.');location.hash='organisation/'+result.id;});});
+ form.addEventListener('submit',e=>{e.preventDefault();if(!valid(form))return;if(!d.roles.length){notice.replaceChildren(note('Choose at least one organisation role.',true));return;}const payload={requestId:d.requestId,...(id?{version:d.version}:{}),...Object.fromEntries(['name','description','category','email','directoryStatus'].map(k=>[k,d[k].trim()])),role:d.roles[0],roles:d.roles,allowDuplicate:d.allowDuplicate};save(form,d,notice,submit,id?'organisations/'+id+'/profile':'organisations',id?'PUT':'POST',payload,result=>{drafts.delete(key);host.announce(id?'Organisation details saved.':'Organisation created.');location.hash='organisation/'+result.id;},candidates=>{notice.append(el('h2','Please check these existing organisations'));for(const c of candidates)notice.append(link(c.name+' — open existing record','organisation/'+c.id,'duplicate-result'));notice.append(button('This is a different organisation — save anyway',()=>{d.allowDuplicate=true;d.requestId=crypto.randomUUID();form.requestSubmit();}));});});
+ form.addEventListener('input',e=>{if(e.target.name==='name'||e.target.name==='email')d.allowDuplicate=false;});
  if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';notice.append(note('A previous save could not be confirmed. Retry it before changing these details.'));}
 }

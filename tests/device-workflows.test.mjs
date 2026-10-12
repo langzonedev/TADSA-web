@@ -16,12 +16,12 @@ test('client intake always reads contact identity from the linked person after p
  assert.equal(client.details.email,'updated@example.invalid');assert.equal(client.details.residentialAddress,'1 Fictional Street');
 });
 
-test('opening day and project year follow Adelaide midnight, retaining legacy date fallback',t=>{
+test('opening day follows Adelaide midnight with global project references, retaining legacy date fallback',t=>{
  t.mock.timers.enable({apis:['Date'],now:new Date('2026-12-31T13:30:00Z')});
  const d=normalise(seed({enriched:false})),legacy=d.projects[0],legacyDate=legacy.openedAt;
  assert.equal(dispatch(d,'projects/'+legacy.id).openedAt,legacyDate);
  const p=dispatch(d,'projects','POST',{requestId:req(),clientId:d.clients[0].id,title:'Synthetic New Year enquiry',summary:'Date boundary',kind:'Assessment',requiredSkills:[],technicianId:null,fundingStatus:'unknown',payerId:null,fundingNotes:''});
- assert.equal(p.openedAt,'2027-01-01');assert.match(p.reference,/^P-2027-/);
+ assert.equal(p.openedAt,'2027-01-01');assert.equal(p.reference,'6000');
  const creation=d.audit.find(e=>e.projectId===p.id&&e.action==='Project created');
  creation.at='2026-06-30T14:29:59Z';assert.equal(dispatch(d,'projects/'+p.id).openedAt,'2026-06-30');
  creation.at='2026-06-30T14:30:00Z';assert.equal(dispatch(d,'projects/'+p.id).openedAt,'2026-07-01');
