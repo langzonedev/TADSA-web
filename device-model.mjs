@@ -3,6 +3,7 @@ import {RESIDENTIAL_FIELDS,CLIENT_GEOCODE_FIELDS,residentialFields,clientGeocode
 import {createLifecycle} from './lifecycle-model.js';
 import {createProjectDetails,validateReviewDate,projectNeedsReview} from './project-details-model.js';
 import {invoiceDetails} from './device-business.mjs';
+import {deviceDirectoryQuery} from './device-directory-queries.mjs';
 // Fictional, device-local workflow model. No server, identity or payment integration.
 export const roles=['Client','Technician','Occupational therapist','Administrator','Carer','Referrer','Allied-health contact','Funder'];
 export const skills=['Assessment','Electronics','Metalwork','Sewing','Woodworking'];
@@ -27,6 +28,7 @@ export function normalise(data){
  return data;
 }
 export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(),actorContext=null){
+ const directoryResult=deviceDirectoryQuery(d,path,method,query,actorContext);if(directoryResult!==undefined)return directoryResult;
  const parts=path.replace(/^\/+|\/+$/g,'').split('/'),[kind,id,sub,subid,action]=parts;
  if(kind==='people'&&sub==='credentials'&&actorContext&&actorContext.role!=='administrator'&&!actorContext.manageSensitiveDetails)fail('Sensitive technician details permission is required.',403);
  const find=(table,key)=>d[table].find(x=>x.id===key)??fail('Record not found.',404);

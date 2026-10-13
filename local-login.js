@@ -1,4 +1,5 @@
 import {node,accountRequest,passwordChange} from './accounts.js';
+import {requestInlineConfirmation} from './inline-confirmation.js';
 export let sessionEnded=false;
 
 export function lockWorkspace(){document.documentElement.dataset.authState='locked';window.dispatchEvent(new Event('tadsa-auth-locked'));for(const selector of ['.app-shell','.mobile-navigation']){const element=document.querySelector(selector);if(element){element.inert=true;element.hidden=true;}}document.body.classList.remove('drawer-open');}
@@ -15,7 +16,7 @@ export async function requireLocalSession(container,refresh,isCurrent=()=>true,h
  const demo=status.mode==='device-demo';
  if(status.authenticated){
   const bar=node('div',undefined,'session-controls');bar.id='local-session';const name=node('a',(demo?'Demo: ':'')+(status.user.displayName||status.user.username));name.href='#accounts';bar.append(name);
-  const signout=node('button','Sign out','primary');signout.type='button';signout.id='local-signout';signout.onclick=async()=>{if(hasDrafts()&&!confirm('Sign out and discard unsaved changes?'))return;signout.disabled=true;try{await accountRequest('auth/logout',{});sessionEnded=true;lockWorkspace();container.replaceChildren();location.reload();}catch{signout.disabled=false;signout.textContent='Retry sign out';}};bar.append(signout);document.querySelector('#sidebar-session').append(bar);
+  const signout=node('button','Sign out','primary');signout.type='button';signout.id='local-signout';signout.onclick=async()=>{if(signout.disabled||!isCurrent()||!signout.isConnected)return;signout.disabled=true;try{if(hasDrafts()&&!await requestInlineConfirmation(signout,{title:'Sign out?',message:'Sign out and discard unsaved changes?',confirmLabel:'Sign out and discard changes',isCurrent:()=>isCurrent()&&signout.isConnected})){if(isCurrent()&&signout.isConnected)signout.disabled=false;signout.focus({preventScroll:true});return;}if(!isCurrent()||!signout.isConnected)return;await accountRequest('auth/logout',{});sessionEnded=true;lockWorkspace();container.replaceChildren();location.reload();}catch{if(isCurrent()&&signout.isConnected){signout.disabled=false;signout.textContent='Retry sign out';}}};bar.append(signout);document.querySelector('#sidebar-session').append(bar);
   if(status.user.mustChangePassword&&!demo){const change=node('div');change.append(node('h2','Set your own password'));passwordChange(change,()=>{sessionEnded=true;location.reload();});change.append(signout);mountGate(change,{forced:true});return false;}unlockWorkspace();return true;
  }
  const form=node('form',undefined,'panel workflow-panel form-grid');form.append(node('h1',demo?'Explore the TADSA demonstration':'Sign in to TADSA'));
