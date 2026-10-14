@@ -2,6 +2,7 @@ import {RESIDENTIAL_FIELDS,AUSTRALIAN_STATES,residentialAddressText} from './cli
 import {attachAddressLookup} from './address-lookup.js';
 import {reconcileContactDraft} from './contact-draft.js';
 import {fieldLabel,formatValue} from './record-values.js';
+import {requestInlineConfirmation} from './inline-confirmation.js';
 const drafts=new Map();
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 export const clientDetailsHasDrafts=()=>[...drafts.values()].some(d=>d.dirty||d.pending);
@@ -46,8 +47,17 @@ export async function renderClientDetails(view,id,host) {
   const repToggle=()=>{rep.disabled=d.preferredContact!=='representative';rep.required=!rep.disabled;};repToggle();preferred.addEventListener('change',repToggle);
   field('contactNeeds','Contact needs or preferences',1000,'textarea');form.append(status);
   if(d.version!==current.version){status.append(el('p','Saved details changed. Your draft is retained. Compare current values before retrying.'));const latest=el('dl');latest.className='review-list';const resolve=value=>client.contacts.find(c=>c.personId===value)?.name??value;for(const key of ['name','email','phone','residentialAddress','workAddress','sameAsResidential','preferredContact','representativePersonId','contactNeeds',...RESIDENTIAL_FIELDS]){const saved=['name','email','phone'].includes(key)?client.person[key]:current[key];if(JSON.stringify(saved)===JSON.stringify(d[key]))continue;latest.append(el('dt',fieldLabel(key)),el('dd',`Latest saved: ${formatValue(saved,key,resolve)}. Your draft: ${formatValue(d[key],key,resolve)}.`));}status.append(latest);const accept=el('button','Use latest version with my reviewed draft');accept.type='button';accept.onclick=()=>{d.version=current.version;status.replaceChildren(el('p','Latest version acknowledged. Review and save.'));};status.append(accept);}
-  const save=el('button','Save client details');save.type='submit';const cancel=el('button','Discard changes');cancel.type='button';cancel.onclick=()=>{if(d.pending)return;if(d.dirty&&!window.confirm('Discard unsaved client details?'))return;drafts.delete(id);location.hash='client/'+id;};form.append(save,cancel);view.append(form);
-  form.addEventListener('submit',async event=>{event.preventDefault();if(d.pending)return;d.pending=true;host.setSaving?.(true);const disabled=[...form.elements].map(n=>[n,n.disabled]);for(const[n]of disabled)n.disabled=true;status.replaceChildren(el('p','Saving…'));
+  let discarding=false;
+  const save=el('button','Save client details');save.type='submit';const cancel=el('button','Discard changes');cancel.type='button';cancel.onclick=async()=>{
+    if(discarding||d.pending||host.isSaving?.()||!form.isConnected||drafts.get(id)!==d)return;
+    if(d.dirty){discarding=true;const before=JSON.stringify(d),disabled=[...form.elements].map(n=>[n,n.disabled]),current=()=>form.isConnected&&drafts.get(id)===d&&!d.pending&&!host.isSaving?.()&&JSON.stringify(d)===before;for(const[n]of disabled)n.disabled=true;let confirmed=false;
+      try{confirmed=await requestInlineConfirmation(cancel,{title:'Discard client details?',message:'Discard unsaved client details? Saved contact and address details will stay unchanged.',confirmLabel:'Discard changes',isCurrent:current});}
+      finally{discarding=false;if(form.isConnected&&drafts.get(id)===d&&!d.pending&&!host.isSaving?.()){for(const[n,state]of disabled)n.disabled=state;cancel.focus({preventScroll:true});}}
+      if(!confirmed||!current())return;
+    }
+    drafts.delete(id);location.hash='client/'+id;
+  };form.append(save,cancel);view.append(form);
+  form.addEventListener('submit',async event=>{event.preventDefault();if(d.pending||discarding)return;d.pending=true;host.setSaving?.(true);const disabled=[...form.elements].map(n=>[n,n.disabled]);for(const[n]of disabled)n.disabled=true;status.replaceChildren(el('p','Saving…'));
     const body=Object.fromEntries(['version','name','email','phone','residentialAddress','workAddress','sameAsResidential','preferredContact','representativePersonId','contactNeeds',...RESIDENTIAL_FIELDS].map(k=>[k,d[k]]));if(d.preferredContact==='client')body.representativePersonId=null;
     body.residentialGeocode=d.residentialGeocode??null;if(!d.sameAsResidential)body.workGeocode=d.workGeocode??null;
     try{await host.request(`clients/${id}/details`,'PUT',body);drafts.delete(id);host.announce?.('Client details saved.');location.hash='client/'+id;}

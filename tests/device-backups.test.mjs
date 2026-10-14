@@ -20,7 +20,21 @@ const call=(db,path,input,method='POST')=>handleDeviceBackups(db,path,method,inp
 const req=()=>({requestId:crypto.randomUUID()});
 const bytes=x=>JSON.stringify([...x.entries()]);
 const protectedState=db=>bytes(new Map([...db.values].filter(([key])=>key==='data'||key==='generation'||key==='accounts'||key.startsWith('backup:')||key.startsWith('backup-meta:'))));
+const historicalContext=()=>({format:'tadsa-project-historical-context-v1',sourceStatus:'Closed',reviewDate:'2004-02-01',coordinator:'Synthetic coordinator',costEstimate:120,costEstimateDate:null,work:[{sourceKey:'s_'+'a'.repeat(64),reference:'SYNTHETIC-TP',type:'TP',status:'Closed',hours:12,linkBasis:'reference-number',linkConfidence:'reviewed-design'}],historicalOnly:true,approvalsVerified:false,paymentsVerified:false});
 async function prepare(){const db=new Database(),backup=await call(db,'backups',req()),preview=await call(db,'backups/'+backup.id+'/restore-preview',req());return {db,backup,preview,path:'backups/restore/'+preview.previewId+'/discard'};}
+
+test('native backup import, preview and activation preserve optional history while rejecting raw payload and forged approval without writes',async()=>{
+ const db=new Database(),data=structuredClone(db.values.get('data')),context=historicalContext();data.projects[0].historicalContext=context;
+ const imported=await call(db,'backups/import',{...req(),name:'Synthetic-history.json',data});
+ const preview=await call(db,'backups/'+imported.id+'/restore-preview',req());
+ assert.deepEqual(db.values.get('backup-preview:'+preview.previewId).candidate.projects[0].historicalContext,context);
+ await call(db,'backups/restore/'+preview.previewId+'/activate',{...req(),confirm:true});assert.deepEqual(db.values.get('data').projects[0].historicalContext,context);
+ const before=protectedState(db);
+ for(const mutate of [c=>{c.approvalsVerified=true;},c=>{c.paymentsVerified=true;},c=>{c.rawRecord={Secret:'Synthetic forbidden archive'};},c=>{c.work[0].rawRecord={};}]){
+  const bad=structuredClone(data);mutate(bad.projects[0].historicalContext);
+  await assert.rejects(call(db,'backups/import',{...req(),name:'Invalid-history.json',data:bad}),e=>e.status===422&&/historical project context/.test(e.message));assert.equal(protectedState(db),before);
+ }
+});
 test('device discard deletes only exact preview; same UUID replay survives deletion and changed action/input reuse fails',async()=>{
  const {db,preview,path}=await prepare(),other='backup-preview:'+crypto.randomUUID();db.values.set(other,{marker:'Other preview'});const before=protectedState(db),input=req(),result=await call(db,path,input);assert.deepEqual(result,{discarded:true});assert.equal(db.values.has('backup-preview:'+preview.previewId),false);assert.deepEqual(db.values.get(other),{marker:'Other preview'});assert.equal(protectedState(db),before);assert.deepEqual(db.commits.at(-1).map(([action,key])=>[action,key]),[['delete','backup-preview:'+preview.previewId],['put','backup-receipt:'+input.requestId]]);assert.deepEqual(await call(db,path,input),result);await assert.rejects(call(db,'backups',input),e=>e.status===409);await assert.rejects(call(db,path,{...input,confirm:true}),e=>e.status===422);assert.equal(protectedState(db),before);
 });

@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "ab43afecbbc27103b9b5340bf149421ccd994552",
+  "sourceRevision": "fa6561b57394921f7f7ef7747cd55cabb651c076",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "inline-confirmation.js": {
@@ -82,6 +82,16 @@
       "sha256": "9ef030795a82d84cd5d4a13158bf11fd8f33d0bc9e6b123963988fcf4bd5fb49",
       "transform": null
     },
+    "project-history.js": {
+      "source": "public/project-history.js",
+      "sha256": "7bc42a317e4c5d53d6aa33e09df79b400cc18d6e5ede43afac186da8712d89e9",
+      "transform": null
+    },
+    "project-history-model.js": {
+      "source": "public/project-history-model.js",
+      "sha256": "7eac36fd37bfc145a28c73a35a47be62ce35ba56c24a46e08036601d3c1557f9",
+      "transform": null
+    },
     "lifecycle-model.js": {
       "source": "public/lifecycle-model.js",
       "sha256": "f4514931c5f4681b5ceb9d4cf1e67de07294ec75290719001bbd13a3dbfbe263",
@@ -134,7 +144,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "d790c5d75a31b1727173559f413e3ff352dd848c909a9f37f9d210c5c8476d00",
+      "sha256": "b96a77a851155daf0f7a033ca5d263f0e7c2d74c1ccdc0a9522e0f433c0b7858",
       "transform": null
     },
     "settings.js": {
@@ -149,7 +159,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "3836e24266f30d9c9e31af44924a3f9c701f77468d96a765643a75339e295b9c",
+      "sha256": "16787943487628669535d467a257bae3e8041351110e50c4099844d532361ef3",
       "transform": null
     },
     "operations.js": {
@@ -159,7 +169,7 @@
     },
     "client-details.js": {
       "source": "public/client-details.js",
-      "sha256": "cffc7475c45138dad13991c99ae40e28448de61cddc5fe8e3f58b78810e9d47b",
+      "sha256": "545e888e595f55604d926a48f2a616c79b0b283e020d8d87a3836a4accd4ad26",
       "transform": null
     },
     "local-login.js": {
@@ -215,5 +225,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "563f53bdd564f718b77470552893695ede00f89ff748444ea4cd8b3910b4abfb"
+  "shellHash": "3fd2525a2a1c227470b2065d9b2daa5a9233d086b2eb8cd2c6edfd20538cb64c"
 }

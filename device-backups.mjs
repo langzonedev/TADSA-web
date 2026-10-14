@@ -8,6 +8,7 @@ import {validateProjectDetailsBackup} from './device-project-details.mjs';
 import {validateInvoiceReferencesBackup} from './device-invoice-references.mjs';
 import {normalise,fail,operationDefaults} from './device-model.mjs';
 import {validateDeviceFile} from './device-files.mjs';
+import {validateProjectHistoricalContext} from './project-history-model.js';
 const STORE='workspace',MAX_BYTES=256*1024*1024,FORMAT='tadsa-device-backup';
 const clone=x=>structuredClone(x);
 const canonical=x=>JSON.stringify(x,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
@@ -62,6 +63,9 @@ export async function validateBackup(input){
  for(const a of raw.audit){if(!object(a))invalid('invalid audit event.');ref('projects',a.projectId,'Audit event');}
  if(raw.contacts!==undefined&&!Array.isArray(raw.contacts))invalid('contacts must be a list.');for(const c of raw.contacts??[]){ref('clients',c.clientId,'Contact');ref('people',c.personId,'Contact');if(c.relationshipLabel!==undefined&&(typeof c.relationshipLabel!=='string'||c.relationshipLabel.trim().length>120||/[\u0000-\u001f\u007f]/.test(c.relationshipLabel)))invalid('invalid contact relationship description.');}
  for(const key of ['operations','calendars','workPlans','attachments','clientNdis','credentials','lifecycles','replays'])if(raw[key]!==undefined&&!object(raw[key]))invalid(key+' must be an object.');
+ for(const project of raw.projects)if(Object.hasOwn(project,'historicalContext')){
+  try{validateProjectHistoricalContext(project.historicalContext);}catch{invalid('invalid historical project context.');}
+ }
  validateProfileDetailsBackup(raw);
  validateProjectDetailsBackup(raw);
  validateInvoiceReferencesBackup(raw);
