@@ -55,3 +55,31 @@ test('historical unmarked activated-copy ambiguity permits copy-only cleanup, ne
 test('concurrent same UUID discard requests converge to one exact deletion/receipt and do not affect another preview',async()=>{
  const {db,preview,path}=await prepare(),input=req(),before=protectedState(db),commits=db.commits.length;const results=await Promise.all([call(db,path,input),call(db,path,input)]);assert.deepEqual(results,[{discarded:true},{discarded:true}]);assert.equal(db.values.has('backup-preview:'+preview.previewId),false);assert.equal(protectedState(db),before);assert.equal(db.commits.slice(commits).flat().filter(([action,key])=>action==='delete'&&key==='backup-preview:'+preview.previewId).length,1);await assert.rejects(call(db,path,req()),e=>e.status===404);
 });
+test('independent consolidated history: unresolved parties roundtrip through native backup without typed links or authority; malformed projections cannot write',async()=>{
+ const db=new Database(),data=structuredClone(db.values.get('data')),context=historicalContext();
+ context.pendingParties=[{role:'Funder',label:'Synthetic unresolved organisation or person',reason:'person-or-organisation-unconfirmed',linkBasis:'exact-source-reference'}];
+ data.projects[0].historicalContext=context;
+ const relationships=structuredClone(data.relationships);
+ const imported=await call(db,'backups/import',{...req(),name:'Synthetic-pending-history.json',data});
+ const preview=await call(db,'backups/'+imported.id+'/restore-preview',req());
+ await call(db,'backups/restore/'+preview.previewId+'/activate',{...req(),confirm:true});
+ assert.deepEqual(db.values.get('data').projects[0].historicalContext,context);
+ assert.deepEqual(db.values.get('data').relationships,relationships);
+ const generated=await call(db,'backups',req()),download=await handleDeviceBackups(db,'backups/'+generated.id+'/download','GET');
+ const exported=JSON.parse(new TextDecoder().decode(download.bytes));
+ assert.deepEqual(exported.data.projects[0].historicalContext,context);
+ assert.equal(exported.data.projects[0].historicalContext.approvalsVerified,false);
+ assert.equal(exported.data.projects[0].historicalContext.paymentsVerified,false);
+ const before=protectedState(db),commits=db.commits.length;
+ for(const mutate of [
+  c=>{c.pendingParties[0].personId='person-1000';},
+  c=>{c.pendingParties[0].linkBasis='guessed';},
+  c=>{c.pendingParties[0].role='Invoice payer';},
+  c=>{c.pendingParties.push({...c.pendingParties[0]});},
+  c=>{c.pendingParties[0].label='x'.repeat(242);}
+ ]){
+  const bad=structuredClone(data);mutate(bad.projects[0].historicalContext);
+  await assert.rejects(call(db,'backups/import',{...req(),name:'Invalid-pending-history.json',data:bad}),e=>e.status===422&&/historical project context/.test(e.message));
+  assert.equal(protectedState(db),before);assert.equal(db.commits.length,commits);
+ }
+});

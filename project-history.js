@@ -29,6 +29,12 @@ export function renderProjectHistory(parent,project,options={}){
     work.append(item);
   }
   panel.append(work,node('p','Source work types and statuses are shown as recorded. Earlier approvals and receipts do not authorise new work. Files held separately, including SharePoint documents, are not included by this database import.','field-help'));
+  if(history.pendingParties?.length){
+    const parties=node('section',null,'project-historical-parties');
+    parties.append(node('h3','Historical relationships awaiting classification'),node('p','These exact source references are retained as history. Confirm the person or organisation before selecting them for new work or as an invoice payer.','field-help'));
+    for(const party of history.pendingParties)facts(parties,[[party.role,party.label??'Source name needs review'],['Review needed',party.reason==='organisation-conversion-required'?'Organisation destination needs review':'Person or organisation classification needed']]);
+    panel.append(parties);
+  }
   const actions=node('div',null,'actions');
   if(typeof project.clientId==='string'&&/^client-\d+$/.test(project.clientId))actions.append(link('New project for this client','new-project/'+project.clientId));
   if(typeof options.openWorkflow==='function')actions.append(action('Review continuation workflow',options.openWorkflow));
