@@ -1,3 +1,4 @@
+import {deviceTechnicianLocation} from './device-model.mjs';
 import {preserveGeocode} from './location-geocode.js';
 import {buildManagementReport} from './management-report.js';
 import {installModelExtensions,dispatch,fail} from './device-model.mjs';
@@ -15,7 +16,7 @@ installModelExtensions(ctx=>{
  }
  if(kind==='business-settings'){if(method==='GET')return structuredClone(businessSettings(d));if(method==='PUT')return updateBusiness(d,input,ctx);}
  if(kind==='availability'&&sub==='location'&&method==='PUT'){
-  const person=find('people',id);if(!person.roles.includes('Technician'))fail('Select a technician.');const calendar=d.calendars[id]??{personId:id,version:0,serviceAreas:[],entries:[]};if(calendar.version!==input.version)fail('This calendar changed.',409,{code:'VERSION_CONFLICT'});const next={baseAddress:str(input.baseAddress,500),suburb:str(input.suburb,120),postcode:str(input.postcode,4)};if(next.postcode&&!/^\d{4}$/.test(next.postcode))fail('Postcode must contain four digits or be blank.');next.geocode=preserveGeocode(input.geocode,calendar.geocode,[next.baseAddress,next.suburb,next.postcode]);if(Object.keys(next).some(k=>JSON.stringify(calendar[k]??(k==='geocode'?null:''))!==JSON.stringify(next[k]))){Object.assign(calendar,next);calendar.version++;event('people',id,'Technician base location updated',next);}d.calendars[id]=calendar;return calendar;
+  const person=find('people',id);if(!person.roles.includes('Technician'))fail('Select a technician.');const calendar=d.calendars[id]??{personId:id,version:0,serviceAreas:[],entries:[]};if(calendar.version!==input.version)fail('This calendar changed.',409,{code:'VERSION_CONFLICT'});const next={baseAddress:str(input.baseAddress,500),suburb:str(input.suburb,120),postcode:str(input.postcode,4)};if(next.postcode&&!/^\d{4}$/.test(next.postcode))fail('Postcode must contain four digits or be blank.');next.geocode=preserveGeocode(input.geocode,calendar.geocode,[next.baseAddress,next.suburb,next.postcode]);if(!calendar.locationRecorded||Object.keys(next).some(k=>JSON.stringify(calendar[k]??(k==='geocode'?null:''))!==JSON.stringify(next[k]))){Object.assign(calendar,next,{locationRecorded:true});calendar.version++;event('people',id,'Technician base location updated',next);}d.calendars[id]=calendar;return {...calendar,...deviceTechnicianLocation(d,id,calendar)};
  }
  if(kind==='projects'&&sub==='location'){
   const p=find('projects',id);if(method==='GET')return location(d,p,project);

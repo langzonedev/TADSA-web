@@ -36,7 +36,7 @@ export async function renderAvailability(view,personId,isCurrent=()=>true){
   board.replaceChildren();board.removeAttribute('aria-busy');
   const formattedDays=new Map(),dateFormatter=new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric'});const format=day=>{if(!formattedDays.has(day))formattedDays.set(day,dateFormatter.format(dateOf(day)));return formattedDays.get(day);};
   board.append(node('h2',`${format(start)} – ${format(end)}`));
-  if(!visible.length){board.append(notice('Add a person with the Technician role to begin.'),link('Add person','new-person'));return;}
+  if(!visible.length){board.append(notice('No current technicians are listed. Choose an existing person and add the Technician role to their profile, or add a person if they are not in the directory.'),link('Choose an existing person','people'),link('Add a new person','new-person'));return;}
   if(failures.size){board.append(notice('Some calendars could not load. Their availability is not shown.',true),action('Retry calendars',draw));}
   board.append(node('p',state.scale==='year'?'Year view shows the selected date to 31 December. Scroll across to later dates.':'Scroll across if needed. Unrecorded dates are unknown; confirm availability before assigning work.','field-help'));
   const days=[];for(let day=start;day<=end;day=move(day,1))days.push(day);
@@ -45,7 +45,7 @@ export async function renderAvailability(view,personId,isCurrent=()=>true){
   const head=node('thead'),hr=node('tr'),corner=node('th','Technician');corner.scope='col';hr.append(corner);
   for(const day of days){const th=node('th');th.scope='col';th.append(node('span',dateOf(day).toLocaleDateString('en-AU',{month:'short'})),node('strong',dateOf(day).toLocaleDateString('en-AU',{day:'numeric'})),node('small',dateOf(day).toLocaleDateString('en-AU',{weekday:'short'})));if(day===localDay(new Date()))th.className='today';hr.append(th);}head.append(hr);table.append(head);
   const body=node('tbody');let first=true;
-  for(const t of visible){const row=node('tr'),name=node('th');name.scope='row';name.append(link(t.name,'person/'+t.id),node('small','General allocation: '+t.availability));row.append(name);const calendar=calendars.get(t.id);
+  for(const t of visible){const row=node('tr'),name=node('th');name.scope='row';name.append(link(t.name,'person/'+t.id),node('small','General allocation: '+(t.availability==='unknown'?'Not recorded':t.availability)));row.append(name);const calendar=calendars.get(t.id);
    if(!calendar){const cell=node('td','Calendar unavailable');cell.colSpan=days.length;row.append(cell);body.append(row);continue;}
    let entryIndex=0;const entries=[...calendar.entries].sort((a,b)=>a.startDate.localeCompare(b.startDate));
    for(const day of days){while(entryIndex<entries.length&&entries[entryIndex].endDate<day)entryIndex++;const candidate=entries[entryIndex],entry=candidate&&candidate.startDate<=day&&candidate.endDate>=day?candidate:null,key=entry?.status||'unknown',[symbol,label]=statuses[key]||statuses.unknown;

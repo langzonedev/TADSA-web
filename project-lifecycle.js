@@ -44,6 +44,18 @@ export async function financeRecordingAccess(stage,read=request){
  if(status?.configured===false||(status?.configured===true&&status.authenticated===true&&status.user?.role==='administrator'))return {allowed:true};
  return {allowed:false,message:'An account administrator must record '+(stage==='finance_clearance'?'Finance clearance':'Finance finalisation')+'. Ask an account administrator to review Finance’s confirmation and record it here. Saved evidence and Finance documents remain available below.'};
 }
+// A project's workflow needs its own parties and recorded reviewers, not every
+// fully hydrated person and their project history in the organisation.
+export async function loadLifecyclePeople(project,state,read=request){
+ const people=new Map((project.relationships??[]).filter(p=>p.type==='person').map(p=>[p.id,{id:p.id,name:p.name}]));
+ if(project.clientName)people.set('client:'+project.clientId,{id:'client:'+project.clientId,name:project.clientName});
+ const reviewerIds=[...new Set((state.history??[]).filter(e=>e.action==='peerReview'&&e.data?.reviewerId).map(e=>e.data.reviewerId))].filter(id=>!people.has(id));
+ for(let i=0;i<reviewerIds.length;i+=4){
+  const ids=reviewerIds.slice(i,i+4),results=await Promise.allSettled(ids.map(id=>read('selections/people/'+encodeURIComponent(id))));
+  results.forEach((result,index)=>{if(result.status==='fulfilled'&&result.value.item?.name)people.set(ids[index],result.value.item);});
+ }
+ return {items:[...people.values()]};
+}
 export async function renderLifecycle(parent,project,options={}){
  const current=await request(`projects/${project.id}/lifecycle`),id=project.id;
  const form=(...args)=>lifecycleForm(...args,options.onSaved);
@@ -60,7 +72,7 @@ export async function renderLifecycle(parent,project,options={}){
  const recordTarget=options.recordTarget??stageSection(parent,'Project record',false),actionsTarget=options.actionsTarget??stageSection(parent,'Project actions',false);
  const holdReasons=(current.workGate?.reasons??[]).filter(r=>/hold|stop/i.test(r));if(holdReasons.length)box.append(notice(holdReasons.join(' ')));else if(stage==='work'&&current.workGate?.reasons?.length)box.append(notice(current.workGate.reasons.join(' ')));if(s.revisionRequested)box.append(notice('Changes to address: '+s.revisionRequested.reason));
  if(current.workGate?.reasons?.some(r=>/hold|stop/i.test(r)))box.append(link('Review hold or client stop','operations/'+id+'/holds'));
- const [technicians,contacts,adminDetails]=await Promise.all([request('technicians'),request('people'),request(`projects/${id}/admin-details`)]);
+ const [technicians,contacts,adminDetails]=await Promise.all([stage==='peer_review'?request('technicians'):{items:(project.relationships??[]).filter(person=>person.role==='Technician')},loadLifecyclePeople(project,s),options.adminDetails??request(`projects/${id}/admin-details`)]);
  const isFreedomWheels=adminDetails.programme==='FW',delivery=s.history.findLast(e=>e.action==='work'&&e.data.deliveredOn)?.data;
  const followUp=workflowFollowUp(s,adminDetails.followUpOn);
  if(followUp){const panel=node('section',null,'workflow-follow-up');panel.append(node('h3','Review and follow-up'),node('p',followUp.prompt),node('p',followUp.timing),node('p','This is the project’s shared follow-up date. It does not send reminders or place work on hold.','field-help'));if(options.openFollowUp)panel.append(action('Update follow-up date',options.openFollowUp));box.append(panel);}
@@ -76,7 +88,7 @@ export async function renderLifecycle(parent,project,options={}){
   if(quote&&['peer_review','client_acceptance','finance_clearance','finance_finalisation','ready_to_close'].includes(stage)){const evidence=node('section',null,'panel task-evidence quote-evidence');evidence.append(node('h2','Quote revision '+quote.version));for(const line of quote.lines){const row=node('div',null,'quote-evidence-line');row.append(node('span',line.description),node('strong',money(line.amountCents??Math.round(line.quantityMilli*line.unitPriceCents/1000))));evidence.append(row,node('small',`${lifecycleCostLabels[line.type]??line.type} · ${line.quantityMilli/1000} × ${money(line.unitPriceCents)}`));}evidence.append(node('p','Quote total: '+money(quote.totalCents)));if(quote.notes)evidence.append(node('p',quote.notes));if(s.acceptance)evidence.append(node('p','Accepted by '+s.acceptance.acceptedBy+' · '+s.acceptance.date));context.prepend(evidence);}
   if(stage==='customer_signoff'&&s.work?.notes)brief.append(node('h3','Work completion notes'),node('p',s.work.notes));
   if(['finance_clearance','finance_finalisation','ready_to_close'].includes(stage)){
-   const [ops,plan]=await Promise.all([options.operations??request(`projects/${id}/operations`),request(`projects/${id}/work-plan`)]);
+   const [ops,plan]=await Promise.all([options.operations??request(`projects/${id}/operations`),options.workPlan??request(`projects/${id}/work-plan`)]);
    const financial=node('section',null,'panel task-evidence');financial.append(node('h2','Invoices and recorded receipts'));
    if(!ops.invoices.length)financial.append(node('p','No draft invoice recorded.'));
    for(const invoice of ops.invoices){const total=invoice.snapshot?.totalCents??invoice.totalCents??0,paid=(plan.payments??[]).filter(p=>p.invoiceId===invoice.id).reduce((sum,p)=>sum+p.amountCents,0);financial.append(node('p',`${invoice.number} · ${money(total)} · Received ${money(paid)} · Outstanding ${money(total-paid)}`));}

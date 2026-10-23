@@ -1,3 +1,4 @@
+import {deviceTechnicianLocation} from './device-model.mjs';
 import {preserveGeocode} from './location-geocode.js';
 import {lifecycleGate} from './device-lifecycle.mjs';
 import './device-credentials.mjs';
@@ -43,8 +44,8 @@ installModelExtensions(ctx=>{const {d,parts,method,input,find,version,bump,proje
  if(kind==='availability'){
   const person=find('people',id);if(!person.roles.includes('Technician'))fail('Select a technician.');const calendar={baseAddress:'',suburb:'',postcode:'',geocode:null,...(d.calendars[id]??{personId:id,version:0,serviceAreas:[],entries:[]})};
   calendar.geocode=preserveGeocode(undefined,calendar.geocode,[calendar.baseAddress,calendar.suburb,calendar.postcode]);
-  if(method==='GET')return calendar;
-  if(sub==='areas'&&method==='PUT'){if(!Number.isInteger(input.version)||input.version!==calendar.version)fail('This calendar changed.',409,{code:'VERSION_CONFLICT'});if(!Array.isArray(input.serviceAreas)||new Set(input.serviceAreas).size!==input.serviceAreas.length||input.serviceAreas.some(s=>!serviceAreas.some(a=>a.id===s)))fail('Select known distinct service areas.');const areas=[...input.serviceAreas].sort();if(JSON.stringify(areas)===JSON.stringify([...calendar.serviceAreas].sort()))return calendar;calendar.serviceAreas=areas;calendar.version++;}
+  if(method==='GET')return {...calendar,...deviceTechnicianLocation(d,id,calendar)};
+  if(sub==='areas'&&method==='PUT'){if(!Number.isInteger(input.version)||input.version!==calendar.version)fail('This calendar changed.',409,{code:'VERSION_CONFLICT'});if(!Array.isArray(input.serviceAreas)||new Set(input.serviceAreas).size!==input.serviceAreas.length||input.serviceAreas.some(s=>!serviceAreas.some(a=>a.id===s)))fail('Select known distinct service areas.');const areas=[...input.serviceAreas].sort();if(JSON.stringify(areas)===JSON.stringify([...calendar.serviceAreas].sort()))return {...calendar,...deviceTechnicianLocation(d,id,calendar)};calendar.serviceAreas=areas;calendar.version++;}
   else if(sub==='entries'&&method==='POST'){
    if('calendarVersion' in input){if(!Number.isSafeInteger(input.calendarVersion)||input.calendarVersion<0)fail('Supply the current calendar version.');if(input.calendarVersion!==calendar.version)fail('This calendar changed. Reload and compare before saving.',409,{code:'VERSION_CONFLICT'});}
    if(action==='remove'){const entry=calendar.entries.find(x=>x.id===subid)??fail('Calendar entry not found.',404);version(entry,input.version);calendar.entries=calendar.entries.filter(x=>x.id!==subid);}
@@ -67,7 +68,7 @@ installModelExtensions(ctx=>{const {d,parts,method,input,find,version,bump,proje
    calendar.version++;
 
   }else return;
-  d.calendars[id]=calendar;event('people',id,'Availability calendar updated',{action:sub});return calendar;
+  d.calendars[id]=calendar;event('people',id,'Availability calendar updated',{action:sub});return {...calendar,...deviceTechnicianLocation(d,id,calendar)};
  }
  if(kind!=='projects')return;
  if(sub==='work-plan'){

@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "8ab9aa518a9f0b8ecfaddad552916fd0a8b7c0d6",
+  "sourceRevision": "1522f965276991ec60b71bb72b013c9f8548c5ba",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "inline-confirmation.js": {
@@ -9,7 +9,7 @@
     },
     "record-picker.js": {
       "source": "public/record-picker.js",
-      "sha256": "11c8838c095024825c6d9d8fafdb61861aef8e910992aac9c22e66b98a409ad5",
+      "sha256": "dc2cd0331ba324b73b83645bbd5debed0a0d26287e441d5ab8588c9704106953",
       "transform": null
     },
     "organisation-model.js": {
@@ -74,7 +74,7 @@
     },
     "project-details.js": {
       "source": "public/project-details.js",
-      "sha256": "80e6e651a3331490f880baa6598657481edbe26c61156519cf7474f41fd8004f",
+      "sha256": "c580e9ad8a9bdd4909152fc61e6ced8f8400d2126e5c0b10ea17e6ed8cbea64e",
       "transform": null
     },
     "project-details-model.js": {
@@ -84,7 +84,7 @@
     },
     "project-history.js": {
       "source": "public/project-history.js",
-      "sha256": "7cae5ecd22a1e84daa8a64e948b8c91e5420517288a38009f65070e9cb08e704",
+      "sha256": "84b9b7331e533dea23fb886105066180b96cf238376fbcfaa7efbd647379b071",
       "transform": null
     },
     "project-history-model.js": {
@@ -104,7 +104,7 @@
     },
     "project-lifecycle.js": {
       "source": "public/project-lifecycle.js",
-      "sha256": "aa300db563417b16e41cde031e2e3c64f3e4440dfbed608b4512c909a2d70f26",
+      "sha256": "c3535cf9ab337d8888f0ea043af6a0243deb313b6962446a6b1252f8818db765",
       "transform": null
     },
     "finance-pack.js": {
@@ -144,7 +144,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "b96a77a851155daf0f7a033ca5d263f0e7c2d74c1ccdc0a9522e0f433c0b7858",
+      "sha256": "5dbe24e770226a5e86e78f709e806a3c54a4d6a074bc893f52b3f9f53b67b9f3",
       "transform": null
     },
     "settings.js": {
@@ -159,7 +159,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "16787943487628669535d467a257bae3e8041351110e50c4099844d532361ef3",
+      "sha256": "f929b4f0b8105ecbf174a52f629eee4ed22f895be6edafb9a7ee6138ab70fd69",
       "transform": null
     },
     "operations.js": {
@@ -179,22 +179,27 @@
     },
     "availability.js": {
       "source": "public/availability.js",
-      "sha256": "18aa8f045d4d7ee032e26dcf4392222db96ead4cd4fda0967ed5bb8287f6ebd3",
+      "sha256": "a1be8f776832e365fbf4edddb6c04983402e34e34701f5ec851b56375e9dea54",
       "transform": null
     },
     "technician-location.js": {
       "source": "public/technician-location.js",
-      "sha256": "c823f2581305f10fab9dae1d9c67e322903f731a955660cb779e4a79e440f2b8",
+      "sha256": "1f44cb81554be80199f37fb3077f16545c2a89006306d4f5c38894b0ebe37124",
+      "transform": null
+    },
+    "technician-location-model.js": {
+      "source": "public/technician-location-model.js",
+      "sha256": "0b285b0bd068fcb15ef0a44aa9aa2adadfd0ac2982ca56fbc5979131fe86f5cf",
       "transform": null
     },
     "project-care.js": {
       "source": "public/project-care.js",
-      "sha256": "5883fdfba11fdb8bff32274de68a16d87f813803431d29b49fee6f89822b268d",
+      "sha256": "cc523473739111b4191a7bb00e2f5dc426cdfea92de3eb0d197993a7a3764d85",
       "transform": null
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "f800b6c3de3d8512a677eb7c7942e3b8f7172867255e06fa2e7510b011f8e14d",
+      "sha256": "783d8d6f8c991626aa4a536016a309dabf35c456bd8eeeeda6f9f469283d7a14",
       "transform": null
     },
     "boot.js": {
@@ -209,7 +214,7 @@
     },
     "seed.mjs": {
       "source": "src/seed.mjs",
-      "sha256": "493a868fa5ce8aa8059625d15ad477dff9d1e2845fcf11146df3dedb7866b82f",
+      "sha256": "f42873a7b6a5b1f35f413938cdb7e731e9e666ae6341afcf0237d36f557ebc4c",
       "transform": "Fictional authored fixture only"
     },
     "seed-enrichment.mjs": {
@@ -225,5 +230,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "832d0b5c8d4546771f3aaf3881171ea45bce52de09b0a47df142e65693b66c18"
+  "shellHash": "7063a3c57e4e94914d66675dfd7b749d9c23300626b769d32a247b199a523c45"
 }

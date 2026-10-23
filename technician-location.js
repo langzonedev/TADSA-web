@@ -5,6 +5,7 @@ export async function renderTechnicianLocation(view,id){
  const [calendar,options]=await Promise.all([request('availability/'+id),request('availability-options')]);
  const box=node('section',null,'panel technician-profile-location'),summary=node('div'),forms=node('div');box.append(node('h2','Location & service areas'),summary,forms);view.append(box);
  summary.append(node('p',[calendar.baseAddress,calendar.suburb,calendar.postcode].filter(Boolean).join(', ')||'Base location not recorded.'));
+ if(calendar.locationSource==='person-contact')summary.append(node('p','Using the person’s saved contact address for postcode matching. Save a technician base below if work starts from a different location.','field-help'));
  const areas=calendar.serviceAreas.map(id=>options.serviceAreas.find(area=>area.id===id)?.label||id);summary.append(node('p',areas.length?'Service areas: '+areas.join(', '):'Service areas not recorded.'));
  const edit=action('Edit location & service areas',()=>{editing.add(id);draw();});summary.append(edit,link('View technician availability','availability/'+id));
  function draw(){edit.hidden=editing.has(id);forms.hidden=!editing.has(id);if(!editing.has(id)||forms.children.length)return;

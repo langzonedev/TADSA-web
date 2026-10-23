@@ -2,8 +2,8 @@ import {node,field,editor,request} from './project-care.js';
 import {createProjectDetails,createFreedomWheelsDetails} from './project-details-model.js';
 const payload=d=>Object.fromEntries(['requestId','version',...Object.keys(createProjectDetails())].map(k=>[k,d[k]]));
 const labelSave=(entry,label)=>{const button=entry.form.querySelector('button[type=submit]');button.dataset.label=label;if(!entry.d.pending)button.textContent=label;};
-export async function renderProjectDetails(view,id){
- const details=await request(`projects/${id}/admin-details`);
+export async function renderProjectDetails(view,id,context={}){
+ const details=context.details??await request(`projects/${id}/admin-details`);
  const entry=editor(view,'project-admin/'+id,details,'Programme & follow-up',(form,d)=>{
   const programme=field(form,'Programme',d,'programme','text',[['','Not recorded'],['TAD','TAD'],['FW','Freedom Wheels (FW)']]);
   d.freedomWheels={...createFreedomWheelsDetails(),...d.freedomWheels};

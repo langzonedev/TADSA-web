@@ -11,6 +11,12 @@ export function seed({enriched=true,asOf='2026-09-25'}={}) {
     ['person-13','Michael Tan','Technician'], ['person-14','Anna Novak','Carer'],
     ['person-15','Leila Farouk','Allied-health contact']
   ].map(([id,name,role]) => ({ id,name,role,email: name.toLowerCase().replaceAll(' ','.')+'@example.invalid',phone:'Not recorded' }));
+  // Explicit fictional fixture capabilities; directory normalisation must never
+  // manufacture these values for imported technicians with no saved profile.
+  for(const person of people.filter(person=>person.role==='Technician'))person.technician={
+    skills:person.id==='person-12'?['Assessment','Sewing','Woodworking']:person.id==='person-13'?['Assessment','Electronics','Metalwork']:['Assessment','Metalwork','Woodworking'],
+    availability:person.id==='person-12'?'limited':'available'
+  };
   const clients = ['person-1','person-2','person-6','person-7','person-8','person-9','person-10','person-11'].map((personId,i) => ({id:'client-'+(i+1),personId}));
   const definitions = [
     ['Adjustable art station','client-1','open','Technical','2026-09-23','An adjustable tabletop support to make painting and sketching more comfortable.',false,false,'person-3'],
