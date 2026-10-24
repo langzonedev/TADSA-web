@@ -96,6 +96,13 @@ export async function validateBackup(input){
  for(const [id,n]of Object.entries(raw.clientNdis??{})){ref('clients',id,'NDIS record');if(!object(n))invalid('invalid NDIS record.');amount(n.version,'NDIS version',0,2147483647);if(typeof n.number!=='string'||(n.number&&!/^[0-9 ]{3,30}$/.test(n.number)))invalid('invalid NDIS number.');}
  for(const [id,state]of Object.entries(raw.lifecycles??{})){ref('projects',id,'Lifecycle');validateLifecycleBackup(state);const project=raw.projects.find(p=>p.id===id);if(Boolean(state.closed)!==(project.status==='closed'))invalid('lifecycle closure does not match project status.');}
  for(const [id,value]of Object.entries(raw.credentials??{})){ref('people',id,'Technician credentials');if(value.personId!==id)invalid('credential person does not match its record.');validateCredentials(value);}
+ if(raw.assessmentTemplates!==undefined){
+  if(!Array.isArray(raw.assessmentTemplates))invalid('assessment templates must be a list.');
+  for(const [index,file]of raw.assessmentTemplates.entries()){
+   if(!object(file)||file.revision!==index+1||!validInstant(file.createdAt)||typeof file.createdBy!=='string'||!file.createdBy.trim()||!['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.mime))invalid('invalid assessment template revision.');
+   await validateDeviceFile({name:file.name,mime:file.mime,dataBase64:file.dataBase64});if(file.size!==atob(file.dataBase64).length)invalid('assessment template size does not match contents.');
+  }
+ }
  for(const [id,files]of Object.entries(raw.attachments??{})){ref('projects',id,'Attachments');if(!Array.isArray(files))invalid('attachment list is invalid.');const ids=new Set();for(const file of files){if(!uuid(file.id)||ids.has(file.id))invalid('invalid or duplicate attachment ID.');ids.add(file.id);await validateDeviceFile({name:file.name,mime:file.mime,dataBase64:file.dataBase64});if(file.size!==atob(file.dataBase64).length)invalid('attachment size does not match contents.');}if(files.filter(x=>!x.removed).length>20)invalid('a project exceeds the active attachment limit.');}
  if(!Number.isSafeInteger(raw.sequence)||raw.sequence<0)invalid('invalid identifier sequence.');for(const set of Object.values(sets))for(const id of set){const n=id.match(/-(\d+)$/)?.[1];if(n&&Number(n)>raw.sequence)invalid('identifier sequence is behind an existing record.');}
  let data;try{data=normalise(raw);}catch{invalid('data cannot be upgraded safely.');}return data;

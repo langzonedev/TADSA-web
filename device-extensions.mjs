@@ -1,3 +1,4 @@
+import './device-assessment-templates.mjs';
 import {deviceTechnicianLocation} from './device-model.mjs';
 import {preserveGeocode} from './location-geocode.js';
 import {lifecycleGate} from './device-lifecycle.mjs';

@@ -388,3 +388,35 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 .address-lookup{grid-column:1/-1;min-width:0;margin-top:-8px}.address-suggestions{display:grid;gap:3px}.address-suggestions button{text-align:left;white-space:normal;overflow-wrap:anywhere;min-height:44px;background:var(--panel,#fff);color:var(--text,#24304b);border:1px solid var(--line);padding:10px}.address-suggestions [aria-selected=true]{outline:2px solid #5364a2;background:#edf1fa}.address-lookup .field-help{font-size:12px;margin:5px 0}.travel-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--line);padding:12px 0}.travel-row strong{min-width:150px}.travel-row span:last-child{overflow-wrap:anywhere}.address-lookup a{overflow-wrap:anywhere}@media print{.address-lookup{display:none}}
 .record-picker{min-width:0}.record-picker>label{display:block;min-width:0}.record-picker select[size]{width:100%;height:auto;min-height:11rem;padding:4px;white-space:normal}.record-picker select[size] option{padding:8px;white-space:normal;overflow-wrap:anywhere}.record-picker .field-help{margin:4px 0}
 .project-history-request{padding:14px 16px;background:var(--surface-soft,#f2f5fa);border-left:4px solid var(--primary,#343c7c);border-radius:6px;margin:12px 0}.project-history-request h3{margin:0 0 8px}.project-history-description{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;line-height:1.6}.project-history-table-scroll{overflow-x:auto}.project-history-work-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:14px}.project-history-work-table th,.project-history-work-table td{text-align:left;width:25%;padding:8px;border-bottom:1px solid var(--line,#d9deea);vertical-align:top;white-space:normal;overflow-wrap:anywhere;line-height:1.5}.project-history-work-table th{background:var(--surface-soft,#f2f5fa)}.project-history-metadata{margin-top:16px}
+
+/* Keep task navigation apart from form content, with one clear save action. */
+.project-task-navigation{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin:0 0 16px;padding:0 0 12px;border-bottom:1px solid var(--line)}
+.project-task-navigation>button{width:auto;margin:0}
+.project-task-navigation .workflow-return-action{margin-left:auto}
+.workflow-follow-up-action{display:inline-flex;width:auto;margin:8px 0 16px}
+.project-task-form .workflow-panel>p{line-height:1.55}
+.project-task-grid:has(.project-task-context:empty){grid-template-columns:minmax(0,1fr)}
+.project-document-library{margin:8px 0 24px;padding:20px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}
+.project-document-library>.care-details{margin:0;padding:0;border:0}
+.project-document-library .actions{gap:10px;flex-wrap:wrap}
+.project-document-library .actions:empty{display:none}
+.document-availability{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 24px}
+.document-availability>div{padding:12px;border:1px solid var(--line);border-radius:8px;min-width:0}
+.document-availability dt{font-weight:650;margin-bottom:6px}.document-availability dd{margin:0;font-size:14px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+@media(min-width:1101px){
+ .project-workspace .record-header{grid-template-columns:minmax(240px,.8fr) minmax(0,1.5fr);gap:16px}
+ .project-workspace .record-header>.record-meta{grid-template-columns:repeat(4,minmax(0,1fr));max-width:none;align-items:stretch}
+ .project-workspace .record-header .project-identity{grid-template-columns:auto minmax(0,1fr);gap:16px}
+ .project-workspace .record-header .project-more-wrap{grid-column:1/-1;justify-self:end}
+}
+@media(min-width:801px) and (max-width:1100px){
+ .project-workspace .record-header{grid-template-columns:minmax(0,1fr) auto}
+ .project-workspace .record-header>.record-meta{grid-template-columns:repeat(4,minmax(0,1fr));max-width:none;width:100%}
+}
+@media(max-width:800px){
+ .project-workspace .record-header>.record-meta{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none;width:100%}
+ .project-workspace .record-header>.record-meta>.project-header-fact:last-child{grid-column:auto}
+ .project-task-navigation .workflow-return-action{margin-left:0}
+ .document-availability{grid-template-columns:minmax(0,1fr)}
+ .project-document-library{padding:14px}
+}

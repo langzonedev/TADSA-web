@@ -18,6 +18,14 @@ export function advanceLifecycleDraftAfterNote(projectId,before,after){
  if(!Number.isSafeInteger(before)||after!==before+1)return;
  for(const [key,draft]of drafts)if(key.startsWith('lifecycle/'+projectId+'/')&&!draft.pending&&draft.version===before)draft.version=after;
 }
+// An acknowledged hours-only save does not alter the technical-work decision.
+// Only advance the local work draft across that one known increment; a retry
+// payload or any other intervening write still requires conflict review.
+export function advanceWorkDraftAfterHours(projectId,before,after){
+ if(!Number.isSafeInteger(before)||after!==before+1)return;
+ const draft=drafts.get('lifecycle/'+projectId+'/work');
+ if(draft&&!draft.pending&&draft.version===before)draft.version=after;
+}
 
 export const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;};
 export const action=(text,fn)=>{const b=node('button',text,'secondary');b.type='button';b.onclick=fn;return b;};
@@ -28,12 +36,13 @@ export function field(parent,label,d,key,type='text',options){const l=node('labe
 export function editor(parent,key,initial,title,fields,path,method,payload,options={}){
  const d=drafts.get(key)??{...initial,requestId:crypto.randomUUID()},box=node('section',null,'panel workflow-panel'),form=node('form',null,'form-grid');if(title)box.append(node('h2',title));box.append(form);parent.append(box);fields(form,d);const feedback=node('div'),buttons=node('div',null,'actions'),save=node('button','Save','primary');save.type='submit';const discard=action('Discard unsaved changes',()=>{drafts.delete(key);host.refresh();});buttons.append(save,discard);form.append(feedback,buttons);const remember=()=>drafts.set(key,d);form.addEventListener('input',remember);form.addEventListener('change',remember);
  save.dataset.label=options.saveLabel??editorSaveLabels[key.split('/')[0]]??'Save';
- const lock=()=>{form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=Boolean(d.pending)&&n!==save);save.textContent=d.pending?'Retry save safely':(save.dataset.label||'Save');};lock();
+ const disabledBeforeSave=new Map();
+ const lock=()=>{form.querySelectorAll('input,select,textarea,button').forEach(n=>{if(d.pending){if(!disabledBeforeSave.has(n))disabledBeforeSave.set(n,n.disabled);n.disabled=n!==save;}else if(disabledBeforeSave.has(n)){n.disabled=disabledBeforeSave.get(n);disabledBeforeSave.delete(n);}});save.textContent=d.pending?'Retry save safely':(save.dataset.label||'Save');};lock();
  form.onsubmit=async e=>{
   e.preventDefault();if(host.isSaving())return;
   const workspace=form.closest('main'),wasInert=workspace?.inert??false;let refreshed=false;
   if(workspace){workspace.inert=true;workspace.setAttribute('aria-busy','true');}
-  host.setSaving(true);form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=true);
+  host.setSaving(true);form.querySelectorAll('input,select,textarea,button').forEach(n=>{if(!disabledBeforeSave.has(n))disabledBeforeSave.set(n,n.disabled);n.disabled=true;});
   try{
    d.pending??=await payload(d);remember();feedback.replaceChildren(notice('Saving…'));
    await request(path,method,d.pending);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);options.onSaved?.();
@@ -44,9 +53,14 @@ export function editor(parent,key,initial,title,fields,path,method,payload,optio
    if(error.status===401)feedback.append(action('Sign in and keep draft',()=>host.refresh()));
    if(error.status===409){
     let review;try{review=await options.reviewConflict?.(d);}catch{/* Keep the draft if the latest record cannot be read. */}
-    if(review)feedback.append(notice(review.message),action(options.reviewLabel??'Review latest project and keep draft',async()=>{
-     d.version=review.version;options.onAcceptReview?.(d,review);d.requestId=crypto.randomUUID();remember();await host.refresh();
-    }));
+    if(review){
+     feedback.append(notice(review.message));
+     if(review.comparison?.length){const comparison=node('dl',null,'conflict-comparison');for(const [label,value]of review.comparison)comparison.append(node('dt',label),node('dd',value));feedback.append(comparison);}
+     if(review.canKeep!==false)feedback.append(action(options.reviewLabel??'Review latest project and keep draft',async()=>{
+      d.version=review.version;options.onAcceptReview?.(d,review);d.requestId=crypto.randomUUID();remember();await host.refresh();
+     }));
+     else feedback.append(action('Discard this draft and load latest workflow',()=>{drafts.delete(key);host.refresh();}));
+    }
     else feedback.append(notice('Discard this draft to load the latest saved version, then reapply your change.'));
    }
   }finally{

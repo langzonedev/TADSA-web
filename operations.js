@@ -1,6 +1,6 @@
 import {createRecordPicker} from './record-picker.js';
 import {requestInlineConfirmation} from './inline-confirmation.js';
-import {advanceLifecycleDraftAfterNote} from './project-care.js';
+import {advanceLifecycleDraftAfterNote,advanceWorkDraftAfterHours} from './project-care.js';
 import {fieldLabel,formatValue} from './record-values.js';
 import {renderSavedDocumentDownloads} from './finance-pack.js';
 import {residentialAddressText} from './client-address.js';
@@ -45,7 +45,7 @@ async function send(form,d,key,path,method,payload,feedback,submit){
   if(host.isSaving())return;const workspace=form.closest('main'),wasInert=workspace?.inert??false;let refreshed=false;
   host.setSaving(true);d.pending??=payload;if(workspace){workspace.inert=true;workspace.setAttribute('aria-busy','true');}
   form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(true));form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=true);feedback.replaceChildren(notice('Saving…'));
-  try{const result=await api(path,method,d.pending);if(/^projects\/[^/]+\/notes$/.test(path))advanceLifecycleDraftAfterNote(path.split('/')[1],d.baseVersion,result.version);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);host.setSaving(false);await host.refresh();refreshed=true;}
+  try{const result=await api(path,method,d.pending);if(/^projects\/[^/]+\/notes$/.test(path))advanceLifecycleDraftAfterNote(path.split('/')[1],d.baseVersion,result.version);if(/^case\/[^/]+\/hours$/.test(key))advanceWorkDraftAfterHours(path.split('/')[1],d.pending.version,result.version);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);host.setSaving(false);await host.refresh();refreshed=true;}
   catch(e){if(e.status){d.pending=null;d.requestId=crypto.randomUUID();}feedback.replaceChildren(notice(e.status?e.message:'Save result not confirmed. Retry the same save safely.',true));if(e.status===401)feedback.append(button('Sign in and keep draft',()=>host.refresh()));if(e.status===409&&method==='PUT')feedback.append(button('Compare latest case',()=>host.refresh()));}
   finally{host.setSaving(false);if(workspace){workspace.inert=wasInert;workspace.removeAttribute('aria-busy');}form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(Boolean(d.pending)));form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=Boolean(d.pending)&&n!==submit);submit.disabled=false;submit.textContent=d.pending?'Retry save safely':submit.dataset.label;if(!wasInert){if(refreshed)workspace?.focus({preventScroll:true});else submit.focus({preventScroll:true});}}
 }
