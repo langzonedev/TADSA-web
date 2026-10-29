@@ -312,15 +312,16 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
    Screen-only rules keep invoice and document printing on their existing layouts. */
 @media screen{
  main{padding:20px 24px}
- .topbar{min-height:64px;padding:8px 24px;gap:12px}
- .environment-strip{padding:6px 24px}
+ .topbar{height:auto;min-height:60px;padding:4px 24px;gap:12px}
+ .topbar #global-search{padding-block:2px}
+ .environment-strip{padding:4px 24px}
  .page-heading{margin-bottom:16px;gap:12px}
  .breadcrumb{margin-bottom:8px;min-height:44px;display:inline-flex;align-items:center}
  .filter-tabs{margin-bottom:12px}
- .panel{padding:18px;margin-bottom:16px}
- .panel h2{margin-bottom:12px}
- .panel .detail-pairs{gap:14px 18px}
- .record-header{padding:18px 20px;gap:16px}
+ .panel{padding:14px 16px;margin-bottom:12px}
+ .panel h2{margin-bottom:8px}
+ .panel .detail-pairs{gap:10px 16px}
+ .record-header{padding:12px 16px;gap:12px}
  .record-meta{margin-top:8px}
  .record-tabs{margin-bottom:16px;padding-inline:20px}
  .detail-layout,.register-layout{gap:16px}
@@ -330,9 +331,10 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
  .inspector-body{padding:16px}
  .inspector-section{margin-top:16px;padding-top:14px}
  .inspector .button{margin-top:12px}
- .form-grid,.workflow-panel .form-grid{gap:16px}
- .form-grid fieldset,.workflow-panel fieldset{padding:16px;gap:12px}
- .workflow-intro{margin-bottom:16px}
+ .form-grid,.workflow-panel .form-grid{gap:12px}
+ .form-grid fieldset,.workflow-panel fieldset{padding:12px;gap:10px}
+ .field-label{margin-bottom:5px}
+ .workflow-intro{margin-bottom:12px}
  .workflow-steps{margin-bottom:16px}
  .workflow-panel .actions{padding-top:12px}
  .heading-rule{margin:16px 0}
@@ -342,27 +344,46 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
  .report-output{margin-top:16px}
  .availability-controls{margin-block:14px}
  .project-workspace .breadcrumb{margin-bottom:0}
- .project-workspace .project-nav{margin-top:0;gap:4px 18px;padding-inline:0}
+ .project-workspace .project-nav{margin:0;gap:4px 18px;padding-inline:0}
  .project-workspace .project-nav button{padding-block:9px}
  .project-subnav{padding:8px 0}
- .project-workspace .record-header{padding:12px 0 0;gap:12px 16px}
+ .project-workspace .record-header{padding:8px 0 0;gap:8px 12px}
  .project-workspace .record-header>.record-meta{margin-top:0}
  .project-workspace .record-header .project-identity{gap:16px}
- .project-identity .eyebrow{padding:10px 14px;gap:5px;margin-bottom:0}
- .project-header-fact{padding:10px 12px;gap:5px}
- .project-workspace>.project-overview,.project-workspace>#project-focused-pane{margin-top:12px}
- .project-overview-grid{gap:16px}
- .project-workspace .panel{padding:18px}
- .project-overview-grid .project-facts{margin:12px 0;gap:12px 16px}
- .project-context-details{padding-top:6px}
+ .project-identity .eyebrow{padding:8px 10px;gap:4px;margin-bottom:0}
+ .project-identity .project-number{font-size:clamp(20px,1.65vw,24px)}
+ .project-workspace .record-header .project-identity h1{font-size:22px}
+ .project-header-fact{padding:8px 10px;gap:4px}
+ .project-workspace>.project-overview,.project-workspace>#project-focused-pane{margin-top:10px}
+ .project-overview-grid,.project-overview-column{gap:12px}
+ .project-workspace .panel{padding:14px 16px}
+ .project-workspace .panel h2{margin-bottom:8px}
+ .project-workspace .panel p{margin-bottom:8px}
+ .project-workspace .record-summary{line-height:1.5;margin-bottom:8px}
+ .project-overview-grid .project-facts{margin:8px 0;gap:10px 14px}
+ .project-overview-grid .project-facts>div{gap:4px}
+ .project-context-details{padding-top:0}
  .project-context-details>summary{min-height:44px;display:list-item;align-content:center}
  .project-overview-links{margin-top:0}
- .project-finance-summary .detail-pairs{margin:12px 0;gap:8px}
- .project-finance-summary .detail-pairs dd{margin-top:0}
- .project-finance-summary .field-help{margin-top:10px}
- .project-task-grid{gap:16px;margin-top:12px}
- .project-task-form>.lifecycle-panel{padding:18px}
- .project-record-section{padding-block:16px}
+ .project-finance-summary .detail-pairs{margin:8px 0;gap:6px}
+ .project-finance-summary .detail-pairs dd{margin-top:0;line-height:1.4}
+ .project-finance-summary .field-help{margin-top:8px}
+ .project-task-grid{gap:16px;margin-top:10px}
+ .project-task-form>.lifecycle-panel{padding:14px 16px}
+ .project-record-section{padding-block:12px}
+ .project-record-section>h2{margin-bottom:10px}
+ .project-workspace .file-row,.project-workspace .relationship-line{padding-block:8px}
+ .project-workspace .project-record-section .form-grid{gap:12px}
+ .project-workspace .project-task-navigation{margin-bottom:12px;padding-bottom:8px}
+ .case-notes-panel .case-note-entry{margin:8px 0}
+ .case-notes-panel .case-note-entry h3{margin:0 0 4px;font-size:14px;color:var(--muted)}
+ .case-note{padding:8px 10px}
+ .case-notes-panel .case-note{white-space:pre-wrap;overflow-wrap:anywhere;max-height:none;overflow:visible;margin:0 0 4px;border-left:2px solid var(--line);padding:0 0 0 10px;line-height:1.5}
+ .case-notes-panel .case-note-entry small{display:block;color:var(--muted)}
+ .case-notes-panel .case-note-form{gap:8px;margin-top:8px}
+ .case-notes-panel .case-note-feedback:empty{display:none}
+ .case-notes-panel .case-note-form>button{justify-self:start;align-self:flex-start}
+ .case-notes-panel .case-note-form textarea{height:calc(4.5em + 18px);min-height:calc(4.5em + 18px);max-height:none;line-height:1.5;padding:8px;overflow-y:auto;resize:vertical}
 }
 @media screen and (min-width:801px){
  .sidebar{padding-block:22px;overflow-y:auto}

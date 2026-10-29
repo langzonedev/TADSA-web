@@ -94,7 +94,22 @@ export async function renderOperations(view,route,id,options={}){
   return true;
 }
 function currentHold(lifecycle){return lifecycle.workGate?.reasons?.some(r=>/hold|stop/i.test(r));}
-export function renderNotes(view,id,ops,compact=false){const box=node('section',null,'panel workflow-panel');box.append(node('h2','Case notes'),node('p','Latest updates for a quick handover. Add a note while on the phone; recording every conversation is optional.','field-help'));for(const n of (compact?ops.notes.slice(0,3):ops.notes)){box.append(node('p',n.text,'case-note'),node('small',`${n.actor||'Development operator'} · ${new Date(n.at||n.createdAt).toLocaleString('en-AU')}`));}const key='note/'+id,d=drafts.get(key)??{requestId:crypto.randomUUID(),text:'',baseVersion:ops.version};const form=node('form',null,'form-grid');input(form,'New case note',d,'text','textarea').required=true;form.oninput=()=>drafts.set(key,d);const feedback=node('div'),submit=node('button','Add case note','primary');submit.type='submit';submit.dataset.label='Add case note';form.append(feedback,submit);form.onsubmit=e=>{e.preventDefault();drafts.set(key,d);send(form,d,key,`projects/${id}/notes`,'POST',{requestId:d.requestId,text:d.text.trim()},feedback,submit);};if(d.pending){form.querySelector('textarea').disabled=true;submit.textContent='Retry save safely';}box.append(form);if(compact)box.insertBefore(form,box.children[2]??null);if(compact&&ops.notes.length>3)box.append(link('View all case notes','operations/'+id));view.append(box);}
+export function renderNotes(view,id,ops,compact=false){
+ const box=node('section',null,'panel workflow-panel case-notes-panel');box.append(node('h2','Case notes'));
+ if(!compact)box.append(node('p','Latest updates for a quick handover.','field-help'));
+ // The overview leads with the latest saved note, keeping the complete history one click away.
+ for(const n of (compact?ops.notes.slice(0,1):ops.notes)){
+  const entry=node('article',null,'case-note-entry');
+  if(compact)entry.append(node('h3','Latest case note'));
+  entry.append(node('p',n.text,'case-note'),node('small',`${n.actor||'Development operator'} · ${new Date(n.at||n.createdAt).toLocaleString('en-AU')}`));box.append(entry);
+ }
+ if(compact){if(ops.notes.length)box.append(link('View all case notes','operations/'+id));else box.append(node('p','No case notes recorded yet.','muted'));}
+ const key='note/'+id,d=drafts.get(key)??{requestId:crypto.randomUUID(),text:'',baseVersion:ops.version};
+ const form=node('form',null,'form-grid case-note-form');input(form,'New case note',d,'text','textarea').required=true;form.oninput=()=>drafts.set(key,d);
+ const feedback=node('div',null,'case-note-feedback'),submit=node('button','Add case note','primary');submit.type='submit';submit.dataset.label='Add case note';form.append(feedback,submit);
+ form.onsubmit=e=>{e.preventDefault();drafts.set(key,d);send(form,d,key,`projects/${id}/notes`,'POST',{requestId:d.requestId,text:d.text.trim()},feedback,submit);};
+ if(d.pending){form.querySelector('textarea').disabled=true;submit.textContent='Retry save safely';}box.append(form);view.append(box);
+}
 function renderInvoices(view,id,p,ops,payers,business,identities,lifecycle,reviewFunding){
  if(!lifecycle.managed&&p.kind==='Assessment'){view.append(notice('Assessments are free. No assessment invoice or payment is required.'));return;}
  const box=node('section',null,'panel workflow-panel');box.append(node('h2','Draft invoices'),notice('Save an itemised draft for review. Recording an invoice does not confirm payment. Financial details and tax treatment come from Settings.'));
