@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "d906d7b2e38914a256ae34cd884124d2b0e061fb",
+  "sourceRevision": "e6abcc268ca07f3e4586dfbef457741957412c75",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "inline-confirmation.js": {
@@ -144,7 +144,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "1123311e7050c1dd4e8c9c7674d0d81ab5da338f123db026d38b265bbf73285e",
+      "sha256": "49bcf52c8266cf7d73b59042a6486a654ef7763a6ced05efc47709508cddfb61",
       "transform": null
     },
     "settings.js": {
@@ -159,7 +159,7 @@
     },
     "appearance.js": {
       "source": "public/appearance.js",
-      "sha256": "c836b30d332a898bd27ed7ecd1685add5f9f7949bbc2d968a0147913c0b8aa17",
+      "sha256": "33b258dde2f136e0ef5586c4dc88ec653457e2b98e2fb42dc2b95166d01b3be1",
       "transform": null
     },
     "workflows.js": {
@@ -179,7 +179,7 @@
     },
     "local-login.js": {
       "source": "public/local-login.js",
-      "sha256": "ce1629c796e8bdf426076b6aaecc14fe86d8f0037930bc5a3945e35080b048fc",
+      "sha256": "19781ba8e8932da64113c7b9aea0a328c6babe38c13b9ca9255d6348e7514404",
       "transform": null
     },
     "availability.js": {
@@ -204,7 +204,7 @@
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "b17a3d3fe2f6eede61a87400e99f82da22ffadf028c40990363be05734b61edd",
+      "sha256": "2ce46e8f3987f036ac7234252b1d3e2e71f2fc39da1e3df251fe40885c39a5d8",
       "transform": null
     },
     "boot.js": {
@@ -230,10 +230,10 @@
     },
     "index.html": {
       "source": "public/index.html",
-      "sourceSha256": "9b6807156cf28b63c51f320814bba34e0a30fedbba95a77f4ada8c7ff5643ca7",
-      "sha256": "3c6923100b071af53f9910f2543bd487d7e2ee162041e59ce41d2bdeeb85dfa2",
+      "sourceSha256": "c0487faf4b9ba745bbf96e09f92b8392d5a7d0e171721ec0e514ae00dcdf8866",
+      "sha256": "3d4eaa1e704d37829c8aed6f548e3370ea7a21a1d3209f70488da750b282564b",
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "e3198449b17749ba543ffb774f5cce00429581f3ea97f2388935a200a3e607b7"
+  "shellHash": "3e7c5a490b504165e2d5e1f233b0c79749c526275c42f24f9b83c5ef2ef406f5"
 }

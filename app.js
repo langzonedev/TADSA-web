@@ -420,3 +420,27 @@ drawerToggle.addEventListener('click',()=>setDrawer(!drawerOpen));drawerClose.ad
 document.addEventListener('keydown',e=>{if(!drawerOpen)return;if(e.key==='Escape'){e.preventDefault();setDrawer(false);return;}if(e.key==='Tab'){const stops=[...drawer.querySelectorAll('a[href],button:not([disabled]),[tabindex="0"]')].filter(n=>n.getClientRects().length);const first=stops[0],last=stops.at(-1);if(e.shiftKey&&(document.activeElement===first||!drawer.contains(document.activeElement))){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
 setDrawer(false,false);
 window.addEventListener('tadsa-auth-locked',()=>setDrawer(false,false));
+
+// Desktop width is a local presentation preference; changing it never rerenders a form.
+const sidebarCollapse=document.querySelector('#sidebar-collapse'),sidebarTooltip=document.createElement('div');
+sidebarTooltip.id='sidebar-tooltip';sidebarTooltip.className='sidebar-tooltip';sidebarTooltip.hidden=true;sidebarTooltip.setAttribute('aria-hidden','true');document.body.append(sidebarTooltip);
+let sidebarHovered=null;
+const compactSidebar=()=>!mobileMedia.matches&&document.documentElement.dataset.sidebar==='collapsed';
+function hideSidebarTooltip(){sidebarTooltip.hidden=true;sidebarHovered=null;}
+function syncSidebarControl(){const collapsed=compactSidebar(),label=collapsed?'Expand menu':'Collapse menu';sidebarCollapse.setAttribute('aria-expanded',String(!collapsed));sidebarCollapse.setAttribute('aria-label',label);sidebarCollapse.querySelector('.sidebar-toggle-label').textContent=label;hideSidebarTooltip();}
+sidebarCollapse.addEventListener('click',()=>{const collapsed=!compactSidebar();document.documentElement.dataset.sidebar=collapsed?'collapsed':'expanded';try{localStorage.setItem('tadsa-sidebar-collapsed',String(collapsed));}catch{}syncSidebarControl();});
+const tooltipTarget=target=>target instanceof Element?target.closest('#workspace-navigation nav a,#sidebar-collapse,#local-signout'):null;
+function showSidebarTooltip(target){if(!compactSidebar()||!target||target.matches(':disabled')||document.documentElement.dataset.authState!=='ready'){hideSidebarTooltip();return;}sidebarTooltip.textContent=target.getAttribute('aria-label')||target.textContent.trim();sidebarTooltip.hidden=false;const bounds=target.getBoundingClientRect();sidebarTooltip.style.left=drawer.getBoundingClientRect().right+'px';sidebarTooltip.style.top=Math.max(8,Math.min(innerHeight-sidebarTooltip.offsetHeight-8,bounds.top+(bounds.height-sidebarTooltip.offsetHeight)/2))+'px';}
+drawer.addEventListener('mouseover',e=>{sidebarHovered=tooltipTarget(e.target);showSidebarTooltip(sidebarHovered);});
+drawer.addEventListener('mouseleave',e=>{if(e.relatedTarget instanceof Node&&sidebarTooltip.contains(e.relatedTarget))return;sidebarHovered=null;showSidebarTooltip(tooltipTarget(document.activeElement));});
+sidebarTooltip.addEventListener('mouseleave',()=>showSidebarTooltip(tooltipTarget(document.activeElement)));
+drawer.addEventListener('focusin',e=>showSidebarTooltip(tooltipTarget(e.target)));
+drawer.addEventListener('focusout',()=>{hideSidebarTooltip();});
+drawer.addEventListener('click',hideSidebarTooltip);
+drawer.addEventListener('scroll',hideSidebarTooltip);
+window.addEventListener('resize',hideSidebarTooltip);
+window.addEventListener('hashchange',hideSidebarTooltip);
+window.addEventListener('tadsa-auth-locked',hideSidebarTooltip);
+window.addEventListener('storage',e=>{if(e.key==='tadsa-sidebar-collapsed'||e.key===null)syncSidebarControl();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSidebarTooltip();});
+mobileMedia.addEventListener('change',syncSidebarControl);syncSidebarControl();

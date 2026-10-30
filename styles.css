@@ -424,6 +424,35 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 .document-availability{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 24px}
 .document-availability>div{padding:12px;border:1px solid var(--line);border-radius:8px;min-width:0}
 .document-availability dt{font-weight:650;margin-bottom:6px}.document-availability dd{margin:0;font-size:14px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+/* Original SVG navigation icons keep their labels in the accessibility tree. */
+.sidebar .nav-icon,.sidebar-collapse svg,.signout-icon{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.brand-mark,.sidebar-collapse{display:none}
+.signout-icon{display:none}
+.sidebar #sidebar-session [role=alertdialog] button.secondary{background:var(--surface,#fff);color:var(--text,#28314b);border-color:var(--line)}
+.sidebar #sidebar-session [role=alertdialog] button.secondary:hover{background:var(--surface-soft,#eef1f9)}
+.sidebar-tooltip{position:fixed;z-index:80;max-width:240px;padding:9px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface,#fff);color:var(--text,#28314b);box-shadow:0 4px 16px #0003;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+@media screen and (min-width:801px){
+ .sidebar-collapse{display:flex;align-items:center;justify-content:flex-start;gap:10px;min-height:44px;padding:8px 12px;margin:0 0 10px;border:1px solid #8291c8;border-radius:6px;background:transparent;color:#fff;font-size:13px;flex:none}
+ .sidebar-collapse:hover{background:#ffffff18}
+ .sidebar-collapse:focus-visible{outline-color:#fff}
+ .sidebar nav a{flex:none}
+ html[data-sidebar=collapsed] .app-shell{grid-template-columns:76px minmax(0,1fr)}
+ html[data-sidebar=collapsed] .sidebar{padding:16px 10px;gap:0;overflow-y:auto;overflow-x:hidden}
+ html[data-sidebar=collapsed] .sidebar .brand{margin:0 0 12px;display:flex;justify-content:center;min-height:44px;flex:none}
+ html[data-sidebar=collapsed] .brand-logo,html[data-sidebar=collapsed] .brand-caption{display:none}
+ html[data-sidebar=collapsed] .brand-mark{display:block;font-size:28px;font-weight:750;line-height:1;letter-spacing:0;color:#fff}
+ html[data-sidebar=collapsed] .sidebar-collapse{justify-content:center;padding:8px;margin-bottom:10px}
+ html[data-sidebar=collapsed] .sidebar-collapse svg{transform:rotate(180deg)}
+ html[data-sidebar=collapsed] .sidebar .nav-label,html[data-sidebar=collapsed] .sidebar-toggle-label,html[data-sidebar=collapsed] .sidebar .signout-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ html[data-sidebar=collapsed] .sidebar nav{display:flex;flex-direction:column;gap:6px;flex:none}
+ html[data-sidebar=collapsed] .sidebar nav a{justify-content:center;gap:0;padding:10px;min-height:46px}
+ html[data-sidebar=collapsed] .sidebar-bottom{padding:12px 0 0}
+ html[data-sidebar=collapsed] .sidebar-bottom>:not(#sidebar-session),html[data-sidebar=collapsed] #sidebar-session .session-controls>a{display:none}
+ html[data-sidebar=collapsed] #sidebar-session{margin:0;padding:10px 0 0}
+ html[data-sidebar=collapsed] .sidebar #local-signout{display:flex;align-items:center;justify-content:center;padding:10px;min-height:46px}
+ html[data-sidebar=collapsed] .sidebar .signout-icon{display:block}
+ html[data-sidebar=collapsed] #sidebar-session [role=alertdialog]{position:fixed;left:84px;bottom:16px;width:320px;max-height:calc(100dvh - 32px);overflow-y:auto;z-index:85;box-shadow:0 4px 20px #0004;text-align:left}
+}
 @media(min-width:1101px){
  .project-workspace .record-header{grid-template-columns:minmax(240px,.8fr) minmax(0,1.5fr);gap:16px}
  .project-workspace .record-header>.record-meta{grid-template-columns:repeat(4,minmax(0,1fr));max-width:none;align-items:stretch}
