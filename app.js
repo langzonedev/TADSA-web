@@ -18,7 +18,7 @@ import {renderCredentials} from './technician-credentials.js';
 import {renderAvailability} from './availability.js';
 import {renderTechnicianLocation} from './technician-location.js';
 import {renderClientDetails,clientDetailsSummary,clientDetailsHasDrafts} from './client-details.js';
-import { configureWorkflows, renderWorkflow, workflowHasDrafts, addClientContactActions } from './workflows.js';
+import { configureWorkflows, renderWorkflow, workflowHasDrafts, renderProjectDraftReturn, addClientContactActions } from './workflows.js';
 const main = document.querySelector('#content');
 const globalInput = document.querySelector('#global-query');
 const announcement = document.querySelector('#announcement');
@@ -35,8 +35,8 @@ configureWorkflows({ isSaving: () => saving, setSaving: value => { saving = valu
 configureOperations({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>render()});
 configureCare({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>render()});
 const el = (tag, text, className) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; };
-const link = (text, hash, className) => { const a = el('a', text, className); a.href = `#${hash}`; return a; };
-const button = (text, action, className = 'secondary') => { const b = el('button', text, className); b.type = 'button'; b.addEventListener('click', action); return b; };
+const link = (text, hash, className) => { const a = el('a', text, className); if(/^(Edit|Update)\b/.test(text))a.classList.add('outlined-action'); a.href = `#${hash}`; return a; };
+const button = (text, action, className = 'secondary') => { const b = el('button', text, className); if(/^(Edit|Update)\b/.test(text))b.classList.add('outlined-action'); b.type = 'button'; b.addEventListener('click', action); return b; };
 const cap = text => text ? text[0].toUpperCase() + text.slice(1) : 'Not recorded';
 const initials = name => name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('');
 const avatar = name => { const n = el('span', initials(name), 'avatar'); n.setAttribute('aria-hidden', 'true'); return n; };
@@ -179,14 +179,27 @@ async function search(view, term) {
   view.append(el('p', results.length === 50 ? 'Showing the first 50 results. Refine your search with a name or reference to find a specific record.' : `${results.length} matching record${results.length === 1 ? '' : 's'}`, 'muted'), box); if(results.length===50){const directories=el('div',undefined,'actions');directories.append(link('Browse people','people','button secondary'),link('Browse organisations','organisations','button secondary'),link('Browse projects','projects','button secondary'));view.append(directories);}
 }
 function recordHeader(view, eyebrow, title, meta, action) { const header = el('div', undefined, 'record-header'); const text = el('div'); text.append(el('div', eyebrow, 'eyebrow'), el('h1', title)); if (meta) text.append(meta); header.append(text); if (action) header.append(action); view.append(header); return header; }
-function clientContactSummary(box, client) {
-  box.append(details([['Residential address', residentialAddressText(client.details)||'Not recorded'], ['National Disability Insurance Scheme (NDIS) number',client.ndis?.number||'Not recorded']]),link('Edit client contact and addresses','client-details/'+client.id,'text-button'));
+function contactRoles(person){
+  const meta=el('div',undefined,'record-meta contact-roles');meta.setAttribute('aria-label','Contact roles');
+  for(const role of person.roles?.length?person.roles:[person.role||'Role not recorded'])meta.append(el('span',role,'contact-role'));
+  return meta;
 }
-async function client(view, id) {
-  const c = await api(`clients/${id}`); view.append(link('← Back to people', 'people', 'breadcrumb'));
-  const meta = el('div', undefined, 'record-meta'); meta.append(el('span', 'Client'), el('span', `${c.projects.length} linked projects`)); recordHeader(view, 'Client record', c.person.name, meta, link('New project', `new-project/${c.id}`, 'button primary'));
-  const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel('Contact details'); info.append(details([['Email', c.person.email], ['Phone', c.person.phone]]), link('Edit profile & roles', 'edit-person/' + c.person.id, 'text-button'));
-  clientContactSummary(info,c);const contacts = panel('Client contacts'); addClientContactActions(contacts, c); left.append(info);await renderProfileDetails(left,c.person);left.append(clientDetailsSummary(c),contacts);const right=el('div'); const related = relationships(c.relationships); related.querySelector('h2').textContent = 'People linked through projects';right.append(projectLinks(c.projects),related); grid.append(left, right); view.append(el('div', undefined, 'heading-rule'), grid);
+async function client(view,id){
+  const c=await api('clients/'+id),person=await api('people/'+c.person.id);await contactRecord(view,person,c);
+}
+async function contactRecord(view,person,c=null){
+  view.classList.add('contact-workspace');view.append(link('← Back to people','people','breadcrumb'));
+  recordHeader(view,'Contact record',person.name,contactRoles(person),c?link('New project','new-project/'+c.id,'button primary'):undefined);
+  const grid=el('div',undefined,'detail-layout contact-detail-layout'),left=el('div'),right=el('div');
+  await renderProfileDetails(left,person,{client:c});
+  if(c){left.append(clientDetailsSummary(c));const contacts=panel('Referrers, carers & other contacts');contacts.append(el('p','People linked to this client across their work. Project-specific contacts are recorded separately on each project.','field-help'));addClientContactActions(contacts,c);left.append(contacts);}
+  if(person.technician){
+    await renderTechnicianLocation(left,person.id);try{await renderCredentials(left,person.id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}
+    const tech=panel('Technician details');tech.append(details([['Skills',person.technician.skills.join(', ')||'Not recorded'],['General allocation status',person.technician.availability==='unknown'?'Not recorded':cap(person.technician.availability)]]),el('p','General allocation status is separate from dated calendar entries. Check the dates before assigning work.','field-help'),link('View calendar availability','availability/'+person.id,'button secondary'));left.append(tech);
+  }
+  right.append(projectLinks(c?.projects??person.projects));
+  if(c){const related=relationships(c.relationships);related.querySelector('h2').textContent='Contacts linked through projects';right.append(related);}
+  grid.append(left,right);view.append(grid);
 }
 function auditPanel(p,operationsPromise,managed=false) {
   const names=new Map([[p.id,p.reference+' · '+p.title],[p.clientId,p.clientName],...p.relationships.map(r=>[r.id,r.name])]);
@@ -353,17 +366,27 @@ async function project(view, id) {
   view.addEventListener('click',event=>{const a=event.target.closest('a');if(a?.getAttribute('href')==='#project/'+id+'/costs'){event.preventDefault();navigate('Costs & invoices');}});
   draw();await loadEmbedded(tab);if(tab==='Files')await loadFiles();
 }
-async function entity(view, type, id) {
-  const item = await api(`${pathOf(type)}/${id}`); view.append(link(type==='person'?'← Back to people':'← Back to organisations',type==='person'?'people':'organisations','breadcrumb'));
-  const meta = el('div', undefined, 'record-meta'); meta.append(el('span', item.roles?.join(' · ') ?? item.role)); recordHeader(view, type === 'person' ? 'Person record' : 'Organisation record', item.name, meta, type === 'person' ? link('Edit profile & roles', 'edit-person/' + id, 'button primary') : undefined);
-  const grid = el('div', undefined, 'detail-layout person-detail-layout'); const left = el('div'); const info = panel(type === 'person' ? 'Contact details' : 'About this organisation');
-  info.append(type === 'person' ? details([['Email', item.email], ['Phone', item.phone], ['Roles', item.roles?.join(', ') || item.role],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]) : el('p', item.description, 'record-summary'));
-  if (item.clientId) {const linkedClient=await api('clients/'+item.clientId);clientContactSummary(info,linkedClient);info.append(link('Client details & projects →', `client/${item.clientId}`, 'button primary'),link('New project for this person','new-project/'+item.clientId,'button secondary'));}
-  if(type==='organisation'){info.append(details([['Roles',item.roles?.join(', ')||item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded'],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]),link('Edit organisation','edit-organisation/'+id,'button secondary'));}
-  left.append(info);
-  if(type==='person')await renderProfileDetails(left,item);
-  if (item.technician) {await renderTechnicianLocation(left,id);try{await renderCredentials(left,id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}}
-  if (item.technician) { const tech = panel('Technician details'); tech.append(details([['Skills', item.technician.skills.join(', ') || 'Not recorded'], ['General allocation status', item.technician.availability==='unknown'?'Not recorded':cap(item.technician.availability)]])); tech.append(el('p','General allocation status is separate from dated calendar entries. Check the dates before assigning work.','field-help'),link('View calendar availability','availability/'+id,'text-button')); left.append(tech); } const right=el('div');right.append(projectLinks(item.projects)); const context = panel('Record context'); context.append(el('p', 'People and organisations are relationship records. They do not represent staff sign-in accounts.', 'muted'));right.append(context); grid.append(left, right); view.append(el('div', undefined, 'heading-rule'), grid);
+async function entity(view,type,id){
+  const item=await api(`${pathOf(type)}/${id}`);
+  if(type==='person'){const c=item.clientId?await api('clients/'+item.clientId):null;await contactRecord(view,item,c);return;}
+  view.append(link('← Back to organisations','organisations','breadcrumb'));
+  const meta=el('div',undefined,'record-meta');meta.append(el('span',item.roles?.join(' · ')??item.role));recordHeader(view,'Organisation record',item.name,meta);
+  const grid=el('div',undefined,'detail-layout'),left=el('div'),info=panel('About this organisation');info.append(el('p',item.description,'record-summary'),details([['Roles',item.roles?.join(', ')||item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded'],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]),link('Edit organisation','edit-organisation/'+id,'button secondary'));left.append(info);grid.append(left,projectLinks(item.projects));view.append(grid);
+}
+const contactJourneyRoutes=new Set(['client','person','edit-person','client-details','link-contact','link-referrer','availability']);
+let contactProjectReturn='';
+function trackContactOrigin(oldHash,newHash){
+  const oldRoute=oldHash.replace(/^#/,''),nextRoute=newHash.replace(/^#/,'').split('/')[0];
+  if(oldRoute.startsWith('project/')&&contactJourneyRoutes.has(nextRoute))contactProjectReturn=oldRoute;
+  else if(!contactJourneyRoutes.has(nextRoute))contactProjectReturn='';
+}
+function showContactReturn(view,route){
+  if(!contactProjectReturn||!contactJourneyRoutes.has(route))return;
+  const back=link('← Back to project',contactProjectReturn,'breadcrumb');
+  const existing=view.querySelector('a.breadcrumb[href="#people"]');if(existing)existing.replaceWith(back);else view.prepend(back);
+}
+function outlineEditActions(view){
+  for(const control of view.querySelectorAll('a,button'))if(/^(Edit|Update)\b/.test(control.textContent.trim())&&!control.closest('[role=tablist],.project-more-menu')&&!control.matches('[type=submit]'))control.classList.add('outlined-action');
 }
 async function render() {
   if (saving) { announce('Please wait for the save to finish.'); return; }
@@ -373,7 +396,7 @@ async function render() {
   // Mount the route while it loads so record identity and progress are visible.
   // The partial view stays inert until all its required data is ready.
   const loading=el('p','Loading workspace…','loading');loading.setAttribute('role','status');view.append(loading);view.inert=true;main.replaceChildren(view);main.setAttribute('aria-busy','true');
-  const active = ({ project: 'projects', client: 'people', person: 'people', organisation: 'organisations', 'organisation-category':'organisations','new-organisation':'organisations','edit-organisation':'organisations', clients:'people', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'people', 'new-project': 'projects', coordination: 'projects', operations:'projects',documents:'projects','client-details':'people' })[route] ?? route;
+  const active = ({ project: 'projects', client: 'people', person: 'people', organisation: 'organisations', 'organisation-category':'organisations','new-organisation':'organisations','edit-organisation':'organisations', clients:'people', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'people', 'new-project': 'projects', 'link-referrer':'people', 'link-contact':'people', coordination: 'projects', operations:'projects',documents:'projects','client-details':'people' })[route] ?? route;
   document.querySelectorAll('[data-nav]').forEach(a => { if (a.dataset.nav === active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   try {
     const arg = decodeURIComponent(raw);
@@ -393,7 +416,7 @@ async function render() {
     else if (route === 'person' || route === 'organisation') await entity(view, route, arg);
     else view.append(heading('Page not found', 'Return to your workspace to continue.'), link('Open projects', 'projects', 'button primary'));
   } catch (error) { view.replaceChildren(heading('Unable to load this view', 'Your unsaved project drafts are retained in this browser tab.'), message(error.status ? error.message : 'Check that the local application and database are running, then try again.', true), button('Try again', render, 'primary'), link('Back to projects', 'projects', 'text-button')); }
-  if (ticket === renderVersion) { loading.remove();view.inert=false;main.replaceChildren(view); main.removeAttribute('aria-busy'); main.focus({ preventScroll: true }); window.scrollTo(0, 0); document.title = `TADSA · ${view.querySelector('h1')?.textContent ?? 'Workspace'}`; }
+  if (ticket === renderVersion) { showContactReturn(view,route);renderProjectDraftReturn(view,route);outlineEditActions(view);loading.remove();view.inert=false;main.replaceChildren(view); main.removeAttribute('aria-busy'); main.focus({ preventScroll: true }); window.scrollTo(0, 0); document.title = `TADSA · ${view.querySelector('h1')?.textContent ?? 'Workspace'}`; }
 }
 // Debounced live suggestions keep focus in the field and reject stale responses.
 const searchForm=document.querySelector('#global-search');
@@ -409,7 +432,7 @@ searchForm.addEventListener('focusout',()=>setTimeout(()=>{if(!searchForm.contai
 document.querySelector('#global-search').addEventListener('submit', event => { event.preventDefault(); closeSearchPreview(); if (saving) { announce('Please wait for the save to finish.'); return; } const target = `#search/${encodeURIComponent(globalInput.value.trim())}`; if (location.hash === target) render(); else location.hash = target; });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); main.focus(); });
 window.addEventListener('keydown', event => { if (document.documentElement.dataset.authState==='ready' && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if(drawerOpen)setDrawer(false,false);globalInput.focus(); globalInput.select(); } });
-window.addEventListener('hashchange', event => { if (saving) { history.replaceState(null, '', new URL(event.oldURL).hash || '#projects'); announce('Your changes are saving. Please wait before leaving this record.'); const pending = main.querySelector('.message'); if (pending) pending.textContent = 'Your changes are saving. Please wait before leaving this record.'; return; } if(announcementRoute!==(location.hash||'#projects')){announcement.textContent='';document.querySelector('.save-toast')?.remove();clearTimeout(toastTimer);} render(); });
+window.addEventListener('hashchange', event => { if (saving) { history.replaceState(null, '', new URL(event.oldURL).hash || '#projects'); announce('Your changes are saving. Please wait before leaving this record.'); const pending = main.querySelector('.message'); if (pending) pending.textContent = 'Your changes are saving. Please wait before leaving this record.'; return; } trackContactOrigin(new URL(event.oldURL).hash,location.hash);if(announcementRoute!==(location.hash||'#projects')){announcement.textContent='';document.querySelector('.save-toast')?.remove();clearTimeout(toastTimer);} render(); });
 window.addEventListener('beforeunload', event => { if(sessionEnded||workspaceRestored)return; if (drafts.size || workflowHasDrafts() || operationsHaveDrafts() || careHasDrafts() || clientDetailsHasDrafts() || saving) { event.preventDefault(); event.returnValue = ''; } });
 render();
 // The desktop rail becomes a focus-contained navigation drawer on small screens.

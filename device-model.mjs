@@ -62,6 +62,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   if(kind==='clients'&&!id)keys=['requestId','name','email','phone','allowDuplicate'];
   if(kind==='people'&&!id)keys=['requestId','name','email','phone','allowDuplicate',...(input.roles?['roles','technician']:['role'])];
   if(kind==='people'&&sub==='profile')keys=['requestId','allowDuplicate','version','name','email','phone','roles','technician'];
+  if(kind==='clients'&&sub==='ndis')keys=['requestId','version','number'];
   if(kind==='clients'&&sub==='details')keys=['version','name','email','phone','residentialAddress','workAddress','sameAsResidential','preferredContact','representativePersonId','contactNeeds',...[...RESIDENTIAL_FIELDS,...CLIENT_GEOCODE_FIELDS].filter(k=>Object.hasOwn(input??{},k))];
   if(kind==='clients'&&sub==='contacts')keys=['requestId','personId','role',...(Object.hasOwn(input,'relationshipLabel')?['relationshipLabel']:[])];
   if(kind==='projects'&&!id)keys=['requestId','clientId','title','summary','kind','requiredSkills','technicianId','fundingStatus','payerId','fundingNotes'];
@@ -83,6 +84,15 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
  }
 
  if(extensionHandler)extensionHandler({d,parts,method,input,query,find,version,bump,project,ops,event,next,payer,str,integer,actorContext,phase:'guard'});
+ if(kind==='clients'&&sub==='ndis'&&!subid){
+  find('clients',id);const saved=d.clientNdis[id]??{number:'',version:0};
+  if(method==='GET')return {...saved};
+  if(method!=='PUT')fail('This action is not available.',405);
+  integer(input.version,2147483647);const number=str(input.number,30);if(number&&!/^[0-9 ]{3,30}$/.test(number))fail('Enter a numeric NDIS number or leave it blank.');
+  if(saved.version!==input.version)fail('The client NDIS number changed. Reload and compare.',409,{code:'VERSION_CONFLICT'});
+  if(saved.number!==number){d.clientNdis[id]={number,version:saved.version+1};event('clients',id,'NDIS number updated',{numberChanged:true});}
+  return {...(d.clientNdis[id]??saved)};
+ }
  if(kind==='auth')return {configured:false,authenticated:false,storage:'device-local'};
  if(kind==='health')return {application:'tadsa-device-preview',version:'1.0.0',storage:'indexeddb'};
  if(kind==='organisations'&&((!id&&method==='POST')||(id&&sub==='profile'&&method==='PUT'))){

@@ -8,6 +8,13 @@ const drafts = new Map();
 let host;
 export const configureWorkflows = options => { host = options; };
 export const workflowHasDrafts = () => [...drafts.values()].some(d => d.dirty || d.pending);
+export function renderProjectDraftReturn(view,route){
+  const d=drafts.get('new-project');
+  if(route==='new-project'||!d||(!d.dirty&&!d.pending&&d.step===1))return;
+  const banner=el('aside',null,'project-draft-return');banner.setAttribute('aria-label','Project in progress');
+  const context=el('div');context.append(el('strong',d.title.trim()||'New project in progress'),el('span',`Step ${d.step} of 4 · Unsaved draft kept in this tab.`));
+  banner.append(context,link('← Return to project draft','new-project','button secondary'));view.prepend(banner);
+}
 const el = (tag, text, cls) => { const n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; };
 const link = (text, route, cls = 'text-button') => { const n = el('a', text, cls); n.href = '#' + route; return n; };
 const button = (text, action, cls = 'secondary') => { const n = el('button', text, cls); n.type = 'button'; n.addEventListener('click', action); return n; };
@@ -102,19 +109,19 @@ function coordinationFields(form, d, directories, focus) {
   if (focus === 'funding') return;
   d.technicianIds??=d.technicianId?[d.technicianId]:[];
   const assignment = el('fieldset'); assignment.append(el('legend', 'Choose the technical team'), el('p', 'Use recorded skills to narrow the list. Confirm availability and suitability with the technician before work begins.', 'field-help'));
-  const skills = el('div', null, 'skill-options'); const technicians = el('div');let technicianPage=0,technicianQuery='',calendarGeneration=0;
+  const skills = el('div', null, 'skill-options'); const technicians = el('div');let technicianPage=d.technicianPage??0,technicianQuery=d.technicianQuery??'',calendarGeneration=0;
   for (const skill of directories.skills) check(skills, skill, d.requiredSkills.includes(skill), on => { d.requiredSkills = on ? [...d.requiredSkills,skill] : d.requiredSkills.filter(s => s !== skill); d.assignmentAcknowledged = false; touch(d); drawTechnicians(); });
   assignment.append(el('h3', 'Skills needed (optional)'), skills);
   check(assignment, 'Show technicians who do not match all selected skills', d.showAll ?? false, on => { d.showAll = on; drawTechnicians(); });
   const areaFilter=selectField(assignment,'Technician service area filter',d,'filterArea',[['','Any service area'],...directories.serviceAreas.map(a=>[a.id,a.label])]);const postcodeFilter=field(assignment,'Technician postcode filter',d,'filterPostcode',{max:4,help:'Type a postcode to narrow the list using a saved technician base or person contact address. No travel distance is inferred.'});postcodeFilter.inputMode='numeric';areaFilter.addEventListener('change',()=>{d.assignmentAcknowledged=false;drawTechnicians();});postcodeFilter.addEventListener('input',()=>{d.assignmentAcknowledged=false;drawTechnicians();});
   assignment.append(link('View all technician calendars and service areas','availability'),technicians); form.append(assignment);
-  const searchLabel=el('label',null,'workflow-field'),search=el('input');search.type='search';search.maxLength=120;search.setAttribute('aria-label','Search technician names');searchLabel.append(el('span','Search technician names','field-label'),search);assignment.insertBefore(searchLabel,technicians);search.addEventListener('input',()=>{if(d.pending||host.isSaving()){search.value=technicianQuery;return;}technicianQuery=search.value;technicianPage=0;drawTechnicians();});
+  const searchLabel=el('label',null,'workflow-field'),search=el('input');search.type='search';search.value=technicianQuery;search.maxLength=120;search.setAttribute('aria-label','Search technician names');searchLabel.append(el('span','Search technician names','field-label'),search);assignment.insertBefore(searchLabel,technicians);search.addEventListener('input',()=>{if(d.pending||host.isSaving()){search.value=technicianQuery;return;}technicianQuery=search.value;d.technicianQuery=technicianQuery;technicianPage=0;drawTechnicians();});
   function drawTechnicians(focusPage=false) {
     const generation=++calendarGeneration;
     technicians.replaceChildren();
     if(d.technicianId&&!directories.technicians.some(t=>t.id===d.technicianId)) technicians.append(note('The previously assigned person is no longer listed as a technician. Their saved assignment remains in the project history. Choose active technical members or clear the team selection before saving this allocation.',true));
     const locationMatches=t=>(!d.filterArea||(t.serviceAreas||[]).includes(d.filterArea))&&(!d.filterPostcode||String(t.postcode||'').startsWith(d.filterPostcode.trim()));const visible = directories.technicians.filter(t => d.technicianIds.includes(t.id) || ((d.showAll || d.requiredSkills.every(s => t.skills.includes(s)))&&locationMatches(t)));
-    const selectedRows=visible.filter(t=>d.technicianIds.includes(t.id)),matches=visible.filter(t=>!d.technicianIds.includes(t.id)&&t.name.toLocaleLowerCase('en-AU').includes(technicianQuery.trim().toLocaleLowerCase('en-AU')));technicianPage=Math.min(technicianPage,Math.max(0,Math.ceil(matches.length/50)-1));const start=technicianPage*50,rows=[...selectedRows,...matches.slice(start,start+50)];if(d.technicianIds.length)technicians.append(button('Clear team selection',()=>{d.technicianIds=[];d.technicianId='';d.assignmentAcknowledged=false;touch(d);drawTechnicians();}));technicians.append(el('p',d.technicianIds.length?`${d.technicianIds.length} technical members selected`:'No technician assigned yet. You can allocate the team later.','field-help'));
+    const selectedRows=visible.filter(t=>d.technicianIds.includes(t.id)),matches=visible.filter(t=>!d.technicianIds.includes(t.id)&&t.name.toLocaleLowerCase('en-AU').includes(technicianQuery.trim().toLocaleLowerCase('en-AU')));technicianPage=Math.min(technicianPage,Math.max(0,Math.ceil(matches.length/50)-1));d.technicianPage=technicianPage;const start=technicianPage*50,rows=[...selectedRows,...matches.slice(start,start+50)];if(d.technicianIds.length)technicians.append(button('Clear team selection',()=>{d.technicianIds=[];d.technicianId='';d.assignmentAcknowledged=false;touch(d);drawTechnicians();}));technicians.append(el('p',d.technicianIds.length?`${d.technicianIds.length} technical members selected`:'No technician assigned yet. You can allocate the team later.','field-help'));
     const paging=el('div',null,'actions'),previous=button('Previous technicians',()=>{if(d.pending||host.isSaving())return;technicianPage--;drawTechnicians(true);}),next=button('Next technicians',()=>{if(d.pending||host.isSaving())return;technicianPage++;drawTechnicians(true);}),pageStatus=el('span',`${matches.length?start+1:0}–${Math.min(start+50,matches.length)} of ${matches.length} matching unselected technicians. ${selectedRows.length} selected members remain visible.`);pageStatus.tabIndex=-1;pageStatus.setAttribute('role','status');previous.disabled=start===0||Boolean(d.pending)||host.isSaving();next.disabled=start+50>=matches.length||Boolean(d.pending)||host.isSaving();paging.append(previous,pageStatus,next);technicians.append(paging);if(focusPage)pageStatus.focus({preventScroll:true});
     for (const t of rows) {
       const l = el('label', null, 'choice-card'); const radio = el('input'); radio.type = 'checkbox'; radio.name = 'technician'; radio.value = t.id; radio.checked = d.technicianIds.includes(t.id);
@@ -160,7 +167,7 @@ async function newProject(view, clientId) {
     slot.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.destroy());slot.replaceChildren(); steps.querySelectorAll('li').forEach((n,i) => i+1 === d.step ? n.setAttribute('aria-current','step') : n.removeAttribute('aria-current'));
     const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technical team','Review'][d.step-1]}`); const form = el('form', null, 'form-grid'); const notice = el('div');
     if (d.step === 1) {
-      const picker=createRecordPicker({label:'Existing client',kind:'clients',selectedId:d.clientId,required:true,onChange:async(id,item)=>{d.clientId=id;selected=item?{person:{name:item.name},details:{residentialAddress:item.address}}:null;touch(d);if(id){try{const client=await request('clients/'+id);if(d.clientId===id)selected=client;}catch{}}}});picker.element.recordPicker=picker;form.append(picker.element,link('Create new client','new-client/project','button secondary'),el('p','Search by name, reference, phone, email or address. Confirm the person’s details before choosing.','field-help'));
+      const picker=createRecordPicker({label:'Existing client',kind:'clients',selectedId:d.clientId,required:true,onConfirm:()=>form.requestSubmit(),onChange:async(id,item)=>{d.clientId=id;selected=item?{person:{name:item.name},details:{residentialAddress:item.address}}:null;touch(d);if(id){try{const client=await request('clients/'+id);if(d.clientId===id)selected=client;}catch{}}}});picker.element.recordPicker=picker;form.append(picker.element,link('Create new client','new-client/project','button secondary'),el('p','Search by name, reference, phone, email or address. Confirm the person’s details before choosing.','field-help'));
     } else if (d.step === 2) {
       form.append(note(`Client: ${selected?.person.name ?? 'Choose a client first'}`));
       field(form,'Project title',d,'title',{required:true,help:'A short description the client and team will recognise.'});
@@ -232,8 +239,8 @@ async function editCoordination(view,id,options={}) {
   else if(d.version!==project.version)compare(project);
 }
 
-async function linkContact(view,id) {
-  const client=await request('clients/'+id);const key='contact/'+id;const d=getDraft(key,{mode:'existing',personId:'',role:'Occupational therapist',relationshipLabel:'',name:'',phone:'',email:'',allowDuplicate:false,personRequestId:crypto.randomUUID()});
+async function linkContact(view,id,initialRole='Occupational therapist') {
+  const client=await request('clients/'+id);const key='contact/'+id;const d=getDraft(key,{mode:'existing',personId:'',role:initialRole,relationshipLabel:'',name:'',phone:'',email:'',allowDuplicate:false,personRequestId:crypto.randomUUID()});
   title(view,'Link a contact',`Client: ${client.person.name}. This links a person to the client, not to every project.`, 'client/'+id);
   const box=panel('Contact details');const form=el('form',null,'form-grid');selectField(form,'Relationship to client',d,'role',[['Occupational therapist','Occupational therapist (OT)'],['Carer','Carer'],['Referrer','Referrer']],()=>{d.personId='';drawPerson();});
   field(form,'Relationship description (optional)',d,'relationshipLabel',{max:120});form.append(el('p','For example: parent, guardian or support coordinator. Multiple contacts can be linked; the preferred contact is selected separately in Client details.','field-help'));
@@ -258,7 +265,7 @@ async function linkContact(view,id) {
   if(d.pending||d.personPending){notice.append(note('A previous save was not confirmed. Retry using the same details.'));lock(form,true,submit);submit.textContent='Retry save safely';}
 }
 export function addClientContactActions(box,client) {
-  box.append(link('Link a contact','link-contact/'+client.id,'button secondary'));
+  const actions=el('div',null,'actions');actions.append(link('Link a contact','link-contact/'+client.id,'button secondary'),link('Link a referrer','link-referrer/'+client.id,'button secondary'));box.append(actions);
   if(!client.contacts?.length)box.append(el('p','No client contacts linked yet. Add an occupational therapist, carer or referrer.','muted'));
   for(const c of client.contacts??[]){const row=el('div',null,'contact-row');const text=el('div');text.append(link(c.name,'person/'+c.personId,'row-title'),el('p',[c.role,c.relationshipLabel].filter(Boolean).join(' · '),'muted'));row.append(text);
     row.append(button(`Unlink ${c.name}`,()=>{const preferred=client.details?.preferredContact==='representative'&&client.details.representativePersonId===c.personId,otherLink=client.contacts.some(other=>other.personId===c.personId&&other.role!==c.role);const impact=preferred?(otherLink?' Another contact link to this preferred representative will remain.':' This is the client’s preferred representative. Unlinking will make intake details incomplete. Review Client details afterward and choose the client or another linked representative.'):'';const prompt=note(`Remove ${c.name} from this client’s contacts? The person record and project links will remain.${impact}`);const d={requestId:crypto.randomUUID()};const form=el('form');const submit=saveButton('Unlink contact');form.append(submit,button('Keep contact',()=>prompt.remove()));const feedback=el('div');form.append(feedback);prompt.append(form);row.append(prompt);form.addEventListener('submit',e=>{e.preventDefault();save(form,d,feedback,submit,`clients/${client.id}/contacts/remove`,'POST',{requestId:d.requestId,personId:c.personId,role:c.role},()=>{host.refresh();});});},'text-button'));box.append(row);}
@@ -268,6 +275,7 @@ export async function renderWorkflow(view,route,arg,options={}) {
   else if(route==='new-client')await newClient(view,arg);
   else if(route==='new-project')await newProject(view,arg);
   else if(route==='link-contact')await linkContact(view,arg);
+  else if(route==='link-referrer')await linkContact(view,arg,'Referrer');
   else if(route==='coordination')await editCoordination(view,arg,options);
   else if(['organisation-category','edit-organisation','new-organisation'].includes(route))await organisationCategory(view,route==='new-organisation'?null:arg);
   else return false;
