@@ -37,12 +37,12 @@ export function editor(parent,key,initial,title,fields,path,method,payload,optio
  const d=drafts.get(key)??{...initial,requestId:crypto.randomUUID()},box=node('section',null,'panel workflow-panel'),form=node('form',null,'form-grid');if(title)box.append(node('h2',title));box.append(form);parent.append(box);fields(form,d);const feedback=node('div'),buttons=node('div',null,'actions'),save=node('button','Save','primary');save.type='submit';const discard=action('Discard unsaved changes',()=>{drafts.delete(key);host.refresh();});buttons.append(save,discard);form.append(feedback,buttons);const remember=()=>drafts.set(key,d);form.addEventListener('input',remember);form.addEventListener('change',remember);
  save.dataset.label=options.saveLabel??editorSaveLabels[key.split('/')[0]]??'Save';
  const disabledBeforeSave=new Map();
- const lock=()=>{form.querySelectorAll('input,select,textarea,button').forEach(n=>{if(d.pending){if(!disabledBeforeSave.has(n))disabledBeforeSave.set(n,n.disabled);n.disabled=n!==save;}else if(disabledBeforeSave.has(n)){n.disabled=disabledBeforeSave.get(n);disabledBeforeSave.delete(n);}});save.textContent=d.pending?'Retry save safely':(save.dataset.label||'Save');};lock();
+ const lock=()=>{form.querySelectorAll('input,select,textarea,button').forEach(n=>{if(d.pending){if(!disabledBeforeSave.has(n))disabledBeforeSave.set(n,n.disabled);n.disabled=n!==save;}else if(disabledBeforeSave.has(n)){n.disabled=disabledBeforeSave.get(n);disabledBeforeSave.delete(n);}});form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(Boolean(d.pending)));save.textContent=d.pending?'Retry save safely':(save.dataset.label||'Save');};lock();
  form.onsubmit=async e=>{
   e.preventDefault();if(host.isSaving())return;
   const workspace=form.closest('main'),wasInert=workspace?.inert??false;let refreshed=false;
   if(workspace){workspace.inert=true;workspace.setAttribute('aria-busy','true');}
-  host.setSaving(true);form.querySelectorAll('input,select,textarea,button').forEach(n=>{if(!disabledBeforeSave.has(n))disabledBeforeSave.set(n,n.disabled);n.disabled=true;});
+  host.setSaving(true);form.querySelectorAll('input,select,textarea,button').forEach(n=>{if(!disabledBeforeSave.has(n))disabledBeforeSave.set(n,n.disabled);n.disabled=true;});form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(true));
   try{
    d.pending??=await payload(d);remember();feedback.replaceChildren(notice('Saving…'));
    await request(path,method,d.pending);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);options.onSaved?.();
