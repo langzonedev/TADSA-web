@@ -1,5 +1,5 @@
 import {installModelExtensions,fail} from './device-model.mjs';
-import {createProfileDetails,validateProfileDetails} from './profile-details-model.js';
+import {createProfileDetails,validateProfileDetails,normaliseProfileDetails} from './profile-details-model.js';
 export function validateProfileDetailsBackup(data){
  if(data.profileDetails===undefined)return;
  const entries=data.profileDetails;if(!entries||typeof entries!=='object'||Array.isArray(entries))fail('Backup rejected: profile details must be an object.');
@@ -14,7 +14,7 @@ installModelExtensions(ctx=>{
  const {d,parts,method,input,find,event}=ctx,[kind,id,sub]=parts;
  if(kind!=='people'||sub!=='profile-details'||parts.length!==3)return;
  const person=find('people',id),before=d.profileDetails?.[id]??{personId:id,version:0,...createProfileDetails()};
- if(method==='GET')return structuredClone(before);
+ if(method==='GET')return structuredClone({...before,...normaliseProfileDetails(before)});
  if(method!=='PUT')fail('Profile action unavailable.',404);
  let value;try{value=validateProfileDetails(input,before.contact);}catch(error){fail(error.message);}
  if(input.version!==before.version)fail('Profile details changed. Reload and compare before saving.',409,{code:'VERSION_CONFLICT'});

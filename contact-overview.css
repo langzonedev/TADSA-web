@@ -1,0 +1,26 @@
+/* Person overview follows the customer's contact / personal details / projects grouping. */
+.contact-overview-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px 28px;align-items:start}
+.contact-overview-values{display:block;min-width:0;margin:0}
+.contact-overview-values dt{font-weight:700;color:var(--ink);margin:0 0 4px}
+.contact-overview-values dd{margin:0 0 18px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}
+.contact-affiliation{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.contact-other-details,.contact-overview>.client-history{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.contact-other-details>summary,.contact-overview>.client-history>summary{cursor:pointer;min-height:32px}
+.contact-editor-toggle{margin-top:16px}
+.contact-editor-area{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.contact-editor-area>h3{margin:0 0 8px}
+.contact-editor-area>.contact-edit-actions{margin:10px 0 20px}
+.contact-editor-area .workflow-panel{padding:0;border:0;background:transparent;box-shadow:none}
+.contact-editor-area .form-grid{margin:0}
+.contact-editor-area .client-ndis{margin-top:20px}
+.contact-overview .contact-editor-area[hidden]{display:none!important}
+@media(max-width:680px){.contact-overview-grid{grid-template-columns:minmax(0,1fr);gap:0}.contact-overview-values dd{margin-bottom:14px}}
+.contact-workspace .contact-header{display:grid;grid-template-columns:minmax(220px,1.5fr) minmax(150px,1fr) minmax(110px,.65fr) auto;align-items:center;gap:16px;padding:16px;margin-bottom:18px}
+.contact-header h1{margin:2px 0 0;font-size:clamp(1.3rem,2vw,1.65rem)}
+.contact-header .contact-header-roles,.contact-header .contact-header-status{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.contact-header .contact-roles{margin:0;gap:6px}
+.contact-header .contact-role{font-size:14px;padding:3px 8px}
+.contact-header .contact-status-value{font-size:15px}
+.contact-header>.button{justify-self:end}
+@media(max-width:1050px){.contact-workspace .contact-header{grid-template-columns:minmax(0,1fr) auto}.contact-header .contact-header-roles{grid-column:1}.contact-header .contact-header-status{grid-column:2;grid-row:2}.contact-header>.button{grid-column:2;grid-row:1}}
+@media(max-width:550px){.contact-workspace .contact-header{grid-template-columns:minmax(0,1fr);gap:12px}.contact-header .contact-header-roles,.contact-header .contact-header-status,.contact-header>.button{grid-column:auto;grid-row:auto;justify-self:start}}

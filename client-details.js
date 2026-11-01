@@ -8,18 +8,24 @@ const drafts=new Map();
 const ndisEditing=new Set();
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 export const clientDetailsHasDrafts=()=>[...drafts.values()].some(d=>d.dirty||d.pending);
+export const clientNdisIsEditing=id=>ndisEditing.has(id);
+export function clientNdisControl(client) {
+  const ndis=el('div');ndis.className='client-ndis';ndis.append(el('strong','NDIS participant number'),el('p',client.ndis?.number||'Not recorded'));
+  const editNdis=action('Edit NDIS number',()=>{ndisEditing.add(client.id);editNdis.hidden=true;ndisEditor.hidden=false;ndisEditor.querySelector('input')?.focus();});const ndisEditor=el('div');ndisEditor.hidden=!ndisEditing.has(client.id);editNdis.hidden=ndisEditing.has(client.id);ndis.append(editNdis,ndisEditor);
+  editor(ndisEditor,'client-ndis/'+client.id,{number:client.ndis?.number||'',version:client.ndis?.version??0},null,(form,d)=>{const input=careField(form,'NDIS participant number',d,'number');input.maxLength=30;input.inputMode='numeric';form.append(el('p','This number is shared across the client’s projects. It does not confirm funding or approval.'));},'clients/'+client.id+'/ndis','PUT',d=>({requestId:d.requestId,version:d.version,number:d.number}),{saveLabel:'Save NDIS number',onSaved:()=>ndisEditing.delete(client.id),reviewLabel:'Keep my reviewed NDIS number',reviewConflict:async d=>{const latest=await careRequest('clients/'+client.id+'/ndis');return {version:latest.version,message:'The saved NDIS number changed. Compare it with your draft before saving.',comparison:[['Latest saved number',latest.number||'Not recorded'],['Your draft',d.number||'Not recorded']]};}});
+  return ndis;
+}
+export function clientHistory(client) {
+  const history=el('details');history.className='client-history';history.append(el('summary',`Client history (${client.audit.length})`));
+  for(const event of client.audit)history.append(el('p',`${new Date(event.at).toLocaleString()} · ${event.action} · ${event.actor}`));
+  return history;
+}
 export function clientDetailsSummary(client) {
   const box=el('section');box.className='panel workflow-panel client-information';box.append(el('h2','Client information'));
-  const d=client.details;box.append(el('p',`${d.reference} · ${d.complete?'Contact and addresses recorded':'Intake details incomplete'}`));
-  const ndis=el('div');ndis.className='client-ndis';ndis.append(el('strong','NDIS participant number'),el('p',client.ndis?.number||'Not recorded'));
-  const editNdis=action('Edit NDIS number',()=>{ndisEditing.add(client.id);editNdis.hidden=true;ndisEditor.hidden=false;ndisEditor.querySelector('input')?.focus();});const ndisEditor=el('div');ndisEditor.hidden=!ndisEditing.has(client.id);editNdis.hidden=ndisEditing.has(client.id);ndis.append(editNdis,ndisEditor);box.append(ndis);
-  editor(ndisEditor,'client-ndis/'+client.id,{number:client.ndis?.number||'',version:client.ndis?.version??0},null,(form,d)=>{const input=careField(form,'NDIS participant number',d,'number');input.maxLength=30;input.inputMode='numeric';form.append(el('p','This number is shared across the client’s projects. It does not confirm funding or approval.'));},'clients/'+client.id+'/ndis','PUT',d=>({requestId:d.requestId,version:d.version,number:d.number}),{saveLabel:'Save NDIS number',onSaved:()=>ndisEditing.delete(client.id),reviewLabel:'Keep my reviewed NDIS number',reviewConflict:async d=>{const latest=await careRequest('clients/'+client.id+'/ndis');return {version:latest.version,message:'The saved NDIS number changed. Compare it with your draft before saving.',comparison:[['Latest saved number',latest.number||'Not recorded'],['Your draft',d.number||'Not recorded']]};}});
+  const d=client.details;box.append(el('p',`${d.reference} · ${d.complete?'Contact and addresses recorded':'Intake details incomplete'}`),clientNdisControl(client));
   box.append(el('p',`Preferred contact: ${d.preferredContact==='representative'?(client.contacts.find(p=>p.personId===d.representativePersonId)?.name||'Representative no longer linked — review required'):'Client'}`));
   if(d.contactNeeds)box.append(el('p',d.contactNeeds));
-  const link=el('a','Edit contact preferences');link.className='button secondary';link.href='#client-details/'+client.id;box.append(link);
-  const history=el('details');history.append(el('summary',`Client history (${client.audit.length})`));
-  for(const event of client.audit)history.append(el('p',`${new Date(event.at).toLocaleString()} · ${event.action} · ${event.actor}`));
-  box.append(history);return box;
+  const link=el('a','Edit contact preferences');link.className='button secondary';link.href='#client-details/'+client.id;box.append(link,clientHistory(client));return box;
 }
 export async function renderClientDetails(view,id,host) {
   const client=await host.request('clients/'+id);const current=client.details;

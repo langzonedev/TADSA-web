@@ -1,7 +1,32 @@
 {
-  "sourceRevision": "b645b63ba7a9f443af6f2c79ec7fbba57f38ac23",
+  "sourceRevision": "5e7e749b1a4d2214a6a99cf66234e2c6088a4d25",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
+    "project-contacts.js": {
+      "source": "public/project-contacts.js",
+      "sha256": "ddeae2b0534707305aab426c1571acf08adaa21061664a56a61beac88aad46df",
+      "transform": null
+    },
+    "project-contacts-model.js": {
+      "source": "public/project-contacts-model.js",
+      "sha256": "620e852bc13a5815b40e4005abef247ffb184c2cbe246a46f3cd8ee1bdf9b6aa",
+      "transform": null
+    },
+    "action-styles.js": {
+      "source": "public/action-styles.js",
+      "sha256": "f7dcce9e95f2b6dfa581b05a0d78b69a205d968c8f96c4afa4c482bef6fb3562",
+      "transform": null
+    },
+    "action-styles.css": {
+      "source": "public/action-styles.css",
+      "sha256": "f205e99d28705d614d4fc5242a46137a117890d18add53d77b89c31247e7fa68",
+      "transform": null
+    },
+    "contact-overview.css": {
+      "source": "public/contact-overview.css",
+      "sha256": "52e745d985d0fc9bf056578eb00bc3d98dab8ae06cb640135b83fc5d76566ea4",
+      "transform": null
+    },
     "inline-confirmation.js": {
       "source": "public/inline-confirmation.js",
       "sha256": "fc3cb54382734a8b0ad0c42636232f7632dba6e0d28bc4d8bb07a1a9d72b44d3",
@@ -64,12 +89,12 @@
     },
     "profile-details.js": {
       "source": "public/profile-details.js",
-      "sha256": "27a5b803f6406a25fca78d3c69470f60a99795b6cc8221260bbf987565638f5b",
+      "sha256": "880d8f915db516950f5c40dcba489d2a03276b125c92636948421445dac5d9a4",
       "transform": null
     },
     "profile-details-model.js": {
       "source": "public/profile-details-model.js",
-      "sha256": "f3b22d51f958d6fea20b5f06c7f63bc3ee0665299549f9aa343a8e225ef7a781",
+      "sha256": "a382b0d25cf8e81a256c8976847f556a30cb854f5436050bde86c05fb04387f9",
       "transform": null
     },
     "project-details.js": {
@@ -144,7 +169,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "44bf7d0184cdbc3bfb455e8bf879bcf288ca9fbb3a626bbc8e9f2553e2b2ef41",
+      "sha256": "320f46dcbac076447152f6237fc855730fddee5338b3afdbe9a50283168d8103",
       "transform": null
     },
     "settings.js": {
@@ -174,7 +199,7 @@
     },
     "client-details.js": {
       "source": "public/client-details.js",
-      "sha256": "4b00e506cfddb2c66b8b9be563696a5b45ca159147c1f860b1eb0c275894d415",
+      "sha256": "85dde36b13d5884a4afe0411009aaa89367ac1e4de8a554ff1f59a81a98a5fb0",
       "transform": null
     },
     "local-login.js": {
@@ -230,10 +255,10 @@
     },
     "index.html": {
       "source": "public/index.html",
-      "sourceSha256": "c0487faf4b9ba745bbf96e09f92b8392d5a7d0e171721ec0e514ae00dcdf8866",
-      "sha256": "3d4eaa1e704d37829c8aed6f548e3370ea7a21a1d3209f70488da750b282564b",
+      "sourceSha256": "e84c0953c8440cc0dbc00a465fd831318a21328bfe91d62ec13d9c2e08e0e68b",
+      "sha256": "3b4f94b97e52280db4d1d5808c802b3eb3f968f46b0839b50c329ef830484053",
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "f6ae374b445612331d19c2c58182dd84044aacdd2f2a2145ff85b658886aa6b4"
+  "shellHash": "f1ff42c04db408df57b50e18a5d117e696e5f2dce6d267a87f525a91725230e3"
 }

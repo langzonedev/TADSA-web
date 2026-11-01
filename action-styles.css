@@ -1,0 +1,35 @@
+/* Edit and save actions use one visual language. Navigation and destructive
+   choices keep distinct intent while sharing touch target and typography.
+   Scope to the shell's main ID so explicit semantic actions outrank the old
+   dark-theme generic button selector and its multiple :not() classes. */
+html body main#content :is(button,a,summary).app-action{
+ display:inline-flex;align-items:center;justify-content:center;gap:8px;
+ min-height:44px;max-width:100%;padding:10px 14px;border:1px solid;
+ border-radius:8px;font-size:14px;font-weight:700;line-height:1.35;
+ text-align:center;text-decoration:none;white-space:normal;vertical-align:middle;
+ cursor:pointer;box-sizing:border-box;
+}
+html body main#content :is(button,a,summary).app-action:is(.app-action-edit,.app-action-primary){
+ background:var(--action-green);color:var(--action-ink);border-color:var(--action-green)!important;
+}
+html body main#content :is(button,a,summary).app-action:is(.app-action-edit,.app-action-primary):hover:not(:disabled):not([aria-disabled=true]){
+ background:var(--action-green-hover);color:var(--action-ink);border-color:var(--action-green-hover)!important;text-decoration:none;
+}
+html body main#content :is(button,a,summary).app-action.app-action-secondary{
+ background:var(--surface,#fff);color:var(--text,#28314b);border-color:var(--line)!important;
+}
+html body main#content :is(button,a,summary).app-action.app-action-secondary:hover:not(:disabled):not([aria-disabled=true]){
+ background:var(--surface-soft,#eef1f9);text-decoration:none;
+}
+html body main#content :is(button,a,summary).app-action.app-action-destructive{
+ background:#a52232;color:#fff;border-color:#a52232!important;
+}
+html body main#content :is(button,a,summary).app-action.app-action-destructive:hover:not(:disabled):not([aria-disabled=true]){
+ background:#841b28;border-color:#841b28!important;
+}
+html body main#content .app-action:focus-visible{outline:3px solid var(--accent,#2f3e84);outline-offset:3px}
+html body main#content .app-action:is(:disabled,[aria-disabled=true]){opacity:.6;cursor:not-allowed}
+html body main#content summary.app-action{list-style:none}
+html body main#content summary.app-action::-webkit-details-marker{display:none}
+html body main#content .project-overview-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+html body main#content .project-overview-links .app-action{margin:0}

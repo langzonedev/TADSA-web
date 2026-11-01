@@ -1,3 +1,5 @@
+import {renderProjectContacts} from './project-contacts.js';
+import {applyActionStyles,installActionStyles} from './action-styles.js';
 import {renderInvoiceReferences} from './invoice-references.js';
 import {residentialAddressText} from './client-address.js';
 import {auditReferenceIds,auditAction,auditChanges,formatValue as displayValue} from './record-values.js';
@@ -17,9 +19,10 @@ import {renderProjectHistory} from './project-history.js';
 import {renderCredentials} from './technician-credentials.js';
 import {renderAvailability} from './availability.js';
 import {renderTechnicianLocation} from './technician-location.js';
-import {renderClientDetails,clientDetailsSummary,clientDetailsHasDrafts} from './client-details.js';
+import {renderClientDetails,clientDetailsHasDrafts} from './client-details.js';
 import { configureWorkflows, renderWorkflow, workflowHasDrafts, renderProjectDraftReturn, addClientContactActions } from './workflows.js';
 const main = document.querySelector('#content');
+installActionStyles(main);
 const globalInput = document.querySelector('#global-query');
 const announcement = document.querySelector('#announcement');
 const drafts = new Map();
@@ -35,8 +38,8 @@ configureWorkflows({ isSaving: () => saving, setSaving: value => { saving = valu
 configureOperations({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>render()});
 configureCare({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>render()});
 const el = (tag, text, className) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; };
-const link = (text, hash, className) => { const a = el('a', text, className); if(/^(Edit|Update)\b/.test(text))a.classList.add('outlined-action'); a.href = `#${hash}`; return a; };
-const button = (text, action, className = 'secondary') => { const b = el('button', text, className); if(/^(Edit|Update)\b/.test(text))b.classList.add('outlined-action'); b.type = 'button'; b.addEventListener('click', action); return b; };
+const link = (text, hash, className) => { const a = el('a', text, className); a.href = `#${hash}`; return a; };
+const button = (text, action, className = 'secondary') => { const b = el('button', text, className); b.type = 'button'; b.addEventListener('click', action); return b; };
 const cap = text => text ? text[0].toUpperCase() + text.slice(1) : 'Not recorded';
 const initials = name => name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('');
 const avatar = name => { const n = el('span', initials(name), 'avatar'); n.setAttribute('aria-hidden', 'true'); return n; };
@@ -189,10 +192,13 @@ async function client(view,id){
 }
 async function contactRecord(view,person,c=null){
   view.classList.add('contact-workspace');view.append(link('← Back to people','people','breadcrumb'));
-  recordHeader(view,'Contact record',person.name,contactRoles(person),c?link('New project','new-project/'+c.id,'button primary'):undefined);
   const grid=el('div',undefined,'detail-layout contact-detail-layout'),left=el('div'),right=el('div');
-  await renderProfileDetails(left,person,{client:c});
-  if(c){left.append(clientDetailsSummary(c));const contacts=panel('Referrers, carers & other contacts');contacts.append(el('p','People linked to this client across their work. Project-specific contacts are recorded separately on each project.','field-help'));addClientContactActions(contacts,c);left.append(contacts);}
+  const {profile}=await renderProfileDetails(left,person,{client:c});
+  const header=el('div',undefined,'record-header contact-header'),identity=el('div'),roles=el('div',undefined,'contact-header-roles'),state=el('div',undefined,'contact-header-status');
+  identity.append(el('div','Person record','eyebrow'),el('h1',person.name));roles.append(el('strong',(person.roles?.length??1)>1?'Roles':'Role'),contactRoles(person));
+  state.append(el('strong','Status'),el('span',DIRECTORY_STATUSES.find(([key])=>key===profile.contact.directoryStatus)?.[1]||'Not recorded','contact-status-value'));
+  header.append(identity,roles,state);if(c)header.append(link('New project','new-project/'+c.id,'button primary'));view.append(header);
+  if(c){const contacts=panel('Referrers, carers & other contacts');contacts.append(el('p','People linked to this client across their work. Project-specific contacts are recorded separately on each project.','field-help'));addClientContactActions(contacts,c);left.append(contacts);}
   if(person.technician){
     await renderTechnicianLocation(left,person.id);try{await renderCredentials(left,person.id);}catch(error){if(error.status!==403)throw error;left.append(message('Qualifications and clearances are restricted to authorised staff.'));}
     const tech=panel('Technician details');tech.append(details([['Skills',person.technician.skills.join(', ')||'Not recorded'],['General allocation status',person.technician.availability==='unknown'?'Not recorded':cap(person.technician.availability)]]),el('p','General allocation status is separate from dated calendar entries. Check the dates before assigning work.','field-help'),link('View calendar availability','availability/'+person.id,'button secondary'));left.append(tech);
@@ -221,7 +227,7 @@ function auditPanel(p,operationsPromise,managed=false) {
 async function project(view, id) {
   let p = await api(`projects/${id}`); let tab = location.hash.split('/')[2]==='costs'?'Costs & invoices':projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
   const destinations=['Overview','Files','Costs & invoices','Workflow history'];
-  if(!destinations.includes(tab)&&!['Task','Edit details','Audit trail','Case-note history','Hold or resume work','Record hours','Prepare invoices','Print documents','Team','Funding','Feedback'].includes(tab)&&!tab.startsWith('Action:'))tab='Overview';
+  if(!destinations.includes(tab)&&!['Task','Edit details','Audit trail','Case-note history','Hold or resume work','Record hours','Prepare invoices','Print documents','Contacts','Team','Funding','Feedback'].includes(tab)&&!tab.startsWith('Action:'))tab='Overview';
   view.classList.add('project-workspace');
   view.append(link('← All projects','projects','breadcrumb'));
   const meta=el('div',undefined,'record-meta'),header=recordHeader(view,p.reference,p.title,meta),headerActions=el('div',undefined,'project-more-wrap');header.firstElementChild.classList.add('project-identity');header.append(headerActions);
@@ -281,7 +287,7 @@ async function project(view, id) {
     for(const member of members)group.append(link(member.name+(label==='CONTACTS'?' · '+member.role:member.id===p.coordination?.technicianId?' · Lead':''),(member.type==='organisation'?'organisation/':'person/')+member.id));facts.append(group);
   }
   brief.append(facts);const context=el('details',undefined,'project-context-details');context.append(el('summary','More project information'),details([['Programme',adminDetails.programme||'Not recorded'],['Coordinator',adminOptions.coordinators.find(a=>a.id===adminDetails.coordinatorAccountId)?.displayName||(adminDetails.coordinatorAccountId?'Previously assigned account':'Not assigned')],['Skills needed',p.coordination?.requiredSkills?.join(', ')||'Not specified'],...(p.status==='closed'?[]:[['Target date',date(p.dueDate)]]),['Work location',[projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded']]));brief.append(context);if(adminDetails.documentFolderUrl){const folder=el('a','Open project document folder','text-button');folder.href=adminDetails.documentFolderUrl;folder.target='_blank';folder.rel='noopener noreferrer';brief.append(folder);}
-  const quickActions=el('div',undefined,'project-overview-links');quickActions.append(link('Update team','coordination/'+id+'/team','text-button'),link('Update funding','coordination/'+id+'/funding','text-button'),button('Edit project details',()=>{editMode=false;navigate('Edit details');},'text-button'));brief.append(quickActions);brief.classList.add('project-home-brief');
+  const quickActions=el('div',undefined,'project-overview-links');quickActions.append(button('Edit contacts & referrer',()=>navigate('Contacts'),'primary'),link('Update team','coordination/'+id+'/team','text-button'),link('Update funding','coordination/'+id+'/funding','text-button'),button('Edit project details',()=>{editMode=false;navigate('Edit details');},'text-button'));brief.append(quickActions);brief.classList.add('project-home-brief');
   const finance=panel('Finance status');finance.classList.add('project-finance-summary');
   const money=value=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(value/100),fullDate=value=>value?new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Adelaide',day:'numeric',month:'short',year:'numeric'}).format(new Date(value.includes('T')?value:value+'T12:00:00Z')):'Not recorded';
   const clearance=state?.financeClearance,lastPayment=[...(workPlan.payments??[])].sort((a,b)=>b.receivedOn.localeCompare(a.receivedOn))[0];
@@ -296,12 +302,13 @@ async function project(view, id) {
   const milestones=state?.cancellation?[['Cancellation recorded',true,false],['Finance finalisation',Boolean(state.financeFinalisation),!state.financeFinalisation],['Closure',Boolean(state.closed),Boolean(state.financeFinalisation)&&!state.closed]]:groups.map(([name],i)=>[name,stage==='closed'||i<phaseIndex,stage!=='closed'&&i===phaseIndex]);
   for(const [i,[name,complete,current]] of milestones.entries()){const item=el('li',(complete?'✓ ':`${i+1} · `)+name);if(complete)item.className='complete';else if(current){item.setAttribute('aria-current','step');item.className='current';}phase.append(item);}if(lifecycle.managed)left.prepend(phase);
   const actionPanes=new Map();for(const [i,child] of [...actionSource.children].entries()){const title=child.querySelector(':scope > summary')?.textContent||child.querySelector('button[type=submit]')?.textContent||'Project action';const pane=el('section',undefined,'project-action-task');pane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),el('h2',title),child);flatten(pane);actionPanes.set('Action:'+i,{title,pane});view.append(pane);if(pane.querySelector(':scope > .project-record-section > h2'))pane.querySelector(':scope > h2')?.remove();}
-  const embedded=new Map([['Hold or resume work',{route:'operations',focus:'holds'}],['Record hours',{route:'operations',focus:'hours'}],['Prepare invoices',{route:'operations',focus:'invoices'}],['Print documents',{route:'documents'}],['Feedback',{route:'feedback'}],['Team',{route:'coordination',focus:'team'}],['Funding',{route:'coordination',focus:'funding'}]].map(([name,config])=>{const pane=el('section',undefined,'project-embedded-pane');pane.hidden=true;pane.tabIndex=-1;view.append(pane);return [name,{...config,pane,loaded:false,loading:null}];}));
+  const embedded=new Map([['Contacts',{route:'contacts'}],['Hold or resume work',{route:'operations',focus:'holds'}],['Record hours',{route:'operations',focus:'hours'}],['Prepare invoices',{route:'operations',focus:'invoices'}],['Print documents',{route:'documents'}],['Feedback',{route:'feedback'}],['Team',{route:'coordination',focus:'team'}],['Funding',{route:'coordination',focus:'funding'}]].map(([name,config])=>{const pane=el('section',undefined,'project-embedded-pane');pane.hidden=true;pane.tabIndex=-1;view.append(pane);return [name,{...config,pane,loaded:false,loading:null}];}));
   function returnNavigation(name){const navigation=el('nav',undefined,'project-task-navigation actions');navigation.setAttribute('aria-label',name+' navigation');navigation.append(button('← Return to current workflow',()=>navigate('Task'),'secondary'),button('Project overview',()=>navigate('Overview'),'text-button'));return navigation;}
-  async function loadEmbedded(name){const entry=embedded.get(name);if(!entry||entry.loaded)return;if(entry.loading)return entry.loading;entry.pane.replaceChildren(el('p','Opening '+name.toLowerCase()+'…','loading'));entry.loading=(async()=>{const body=el('div');try{if(entry.route==='coordination')await renderWorkflow(body,'coordination',id,{embedded:true,focus:entry.focus,onCancel:()=>{entry.loaded=false;navigate('Overview');}});else if(entry.route==='feedback')await renderProjectFeedback(body,id);else await renderOperations(body,entry.route,id,{embedded:true,focus:entry.focus});if(name==='Team')await renderProjectCoordinator(body,id);entry.pane.replaceChildren(returnNavigation(name),el('h2',name),body);body.querySelectorAll('form').forEach(form=>form.startTechnicianCalendars?.());if(name==='Funding')entry.pane.append(fundingReference);entry.loaded=true;}catch(error){entry.pane.replaceChildren(message(error.status?error.message:'This section could not load. Your project is still open.',true),button('Try again',()=>loadEmbedded(name),'secondary'));}finally{entry.loading=null;}})();return entry.loading;}
+  async function loadEmbedded(name){const entry=embedded.get(name);if(!entry||entry.loaded)return;if(entry.loading)return entry.loading;entry.pane.replaceChildren(el('p','Opening '+name.toLowerCase()+'…','loading'));entry.loading=(async()=>{const body=el('div');try{if(entry.route==='coordination')await renderWorkflow(body,'coordination',id,{embedded:true,focus:entry.focus,onCancel:()=>{entry.loaded=false;navigate('Overview');}});else if(entry.route==='contacts')await renderProjectContacts(body,id);else if(entry.route==='feedback')await renderProjectFeedback(body,id);else await renderOperations(body,entry.route,id,{embedded:true,focus:entry.focus});if(name==='Team')await renderProjectCoordinator(body,id);entry.pane.replaceChildren(returnNavigation(name),el('h2',name),body);body.querySelectorAll('form').forEach(form=>form.startTechnicianCalendars?.());if(name==='Funding')entry.pane.append(fundingReference);entry.loaded=true;}catch(error){entry.pane.replaceChildren(message(error.status?error.message:'This section could not load. Your project is still open.',true),button('Try again',()=>loadEmbedded(name),'secondary'));}finally{entry.loading=null;}})();return entry.loading;}
   const sections=[
     {label:'Overview',items:[['Overview','Overview']]},
     {label:'Case notes',items:[['Case-note history','Case notes']]},
+    {label:'Contacts',items:[['Contacts','Contacts & referrer']]},
     {label:'Team',items:[['Team','Team']]},
     {label:'Funding',items:[['Funding','Funding']]},
     {label:'Files',items:[['Files','Project files'],['Print documents','Print documents']]},
@@ -373,7 +380,7 @@ async function entity(view,type,id){
   const meta=el('div',undefined,'record-meta');meta.append(el('span',item.roles?.join(' · ')??item.role));recordHeader(view,'Organisation record',item.name,meta);
   const grid=el('div',undefined,'detail-layout'),left=el('div'),info=panel('About this organisation');info.append(el('p',item.description,'record-summary'),details([['Roles',item.roles?.join(', ')||item.role||'Not recorded'],['Category (optional grouping)',item.category||'Not specified'],['Email',item.email||'Not recorded'],['Record status',DIRECTORY_STATUSES.find(([key])=>key===recordDirectoryStatus(item))?.[1]]]),link('Edit organisation','edit-organisation/'+id,'button secondary'));left.append(info);grid.append(left,projectLinks(item.projects));view.append(grid);
 }
-const contactJourneyRoutes=new Set(['client','person','edit-person','client-details','link-contact','link-referrer','availability']);
+const contactJourneyRoutes=new Set(['client','person','organisation','edit-organisation','organisation-category','edit-person','client-details','link-contact','link-referrer','availability']);
 let contactProjectReturn='';
 function trackContactOrigin(oldHash,newHash){
   const oldRoute=oldHash.replace(/^#/,''),nextRoute=newHash.replace(/^#/,'').split('/')[0];
@@ -385,9 +392,7 @@ function showContactReturn(view,route){
   const back=link('← Back to project',contactProjectReturn,'breadcrumb');
   const existing=view.querySelector('a.breadcrumb[href="#people"]');if(existing)existing.replaceWith(back);else view.prepend(back);
 }
-function outlineEditActions(view){
-  for(const control of view.querySelectorAll('a,button'))if(/^(Edit|Update)\b/.test(control.textContent.trim())&&!control.closest('[role=tablist],.project-more-menu')&&!control.matches('[type=submit]'))control.classList.add('outlined-action');
-}
+function outlineEditActions(view){applyActionStyles(view);}
 async function render() {
   if (saving) { announce('Please wait for the save to finish.'); return; }
   const ticket=++renderVersion;
