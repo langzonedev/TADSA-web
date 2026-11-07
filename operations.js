@@ -1,3 +1,4 @@
+import {registerDraftSource,trackDraftForm,refreshDraftReview} from './draft-review.js';
 import {createRecordPicker} from './record-picker.js';
 import {requestInlineConfirmation} from './inline-confirmation.js';
 import {advanceLifecycleDraftAfterNote,advanceWorkDraftAfterHours} from './project-care.js';
@@ -7,6 +8,7 @@ import {residentialAddressText} from './client-address.js';
 import {attachAddressLookup} from './address-lookup.js';
 let host;
 const drafts=new Map();
+registerDraftSource('operations',()=>[...drafts].map(([key,d])=>({key,pending:Boolean(d.pending)})));
 export const configureOperations=h=>{host=h;};
 export const operationsHaveDrafts=()=>drafts.size>0;
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;};
@@ -47,7 +49,7 @@ async function send(form,d,key,path,method,payload,feedback,submit){
   form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(true));form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=true);feedback.replaceChildren(notice('Saving…'));
   try{const result=await api(path,method,d.pending);if(/^projects\/[^/]+\/notes$/.test(path))advanceLifecycleDraftAfterNote(path.split('/')[1],d.baseVersion,result.version);if(/^case\/[^/]+\/hours$/.test(key))advanceWorkDraftAfterHours(path.split('/')[1],d.pending.version,result.version);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);host.setSaving(false);await host.refresh();refreshed=true;}
   catch(e){if(e.status){d.pending=null;d.requestId=crypto.randomUUID();}feedback.replaceChildren(notice(e.status?e.message:'Save result not confirmed. Retry the same save safely.',true));if(e.status===401)feedback.append(button('Sign in and keep draft',()=>host.refresh()));if(e.status===409&&method==='PUT')feedback.append(button('Compare latest case',()=>host.refresh()));}
-  finally{host.setSaving(false);if(workspace){workspace.inert=wasInert;workspace.removeAttribute('aria-busy');}form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(Boolean(d.pending)));form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=Boolean(d.pending)&&n!==submit);submit.disabled=false;submit.textContent=d.pending?'Retry save safely':submit.dataset.label;if(!wasInert){if(refreshed)workspace?.focus({preventScroll:true});else submit.focus({preventScroll:true});}}
+  finally{refreshDraftReview();host.setSaving(false);if(workspace){workspace.inert=wasInert;workspace.removeAttribute('aria-busy');}form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(Boolean(d.pending)));form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=Boolean(d.pending)&&n!==submit);submit.disabled=false;submit.textContent=d.pending?'Retry save safely':submit.dataset.label;if(!wasInert){if(refreshed)workspace?.focus({preventScroll:true});else submit.focus({preventScroll:true});}}
 }
 export async function renderOperations(view,route,id,options={}){
   if(route==='review-queue'){view.append(node('h1','Needs attention'),node('p','Shared queue: any administrator or coordinator can pick up an item.','subtitle'));const q=await api('review-queue');if(!q.items.length)view.append(notice('No flagged cases.'));for(const p of q.items){const box=node('section',null,'panel');box.append(link(p.title||p.reference||p.projectId,'operations/'+(p.projectId||p.id)),node('p',p.reason||'Review the case, funding or hold details.'));view.append(box);}return true;}
@@ -64,7 +66,7 @@ export async function renderOperations(view,route,id,options={}){
   if(route==='documents'){renderDocuments(view,p,ops,lifecycle);return true;}
   const sections=node('nav',null,'actions');sections.setAttribute('aria-label','Case workspace sections');for(const[label,heading]of [['Hours & holds','Hours, funding and holds'],['Case notes','Case notes'],...(lifecycle.managed||p.kind!=='Assessment'?[['Draft invoices','Draft invoices']]:[])])sections.append(button(label,()=>{const target=[...view.querySelectorAll('h2')].find(h=>h.textContent===heading);if(target){target.tabIndex=-1;target.scrollIntoView({block:'start'});target.focus({preventScroll:true});}}));view.append(sections);
  const key='case/'+id+(focus?'/'+focus:''),d=drafts.get(key)??{...ops,requestId:crypto.randomUUID(),fundingContributors:ops.fundingContributors.map(c=>({...c,amount:money(c.amountCents)}))};
-  const box=node('section',null,'panel workflow-panel'),form=node('form',null,'form-grid');form.classList.add('operations-form');box.append(node('h2','Hours, funding and holds'),form);view.append(box);
+  const box=node('section',null,'panel workflow-panel'),form=node('form',null,'form-grid');trackDraftForm(form,'operations',key,{label:focus==='hours'?'Hours':focus==='holds'?'Hold or resume work':'Case details'});form.classList.add('operations-form');box.append(node('h2','Hours, funding and holds'),form);view.append(box);
   form.addEventListener('input',()=>drafts.set(key,d));form.addEventListener('change',()=>drafts.set(key,d));
   input(form,'Actual hours worked (running total)',d,'actualHours','number').value=d.actualHours??Number(d.actualMinutes)/60;
   input(form,'Estimated hours remaining',d,'remainingHours','number').value=d.remainingHours??Number(d.remainingMinutes)/60;
@@ -105,7 +107,7 @@ export function renderNotes(view,id,ops,compact=false){
  }
  if(compact){if(ops.notes.length)box.append(link('View all case notes','operations/'+id));else box.append(node('p','No case notes recorded yet.','muted'));}
  const key='note/'+id,d=drafts.get(key)??{requestId:crypto.randomUUID(),text:'',baseVersion:ops.version};
- const form=node('form',null,'form-grid case-note-form');input(form,'New case note',d,'text','textarea').required=true;form.oninput=()=>drafts.set(key,d);
+ const form=node('form',null,'form-grid case-note-form');trackDraftForm(form,'operations',key,{label:'Case note'});input(form,'New case note',d,'text','textarea').required=true;form.oninput=()=>drafts.set(key,d);
  const feedback=node('div',null,'case-note-feedback'),submit=node('button','Add case note','primary');submit.type='submit';submit.dataset.label='Add case note';form.append(feedback,submit);
  form.onsubmit=e=>{e.preventDefault();drafts.set(key,d);send(form,d,key,`projects/${id}/notes`,'POST',{requestId:d.requestId,text:d.text.trim()},feedback,submit);};
  if(d.pending){form.querySelector('textarea').disabled=true;submit.textContent='Retry save safely';}box.append(form);view.append(box);
@@ -116,7 +118,7 @@ function renderInvoices(view,id,p,ops,payers,business,identities,lifecycle,revie
  for(const i of ops.invoices)box.append(link((i.number||i.invoiceNumber)+' · '+money(i.totalCents)+' AUD','documents/'+id));
  if(lifecycle.managed&&(lifecycle.state.financeFinalisation||lifecycle.state.closed||p.status==='closed')){box.append(notice('Finance is finalised. Reopen the project through its guided workflow before changing financial records.'));view.append(box);return;}
  const key='invoice/'+id,d=drafts.get(key)??{requestId:crypto.randomUUID(),milestone:'deposit',billingMode:'separate',payer:ops.fundingContributors.length===1?ops.fundingContributors[0].type+':'+ops.fundingContributors[0].id:'',invoiceDate:new Intl.DateTimeFormat('sv-SE',{timeZone:'Australia/Adelaide',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),billingAddress:'',lines:[{description:p.title,quantity:'1',unitPrice:''}],milestoneReached:false};
- const form=node('form',null,'form-grid invoice-editor');
+ const form=node('form',null,'form-grid invoice-editor');trackDraftForm(form,'operations',key,{label:'Draft invoice'});
  let addressGeneration=0;
  const addressFor=async target=>{const[type,recordId]=target.split(':');let item=identities.get(target);if(type==='person'&&!item){try{item=(await api('selections/people/'+recordId)).item;identities.set(target,item);}catch{}}const clientId=type==='client'?recordId:item?.clientId;if(!clientId)return '';const client=await api('clients/'+clientId);const details=client.details;return (!details?.sameAsResidential&&details?.workAddress)||residentialAddressText(details);};
  input(form,'Invoice date',d,'invoiceDate','date').required=true;select(form,'Billing milestone',d,'milestone',[['deposit','Deposit'],['progress','Progress'],['final','Final']]);check(form,'Administrator confirms this billing milestone has been reached',d,'milestoneReached');const arrangement=select(form,'Invoice arrangement',d,'billingMode',[['separate','Separate invoice for this payer’s contribution'],['nominated','One nominated payer manages the split']]);

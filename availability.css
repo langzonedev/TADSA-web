@@ -1,0 +1,35 @@
+/* Status colour describes availability; the outline describes selection. */
+html body main#content .availability-workspace .availability-status-controls{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px}
+html body main#content .availability-workspace button.availability-status{min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-weight:700;box-shadow:none}
+html body main#content .availability-workspace button.availability-status[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:2px}
+html body main#content .availability-workspace button.availability-status:disabled{opacity:.5;cursor:not-allowed}
+html body main#content .availability-workspace .availability-cell:is(.range-selected,[aria-pressed=true]){box-shadow:inset 0 0 0 2px #5365c7;outline:0}
+html body main#content .availability-workspace :is(button.availability-cell,button.availability-status).available{background:#eaf3df;color:#30541d}
+html body main#content .availability-workspace :is(button.availability-cell,button.availability-status).limited{background:#fff2ce;color:#775000}
+html body main#content .availability-workspace :is(button.availability-cell,button.availability-status).unavailable{background:#f9e2e3;color:#842f38}
+html body main#content .availability-workspace :is(button.availability-cell,button.availability-status).unknown{background:var(--paper);color:var(--muted)}
+html body main#content .availability-workspace .availability-cell.availability-draft{outline:2px dashed #5365c7;outline-offset:-5px}
+html[data-theme=dark] body main#content .availability-workspace :is(button.availability-cell,button.availability-status).available{background:#233e2d;color:#cbeeb6}
+html[data-theme=dark] body main#content .availability-workspace :is(button.availability-cell,button.availability-status).limited{background:#44391f;color:#ffe3a0}
+html[data-theme=dark] body main#content .availability-workspace :is(button.availability-cell,button.availability-status).unavailable{background:#48282f;color:#ffd0d6}
+html[data-theme=dark] body main#content .availability-workspace :is(button.availability-cell,button.availability-status).unknown{background:var(--surface);color:var(--muted)}
+html[data-theme=dark] body main#content .availability-workspace .availability-cell:is(.range-selected,[aria-pressed=true]){box-shadow:inset 0 0 0 2px #a4b0ff}
+html[data-theme=dark] body main#content .availability-workspace .availability-cell.availability-draft{outline-color:#a4b0ff}
+html body main#content .availability-workspace .availability-cell:focus-visible{outline:3px solid var(--accent);outline-offset:-5px}
+.availability-selection-help{margin:6px 0 10px;font-size:.9rem;min-height:1.5em;color:var(--muted)}
+.availability-editor{margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;scroll-margin-top:12px}
+.availability-editor:empty{display:none}
+.availability-editor>h2{font-size:1rem;margin:0;flex:1 1 250px}
+.availability-editor>button{margin:0}
+.availability-editor>.workflow-panel{flex:1 1 100%;padding:0;border:0;box-shadow:none;margin:0;background:transparent}
+.availability-editor .form-grid{display:flex;align-items:start;flex-wrap:wrap;gap:8px;margin:0}
+.availability-date-details{flex:1 1 230px}
+.availability-date-details>summary{cursor:pointer;min-height:44px;padding:10px 0;font-weight:600}
+.availability-date-details[open]{flex-basis:100%}
+.availability-detail-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.availability-detail-fields>.field-help,.availability-detail-fields>label:has(textarea){grid-column:1/-1}
+.availability-editor .form-grid>.actions{margin:0;padding:0;border:0;display:flex;flex-wrap:wrap;gap:8px}
+.availability-editor .form-grid>div:empty{display:none}
+.availability-editor .form-grid>div:not(.actions):not(:empty){flex-basis:100%}
+@media(max-width:700px){.availability-detail-fields{grid-template-columns:1fr}.availability-status-controls{gap:6px}.availability-editor .form-grid>.actions{width:100%}.availability-editor{padding:10px}.availability-editor>h2{flex-basis:100%}}
+@media print{.availability-status-controls,.availability-selection-help{display:none!important}}

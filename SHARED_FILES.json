@@ -1,7 +1,22 @@
 {
-  "sourceRevision": "5e7e749b1a4d2214a6a99cf66234e2c6088a4d25",
+  "sourceRevision": "3c3eefdb7984e22162da6ccd56b2d795c126a34d",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
+    "draft-review.js": {
+      "source": "public/draft-review.js",
+      "sha256": "1927871b4b01d2bd41c42644b7d072859a37339062a88036d8e4ac2623754292",
+      "transform": null
+    },
+    "customer-feedback.css": {
+      "source": "public/customer-feedback.css",
+      "sha256": "518bad4da0814f86c8bdced7c23c2e1e7666dc97c5fc653d6ec03dba02345236",
+      "transform": null
+    },
+    "availability.css": {
+      "source": "public/availability.css",
+      "sha256": "fe49bddc8774fffc881b5037424516c1bf9be7ca11b10bbb132dbc3ed0eaf10a",
+      "transform": null
+    },
     "project-contacts.js": {
       "source": "public/project-contacts.js",
       "sha256": "ddeae2b0534707305aab426c1571acf08adaa21061664a56a61beac88aad46df",
@@ -39,7 +54,7 @@
     },
     "organisation-model.js": {
       "source": "public/organisation-model.js",
-      "sha256": "23d6d931275c493f0a05eb0958a0ad77cbbf84fd80e3af75b42c277bb17338b4",
+      "sha256": "ff0df5ba0a5be5580afeb9eaa052da50ee6a96f0ba5045e1ec7178c15871f6b8",
       "transform": null
     },
     "address-lookup.js": {
@@ -169,7 +184,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "320f46dcbac076447152f6237fc855730fddee5338b3afdbe9a50283168d8103",
+      "sha256": "8613518d645268c652001917fc726776a68d70c8fd342f6cfa60cddf500b8a98",
       "transform": null
     },
     "settings.js": {
@@ -189,17 +204,17 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "113d6a8b9ccf85e27430d66a4d77b40572a07c4cfc9c5af8ce0312d3bf8c2e1a",
+      "sha256": "b8fcad596236040ceadaaa770d3e675333a30b2e2d3a6aebab4f13fdda128131",
       "transform": null
     },
     "operations.js": {
       "source": "public/operations.js",
-      "sha256": "e3e2b343c503c756c7100ee915db745b25d9924026b83cd7bb8e26f08157cdb4",
+      "sha256": "7d0919bcecd38598a742ed1d6a61a6a9657e644a131b41483886cde5add0006b",
       "transform": null
     },
     "client-details.js": {
       "source": "public/client-details.js",
-      "sha256": "85dde36b13d5884a4afe0411009aaa89367ac1e4de8a554ff1f59a81a98a5fb0",
+      "sha256": "677f24efad6832419b0f371fd055122706cb06cb194720f257a8c47ebcecac11",
       "transform": null
     },
     "local-login.js": {
@@ -209,7 +224,7 @@
     },
     "availability.js": {
       "source": "public/availability.js",
-      "sha256": "a1be8f776832e365fbf4edddb6c04983402e34e34701f5ec851b56375e9dea54",
+      "sha256": "6644848662e24d6908a20887f89d4696e0ad3d8e70b88898b4421f7e174160e4",
       "transform": null
     },
     "technician-location.js": {
@@ -224,7 +239,7 @@
     },
     "project-care.js": {
       "source": "public/project-care.js",
-      "sha256": "8df7e53a968587dfb2bf521192d4bcf8c11d9bd6001b58f1f58c1d84874d83ef",
+      "sha256": "682319bb30ee9b717faee7bc32761af50adbb84914ac5c499d513cd6a87c14ff",
       "transform": null
     },
     "styles.css": {
@@ -255,10 +270,10 @@
     },
     "index.html": {
       "source": "public/index.html",
-      "sourceSha256": "e84c0953c8440cc0dbc00a465fd831318a21328bfe91d62ec13d9c2e08e0e68b",
-      "sha256": "3b4f94b97e52280db4d1d5808c802b3eb3f968f46b0839b50c329ef830484053",
+      "sourceSha256": "0137ebbffd0e4616850166fae48c6c0d2dc2cdf38108865134c183a1e12fcc4c",
+      "sha256": "d961dea376fc683c49e22a5eb0342b7671e5944224943d9bb4ff7b2cf9837a98",
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "f1ff42c04db408df57b50e18a5d117e696e5f2dce6d267a87f525a91725230e3"
+  "shellHash": "d94cf089c8a500fb288f95a19b58c9e40dc083828bbf150be723153a1932d857"
 }

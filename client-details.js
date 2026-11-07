@@ -1,3 +1,4 @@
+import {registerDraftSource,trackDraftForm,refreshDraftReview} from './draft-review.js';
 import {RESIDENTIAL_FIELDS,AUSTRALIAN_STATES,residentialAddressText} from './client-address.js';
 import {attachAddressLookup} from './address-lookup.js';
 import {reconcileContactDraft} from './contact-draft.js';
@@ -5,6 +6,7 @@ import {fieldLabel,formatValue} from './record-values.js';
 import {requestInlineConfirmation} from './inline-confirmation.js';
 import {editor,field as careField,action,request as careRequest} from './project-care.js';
 const drafts=new Map();
+registerDraftSource('client',()=>[...drafts].filter(([,d])=>d.dirty||d.pending).map(([key,d])=>({key,pending:Boolean(d.pending)})));
 const ndisEditing=new Set();
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 export const clientDetailsHasDrafts=()=>[...drafts.values()].some(d=>d.dirty||d.pending);
@@ -32,7 +34,7 @@ export async function renderClientDetails(view,id,host) {
   const previous=drafts.get(id);if(previous&&!previous.dirty&&!previous.pending&&previous.version!==current.version)drafts.delete(id);
   if(!drafts.has(id))drafts.set(id,{...current,name:client.person.name,email:client.person.email,phone:client.person.phone,dirty:false,pending:false});
   const d=reconcileContactDraft(drafts.get(id),client.person);view.append(el('h1','Client contact and addresses'),el('p','Phone, email and name are shared with the person profile. Saving here updates that same contact record. Complete the address and preferred-contact details for intake.'));
-  const form=el('form');form.className='panel workflow-panel form-grid';const status=el('div');status.setAttribute('role','status');
+  const form=el('form');trackDraftForm(form,'client',id,{label:'Client contact and addresses'});form.className='panel workflow-panel form-grid';const status=el('div');status.setAttribute('role','status');
   const controls={};
   function field(key,label,max,type='text'){
     const wrap=el('label');wrap.className='workflow-field';wrap.append(el('span',label));const input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;
@@ -71,6 +73,6 @@ export async function renderClientDetails(view,id,host) {
     body.residentialGeocode=d.residentialGeocode??null;if(!d.sameAsResidential)body.workGeocode=d.workGeocode??null;
     try{await host.request(`clients/${id}/details`,'PUT',body);drafts.delete(id);host.announce?.('Client details saved.');location.hash='client/'+id;}
     catch(error){status.replaceChildren(el('p',error.message||'Save was not confirmed. Your draft is retained.'));if(error.status===409){const reload=el('button','Compare latest saved details');reload.type='button';reload.onclick=()=>{view.replaceChildren();renderClientDetails(view,id,host).catch(e=>status.append(el('p',e.message)));};status.append(reload);}}
-    finally{d.pending=false;host.setSaving?.(false);for(const[n,state]of disabled)n.disabled=state;}
+    finally{refreshDraftReview();d.pending=false;host.setSaving?.(false);for(const[n,state]of disabled)n.disabled=state;}
   });
 }

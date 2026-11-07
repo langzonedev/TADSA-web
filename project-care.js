@@ -1,6 +1,10 @@
+import {registerDraftSource,trackDraftForm,refreshDraftReview} from './draft-review.js';
 let host;
 const drafts=new Map();
+registerDraftSource('care',()=>[...drafts].map(([key,d])=>({key,pending:Boolean(d.pending)})));
 const openSections=new Map();
+const baselines=new Map();
+const draftValue=d=>JSON.stringify(Object.fromEntries(Object.entries(d).filter(([key])=>!['requestId','version','pending'].includes(key))));
 import {attachAddressLookup} from './address-lookup.js';
 const editorSaveLabels={location:'Save work location',plan:'Save NDIS reference',payment:'Record receipt',upload:'Upload file',remove:'Remove file','business-settings':'Save invoice settings','backup-create':'Create backup','backup-import':'Import backup'};
 function rememberSection(section,key){section.open=openSections.get(key)??false;section.addEventListener('toggle',()=>{openSections.set(key,section.open);if(section.open&&matchMedia('(max-width:800px)').matches){for(const other of section.parentElement?.children??[])if(other!==section&&other.tagName==='DETAILS')other.open=false;}});}
@@ -8,8 +12,8 @@ export const configureCare=h=>{host=h;};
 export const careHasDrafts=()=>drafts.size>0;
 export function renderRetainedReferenceDraft(parent,key){
  const draft=drafts.get(key);if(!draft)return;
- const box=node('section',null,'message warning');box.append(node('h4','Unsaved reference changes'),node('p',draft.pending?'An earlier save was not confirmed. Compare these entered values with the saved references above before discarding this draft.':'The entered values below are still unsaved. Financial references are now read-only; compare them with the saved references above.'));
- const details=node('dl');for(const [label,value]of [['Entered purchase order reference',draft.purchaseOrder],['Entered External Finance invoice reference',draft.financeInvoiceReference]])details.append(node('dt',label),node('dd',value||'Not recorded'));box.append(details,action('Discard unsaved reference changes',()=>{drafts.delete(key);host.refresh();}));parent.append(box);
+ const box=node('section',null,'message warning');box.dataset.draftKey='care:'+key;box.tabIndex=-1;box.append(node('h4','Unsaved reference changes'),node('p',draft.pending?'An earlier save was not confirmed. Compare these entered values with the saved references above before discarding this draft.':'The entered values below are still unsaved. Financial references are now read-only; compare them with the saved references above.'));
+ const details=node('dl');for(const [label,value]of [['Entered purchase order reference',draft.purchaseOrder],['Entered External Finance invoice reference',draft.financeInvoiceReference]])details.append(node('dt',label),node('dd',value||'Not recorded'));box.append(details,action('Discard unsaved reference changes',()=>{drafts.delete(key);baselines.delete(key);host.refresh();}));parent.append(box);
 }
 // A successful note is independent evidence, not a change to the pending decision.
 // Advance only when that note is the sole intervening project-version increment.
@@ -34,7 +38,7 @@ export const notice=(text,error=false)=>{const p=node('p',text,error?'message er
 export async function request(path,method='GET',body){const r=await fetch('/api/'+path,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{}),...(method==='GET'?{signal:AbortSignal.timeout(12000)}:{})});const data=await r.json();if(!r.ok){const e=Error(data.error);e.status=r.status;throw e;}return data;}
 export function field(parent,label,d,key,type='text',options){const l=node('label',null,'workflow-field');l.append(node('span',label,'field-label'));const n=node(options?'select':type==='textarea'?'textarea':'input');n.setAttribute('aria-label',label);if(options){for(const[value,text]of options){const o=node('option',text);o.value=value;n.append(o);}}else if(type!=='textarea')n.type=type;if(type==='checkbox'){n.checked=Boolean(d[key]);l.className='checkbox';}else n.value=d[key]??'';if(type==='text')n.maxLength=200;if(type==='textarea'){n.rows=3;n.maxLength=500;}n.addEventListener(options||type==='checkbox'?'change':'input',()=>d[key]=type==='checkbox'?n.checked:n.value);l.append(n);parent.append(l);return n;}
 export function editor(parent,key,initial,title,fields,path,method,payload,options={}){
- const d=drafts.get(key)??{...initial,requestId:crypto.randomUUID()},box=node('section',null,'panel workflow-panel'),form=node('form',null,'form-grid');if(title)box.append(node('h2',title));box.append(form);parent.append(box);fields(form,d);const feedback=node('div'),buttons=node('div',null,'actions'),save=node('button','Save','primary');save.type='submit';const discard=action('Discard unsaved changes',()=>{drafts.delete(key);host.refresh();});buttons.append(save,discard);form.append(feedback,buttons);const remember=()=>drafts.set(key,d);form.addEventListener('input',remember);form.addEventListener('change',remember);
+ const d=drafts.get(key)??{...initial,requestId:crypto.randomUUID()},box=node('section',null,'panel workflow-panel'),form=node('form',null,'form-grid');if(title)box.append(node('h2',title));box.append(form);parent.append(box);fields(form,d);trackDraftForm(form,'care',key,{label:title||options.saveLabel||editorSaveLabels[key.split('/')[0]],...options.draftReview});if(!drafts.has(key))baselines.set(key,draftValue(d));const feedback=node('div'),buttons=node('div',null,'actions'),save=node('button','Save','primary');save.type='submit';const discard=action('Discard unsaved changes',()=>{drafts.delete(key);baselines.delete(key);host.refresh();});buttons.append(save,discard);form.append(feedback,buttons);const remember=()=>{if(d.pending||draftValue(d)!==baselines.get(key))drafts.set(key,d);else drafts.delete(key);refreshDraftReview();};form.addEventListener('input',remember);form.addEventListener('change',remember);
  save.dataset.label=options.saveLabel??editorSaveLabels[key.split('/')[0]]??'Save';
  const disabledBeforeSave=new Map();
  const lock=()=>{form.querySelectorAll('input,select,textarea,button').forEach(n=>{if(d.pending){if(!disabledBeforeSave.has(n))disabledBeforeSave.set(n,n.disabled);n.disabled=n!==save;}else if(disabledBeforeSave.has(n)){n.disabled=disabledBeforeSave.get(n);disabledBeforeSave.delete(n);}});form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(Boolean(d.pending)));save.textContent=d.pending?'Retry save safely':(save.dataset.label||'Save');};lock();
@@ -45,7 +49,7 @@ export function editor(parent,key,initial,title,fields,path,method,payload,optio
   host.setSaving(true);form.querySelectorAll('input,select,textarea,button').forEach(n=>{if(!disabledBeforeSave.has(n))disabledBeforeSave.set(n,n.disabled);n.disabled=true;});form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(true));
   try{
    d.pending??=await payload(d);remember();feedback.replaceChildren(notice('Saving…'));
-   await request(path,method,d.pending);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);options.onSaved?.();
+   await request(path,method,d.pending);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);baselines.delete(key);options.onSaved?.();
    host.setSaving(false);await host.refresh();refreshed=true;
   }catch(error){
    if(error.status){d.pending=null;d.requestId=crypto.randomUUID();}
@@ -59,11 +63,12 @@ export function editor(parent,key,initial,title,fields,path,method,payload,optio
      if(review.canKeep!==false)feedback.append(action(options.reviewLabel??'Review latest project and keep draft',async()=>{
       d.version=review.version;options.onAcceptReview?.(d,review);d.requestId=crypto.randomUUID();remember();await host.refresh();
      }));
-     else feedback.append(action('Discard this draft and load latest workflow',()=>{drafts.delete(key);host.refresh();}));
+     else feedback.append(action('Discard this draft and load latest workflow',()=>{drafts.delete(key);baselines.delete(key);host.refresh();}));
     }
     else feedback.append(notice('Discard this draft to load the latest saved version, then reapply your change.'));
    }
   }finally{
+   refreshDraftReview();
    host.setSaving(false);if(workspace){workspace.inert=wasInert;workspace.removeAttribute('aria-busy');}lock();
    if(!wasInert){if(refreshed)workspace?.focus({preventScroll:true});else save.focus({preventScroll:true});}
   }

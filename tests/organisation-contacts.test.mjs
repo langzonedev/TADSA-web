@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {seed} from '../seed.mjs';
+import {normalise,dispatch} from '../device-model.mjs';
+import '../device-extensions.mjs';
+import {deviceDirectoryQuery} from '../device-directory-queries.mjs';
+import {validateBackup} from '../device-backups.mjs';
+test('organisation contact values survive device retries legacy edits and validated backups',async()=>{
+ const d=normalise(seed({enriched:false})),id='org-1',path='organisations/'+id,initial=dispatch(d,path),fields={website:'https://example.invalid/',phone:'08 0000 1234',ndisProviderNumber:'00123-TEST',contactName:'Fictional contact'};
+ const command=(row,extra={})=>({requestId:crypto.randomUUID(),version:row.version,name:row.name,role:row.role,description:row.description,category:row.category,email:row.email,...extra});
+ for(const key of Object.keys(fields))assert.equal(initial[key],'');
+ const input=command(initial,{...fields,website:'example.invalid'}),saved=dispatch(d,path+'/profile','PUT',input);for(const[key,value]of Object.entries(fields))assert.equal(saved[key],value);assert.deepEqual(dispatch(d,path+'/profile','PUT',input),saved);
+ for(const route of ['selections','registers'])assert.deepEqual((await deviceDirectoryQuery(d,route,'GET',new URLSearchParams({kind:'organisations',q:fields.phone}),{id:'synthetic-admin',role:'administrator'})).items.map(row=>row.id),[id]);
+ assert.throws(()=>dispatch(d,path+'/profile','PUT',{...input,requestId:crypto.randomUUID()}),e=>e.status===409);
+ const updated=dispatch(d,path+'/profile','PUT',command(saved,{description:'Synthetic notes amended.'}));for(const[key,value]of Object.entries(fields))assert.equal(updated[key],value);
+ assert.throws(()=>dispatch(d,path+'/profile','PUT',command(updated,{website:'javascript:alert(1)'})),e=>e.status===422);
+ const restored=normalise(await validateBackup(structuredClone(d)));assert.deepEqual(dispatch(restored,path),updated);
+ const bad=structuredClone(d);bad.organisations.find(o=>o.id===id).website='data:text/html,test';await assert.rejects(validateBackup(bad),/Backup rejected/);
+ const cleared=dispatch(d,path+'/profile','PUT',command(updated,{website:'',phone:'',ndisProviderNumber:'',contactName:''}));for(const key of Object.keys(fields))assert.equal(cleared[key],'');
+});

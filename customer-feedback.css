@@ -1,0 +1,21 @@
+/* Shared November feedback: clear destinations and visible unfinished work. */
+.summary-heading-link{display:inline-block;background:transparent;border:0;border-radius:3px;padding:2px 0;min-height:28px;font:inherit;font-size:.8rem;font-weight:700;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:left}
+.summary-heading-link:hover{color:var(--accent);background:var(--surface-soft)}
+.summary-heading-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.project-header-fact>.summary-heading-link{display:block;text-transform:uppercase;margin-bottom:5px}
+.panel>h2,.panel>h3,.workflow-panel>h2,.workflow-panel>h3{font-weight:750;font-size:1.15rem}
+.project-context-details>summary,.contact-other-details>summary{text-decoration:underline;text-underline-offset:3px}
+.register-tools>label:first-child{flex:1;min-width:180px;max-width:560px}
+.register-tools>label:first-child>input{width:100%}
+.organisation-role-options{display:flex;flex-wrap:wrap;gap:8px 20px;padding:12px}
+.organisation-role-options>legend{font-weight:700}
+.organisation-role-options>label{display:flex;align-items:center;gap:8px;margin:0;min-height:34px}
+.draft-review{margin:8px 28px;padding:10px 14px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;background:var(--surface);color:var(--ink)}
+.draft-review>summary{font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;min-height:28px}
+.draft-review p{margin:8px 0}.draft-review ul{list-style:none;display:flex;gap:8px;flex-wrap:wrap;padding:0;margin:8px 0 0}.draft-review li{display:flex;align-items:center;gap:8px}
+.draft-form-state{grid-column:1/-1;margin:0 0 8px;padding:8px 10px;border-left:3px solid var(--accent);font-weight:600}
+html:not([data-auth-state=ready]) .draft-review{display:none}
+@media(max-width:700px){.draft-review{margin:8px 12px}.register-tools>label:first-child{max-width:none}}
+
+.breadcrumb+.breadcrumb{margin-left:16px}
+.environment-info{max-height:calc(100vh - 100px);overflow-y:auto}
