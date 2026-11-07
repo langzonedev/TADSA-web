@@ -1,20 +1,20 @@
 {
-  "sourceRevision": "3c3eefdb7984e22162da6ccd56b2d795c126a34d",
+  "sourceRevision": "fb2d0e0fae18bab0962a7f7c1b7750d346c8c33d",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "draft-review.js": {
       "source": "public/draft-review.js",
-      "sha256": "1927871b4b01d2bd41c42644b7d072859a37339062a88036d8e4ac2623754292",
+      "sha256": "14162f3c6d08f38b0f1c664081786b78a195b0479c7b76b9db31c0ee2fc4ab59",
       "transform": null
     },
     "customer-feedback.css": {
       "source": "public/customer-feedback.css",
-      "sha256": "518bad4da0814f86c8bdced7c23c2e1e7666dc97c5fc653d6ec03dba02345236",
+      "sha256": "22860f4e8ae875397be68df10784312b449fd5d3c509eac0d5a3f08c3cba8394",
       "transform": null
     },
     "availability.css": {
       "source": "public/availability.css",
-      "sha256": "fe49bddc8774fffc881b5037424516c1bf9be7ca11b10bbb132dbc3ed0eaf10a",
+      "sha256": "6fc84395c66e0ab8c6b195e1387e3175b24dc878dfc87d3fc3dc105359af53dd",
       "transform": null
     },
     "project-contacts.js": {
@@ -59,7 +59,7 @@
     },
     "address-lookup.js": {
       "source": "public/address-lookup.js",
-      "sha256": "fd03c0228fa900f589ec9a8f6bf54ae12a023b2e90fcfe9f2b7e6201f95f9307",
+      "sha256": "1dfa77e9d2913d27291b16a99dc6637eac55c2e4dfdea6fba01883b5e3e1f88a",
       "transform": null
     },
     "location-geocode.js": {
@@ -184,12 +184,12 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "8613518d645268c652001917fc726776a68d70c8fd342f6cfa60cddf500b8a98",
+      "sha256": "b7f7d00e5b8867457d38f339335e0545d8a2ea8a32686f93b09f9faefe0f8cbb",
       "transform": null
     },
     "settings.js": {
       "source": "public/settings.js",
-      "sha256": "67e167dfb72b9c8f542edfd308ecbbe04b08e913b9a3bed87d7ece67371e04c2",
+      "sha256": "ab80d3c3aa5c67ce5cfcae62ac539d833edb88eb8c53bf013d2a62a0bace6802",
       "transform": null
     },
     "assessment-templates.js": {
@@ -204,17 +204,17 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "b8fcad596236040ceadaaa770d3e675333a30b2e2d3a6aebab4f13fdda128131",
+      "sha256": "315c4a2bd34d0b4ead2f25b8e097fa0a3a1d67f24a4619fe5d23ade5b75522c3",
       "transform": null
     },
     "operations.js": {
       "source": "public/operations.js",
-      "sha256": "7d0919bcecd38598a742ed1d6a61a6a9657e644a131b41483886cde5add0006b",
+      "sha256": "c5cbd633f7e81afcad143106e5ca339479760208b2cbf5f5b603edfe07574148",
       "transform": null
     },
     "client-details.js": {
       "source": "public/client-details.js",
-      "sha256": "677f24efad6832419b0f371fd055122706cb06cb194720f257a8c47ebcecac11",
+      "sha256": "8a8fe72808293dc52ed9d5305308be3368ea412afb3f3db47c87f28dac9b8436",
       "transform": null
     },
     "local-login.js": {
@@ -224,7 +224,7 @@
     },
     "availability.js": {
       "source": "public/availability.js",
-      "sha256": "6644848662e24d6908a20887f89d4696e0ad3d8e70b88898b4421f7e174160e4",
+      "sha256": "84c64e904a2e06ead6391853b5db68864c02bea9e46296e8e71ffd67e94cb4ff",
       "transform": null
     },
     "technician-location.js": {
@@ -275,5 +275,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "d94cf089c8a500fb288f95a19b58c9e40dc083828bbf150be723153a1932d857"
+  "shellHash": "6a4594b08a516ac6cb4338a276b919d64f21f6849ead6b1bf7e26c1a3280855b"
 }

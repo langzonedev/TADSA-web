@@ -31,5 +31,19 @@ html body main#content .availability-workspace .availability-cell:focus-visible{
 .availability-editor .form-grid>.actions{margin:0;padding:0;border:0;display:flex;flex-wrap:wrap;gap:8px}
 .availability-editor .form-grid>div:empty{display:none}
 .availability-editor .form-grid>div:not(.actions):not(:empty){flex-basis:100%}
+/* Keep the current selection, status and save controls together above the grid. */
+html body main#content .availability-workspace .availability-controls{margin-block:8px;gap:8px}
+html body main#content .availability-workspace .availability-editor{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);align-items:start;margin:8px 0;padding:10px 12px;gap:4px 14px}
+html body main#content .availability-workspace .availability-editor>h2{align-self:center;margin:0;overflow-wrap:anywhere}
+html body main#content .availability-workspace .availability-editor>button{justify-self:end;margin:0}
+.availability-editor>.availability-status-area{grid-column:1;grid-row:2;min-width:0}
+html body main#content .availability-workspace .availability-editor>.workflow-panel{grid-column:2;grid-row:2;margin:0;min-width:0}
+html body main#content .availability-workspace .availability-status-controls{margin:4px 0;gap:6px}
+html body main#content .availability-workspace .availability-selection-help{margin:4px 0;min-height:0;line-height:1.45}
+.availability-editor .draft-form-state{margin:0;flex-basis:100%}
+.availability-workspace .availability-help{margin-block:8px}
+.availability-workspace .availability-help>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}
+@media(min-width:1101px){html body main#content .availability-workspace>.breadcrumb{float:right;display:inline-flex;align-items:center;min-height:44px;margin:0 0 0 16px}}
+@media(max-width:1100px){html body main#content .availability-workspace .availability-editor{grid-template-columns:minmax(0,1fr)}.availability-editor>.availability-status-area,html body main#content .availability-workspace .availability-editor>.workflow-panel{grid-column:1;grid-row:auto}html body main#content .availability-workspace .availability-editor>button{grid-column:1;justify-self:start}}
 @media(max-width:700px){.availability-detail-fields{grid-template-columns:1fr}.availability-status-controls{gap:6px}.availability-editor .form-grid>.actions{width:100%}.availability-editor{padding:10px}.availability-editor>h2{flex-basis:100%}}
 @media print{.availability-status-controls,.availability-selection-help{display:none!important}}

@@ -1,4 +1,4 @@
-import {registerDraftSource,trackDraftForm,refreshDraftReview} from './draft-review.js';
+import {registerDraftSource,trackDraftForm,refreshDraftReview,baselineDraft,draftChanged} from './draft-review.js';
 import {organisationRoleSuggestions} from './organisation-model.js';
 import {reconcileContactDraft} from './contact-draft.js';
 import {renderTravelComparison} from './address-lookup.js';
@@ -23,8 +23,8 @@ const button = (text, action, cls = 'secondary') => { const n = el('button', tex
 const note = (text, error = false) => { const n = el('div', text, error ? 'message error' : 'message'); n.setAttribute('role', error ? 'alert' : 'status'); return n; };
 const title = (view, text, sub, back) => { if (back) view.append(link('← Back to '+(back.startsWith('project/')?'project':'client'), back, 'breadcrumb')); view.append(el('h1', text), el('p', sub, 'subtitle workflow-intro')); };
 const panel = text => { const n = el('section', null, 'panel workflow-panel'); if (text) n.append(el('h2', text)); return n; };
-const getDraft = (key, initial) => { const previous=drafts.get(key);if(previous&&!previous.dirty&&!previous.pending&&initial.version!==undefined&&initial.version!==previous.version)drafts.delete(key); if (!drafts.has(key)) drafts.set(key, { ...initial, requestId: crypto.randomUUID(), dirty: false }); return drafts.get(key); };
-const touch = d => { d.dirty = true; };
+const getDraft = (key, initial) => { const previous=drafts.get(key);if(previous&&!previous.dirty&&!previous.pending&&initial.version!==undefined&&initial.version!==previous.version)drafts.delete(key); if (!drafts.has(key)) drafts.set(key, { ...initial, ...("technicianId" in initial?{technicianIds:initial.technicianIds??(initial.technicianId?[initial.technicianId]:[])}:{}), requestId: crypto.randomUUID(), dirty: false }); return baselineDraft(drafts.get(key)); };
+const touch = d => { d.dirty = draftChanged(d); refreshDraftReview(); };
 const options = (items, value) => items.map(([id, name]) => { const n = el('option', name); n.value = id; n.selected = id === value; return n; });
 function field(form, label, d, key, { type = 'text', required = false, max = 120, help = '' } = {}) {
   const l = el('label', null, 'workflow-field'); l.append(el('span', label, 'field-label'));
@@ -208,7 +208,7 @@ async function editCoordination(view,id,options={}) {
   if(focus!=='funding')view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location in Project details.')));
   const box=panel(focus?null:'Review the allocation');
   if(focus!=='funding')renderTravelComparison(box,projectLocation,dirs.technicians);
-  const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:key.startsWith('coordination/')?'Team or funding':'Client contact'});coordinationFields(form,d,dirs,focus);
+  const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:focus==='funding'?'Funding':'Team',context:project.reference+' · '+project.title});coordinationFields(form,d,dirs,focus);
   const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save '+label.toLowerCase());
   actions.append(submit,cancel(form,d,key,options.onCancel??('project/'+id)));form.append(notice,actions);box.append(form);view.append(box);
   function compare(latest) {
@@ -216,7 +216,7 @@ async function editCoordination(view,id,options={}) {
     if(focus!=='team')rows.push(['Funding',latest.coordination.fundingStatus],['Funding notes',latest.coordination.fundingNotes||'None']);
     if(focus!=='funding')rows.push(['Technicians',(latest.coordination.technicianIds??[latest.coordination.technicianId]).map(id=>dirs.technicians.find(t=>t.id===id)?.name).filter(Boolean).join(', ')||'Unassigned'],['Skills',latest.coordination.requiredSkills.join(', ')||'None']);
     notice.replaceChildren(note('This project changed since you started. Your draft is kept. Compare the latest saved details before continuing.',true),reviewList(rows));
-    notice.append(button('Use latest version with my draft',()=>{d.version=latest.version;notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));
+    notice.append(button('Use latest version with my draft',()=>{d.version=latest.version;d.reviewedConflict=true;notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));
   }
   let checking=false;
   form.addEventListener('submit',async e=>{
@@ -244,7 +244,7 @@ async function editCoordination(view,id,options={}) {
 async function linkContact(view,id,initialRole='Occupational therapist') {
   const client=await request('clients/'+id);const key='contact/'+id;const d=getDraft(key,{mode:'existing',personId:'',role:initialRole,relationshipLabel:'',name:'',phone:'',email:'',allowDuplicate:false,personRequestId:crypto.randomUUID()});
   title(view,'Link a contact',`Client: ${client.person.name}. This links a person to the client, not to every project.`, 'client/'+id);
-  const box=panel('Contact details');const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:key.startsWith('coordination/')?'Team or funding':'Client contact'});selectField(form,'Relationship to client',d,'role',[['Occupational therapist','Occupational therapist (OT)'],['Carer','Carer'],['Referrer','Referrer']],()=>{d.personId='';drawPerson();});
+  const box=panel('Contact details');const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:'Client contact',context:client.person.name+' · '+client.id});selectField(form,'Relationship to client',d,'role',[['Occupational therapist','Occupational therapist (OT)'],['Carer','Carer'],['Referrer','Referrer']],()=>{d.personId='';drawPerson();});
   field(form,'Relationship description (optional)',d,'relationshipLabel',{max:120});form.append(el('p','For example: parent, guardian or support coordinator. Multiple contacts can be linked; the preferred contact is selected separately in Client details.','field-help'));
   const mode=el('div',null,'actions');const slot=el('div');
   mode.append(button('Choose existing person',()=>{d.mode='existing';drawPerson();}),button('Create new contact',()=>{d.mode='new';d.personId='';drawPerson();}));form.append(mode,slot);
@@ -291,7 +291,7 @@ async function personProfile(view, id) {
   if(person)reconcileContactDraft(d,person);
   title(view, id ? 'Edit person' : 'New person', 'Record each person once and select all of their directory roles.');
   view.append(link('← Back to people', 'people', 'breadcrumb'));
-  const box = panel('Person details'), form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:'Person details'});
+  const box = panel('Person details'), form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:'Person details',context:person?person.name+' · '+person.id:'New person'});
   field(form,'Full name',d,'name',{required:true}); field(form,'Phone number',d,'phone',{type:'tel',max:40}); field(form,'Email address',d,'email',{type:'email',max:200});
   const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Directory roles'),el('p','Select all roles that apply. These roles do not grant account access.','field-help'));
   const tech = el('fieldset'); tech.append(el('legend','Technician details'),el('p','Record skills and general allocation status. Dated calendar availability is recorded separately and does not change this status. These details do not establish clearance or permission to start work.','field-help'));
@@ -312,7 +312,7 @@ async function personProfile(view, id) {
   }
   if(id&&d.version!==person.version&&!d.pending) {
     notice.append(note('This profile changed since you started. Compare the latest details before saving your draft.',true),reviewList([['Name',person.name],['Phone',person.phone||'None'],['Email',person.email||'None'],['Roles',person.roles.join(', ')],['Skills',person.technician?.skills.join(', ')||'None'],['General allocation status',person.technician?.availability||'Not a technician']]));
-    notice.append(button('Use latest version with my draft',()=>{d.version=person.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));
+    notice.append(button('Use latest version with my draft',()=>{d.version=person.version;d.reviewedConflict=true;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));
   }
   form.addEventListener('submit',async e=>{
     e.preventDefault();if(!valid(form))return;
@@ -327,9 +327,9 @@ async function personProfile(view, id) {
 async function organisationCategory(view,id){
  const item=id?await request('organisations/'+id):null,directory=await request('organisations'),key=id?'edit-organisation/'+id:'new-organisation',d=getDraft(key,{name:item?.name||'',role:item?.role||'',description:item?.description||'',category:item?.category||'',email:item?.email||'',website:item?.website||'',phone:item?.phone||'',ndisProviderNumber:item?.ndisProviderNumber||'',contactName:item?.contactName||'',directoryStatus:item?.directoryStatus??'current',...(id?{version:item.version}:{})});
  for(const key of ['website','phone','ndisProviderNumber','contactName'])d[key]??=item?.[key]||'';
- d.directoryStatus??=item?.directoryStatus??'current';d.roles??=item?.roles?.length?[...item.roles]:d.role?[d.role]:[];d.allowDuplicate??=false;
+ d.directoryStatus??=item?.directoryStatus??'current';d.roles??=item?.roles?.length?[...item.roles]:d.role?[d.role]:[];d.allowDuplicate??=false;if(!d.dirty&&!d.pending)baselineDraft(d,true);
  title(view,id?'Edit organisation':'New organisation',id?item.name:'Record an organisation once, then link it to projects as needed.');view.append(link(id?'Back to organisation':'Back to organisations',id?'organisation/'+id:'organisations','breadcrumb'));
- const box=panel('Organisation details'),form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:'Organisation details'});
+ const box=panel('Organisation details'),form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:'Organisation details',context:item?item.name+' · '+item.id:'New organisation'});
  field(form,'Organisation name',d,'name',{required:true,max:200});
  const suggest=(label,key,values,help)=>{const input=field(form,label,d,key,{required:key==='role',max:key==='role'?120:80,help});const list=el('datalist');list.id='organisation-'+key+'-options';for(const value of [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'en-AU'))){const option=el('option');option.value=value;list.append(option);}input.setAttribute('list',list.id);form.append(list);};
  selectField(form,'Directory status',d,'directoryStatus',[['current','Current'],['inactive','Inactive'],['review','Needs review']]);
@@ -345,7 +345,7 @@ async function organisationCategory(view,id){
  field(form,'NDIS provider number',d,'ndisProviderNumber',{max:80,help:'The organisation’s provider number, if known. This is separate from a client’s NDIS participant number.'});
  field(form,'Contact name',d,'contactName',{max:200});
  const notice=el('div'),actions=el('div',null,'actions'),submit=saveButton(id?'Save organisation details':'Create organisation');actions.append(submit,cancel(form,d,key,id?'organisation/'+id:'organisations'));form.append(notice,actions);box.append(form);view.append(box);
- if(id&&d.version!==item.version){notice.append(note('This organisation changed. Compare the latest saved details before retaining your draft.',true));const latest=el('dl',null,'record-details');for(const [label,k] of [['Name','name'],['Type','role'],['Notes','description'],['Category','category'],['Email','email'],['Website','website'],['Phone','phone'],['NDIS provider number','ndisProviderNumber'],['Contact name','contactName'],['Directory status','directoryStatus']])latest.append(el('dt',label),el('dd',item[k]||'Not recorded'));notice.append(latest,button('Use latest version with my draft',()=>{d.version=item.version;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review all organisation details, then save.'));}));}
+ if(id&&d.version!==item.version){notice.append(note('This organisation changed. Compare the latest saved details before retaining your draft.',true));const latest=el('dl',null,'record-details');for(const [label,k] of [['Name','name'],['Type','role'],['Notes','description'],['Category','category'],['Email','email'],['Website','website'],['Phone','phone'],['NDIS provider number','ndisProviderNumber'],['Contact name','contactName'],['Directory status','directoryStatus']])latest.append(el('dt',label),el('dd',item[k]||'Not recorded'));notice.append(latest,button('Use latest version with my draft',()=>{d.version=item.version;d.reviewedConflict=true;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review all organisation details, then save.'));}));}
  form.addEventListener('submit',e=>{e.preventDefault();if(!valid(form))return;if(!d.roles.length){notice.replaceChildren(note('Choose at least one organisation role.',true));return;}const payload={requestId:d.requestId,...(id?{version:d.version}:{}),...Object.fromEntries(['name','description','category','email','website','phone','ndisProviderNumber','contactName','directoryStatus'].map(k=>[k,d[k].trim()])),role:d.roles[0],roles:d.roles,allowDuplicate:d.allowDuplicate};save(form,d,notice,submit,id?'organisations/'+id+'/profile':'organisations',id?'PUT':'POST',payload,result=>{drafts.delete(key);host.announce(id?'Organisation details saved.':'Organisation created.');location.hash='organisation/'+result.id;},candidates=>{notice.append(el('h2','Please check these existing organisations'));for(const c of candidates)notice.append(link(c.name+' — open existing record','organisation/'+c.id,'duplicate-result'));notice.append(button('This is a different organisation — save anyway',()=>{d.allowDuplicate=true;d.requestId=crypto.randomUUID();form.requestSubmit();}));});});
  form.addEventListener('input',e=>{if(e.target.name==='name'||e.target.name==='email')d.allowDuplicate=false;});
  if(d.pending){lock(form,true,submit);submit.textContent='Retry save safely';notice.append(note('A previous save could not be confirmed. Retry it before changing these details.'));}

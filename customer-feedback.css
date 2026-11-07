@@ -19,3 +19,5 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
 
 .breadcrumb+.breadcrumb{margin-left:16px}
 .environment-info{max-height:calc(100vh - 100px);overflow-y:auto}
+.draft-review li{max-width:100%;flex-wrap:wrap}.draft-review li button{white-space:normal;overflow-wrap:anywhere;text-align:left;max-width:100%}
+.latest-quote-panel:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
