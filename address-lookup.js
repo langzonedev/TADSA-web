@@ -53,13 +53,18 @@ export function attachAddressLookup(input,{draft,fields,geoField}={}){
  // fields maps provider parts to the form's saved keys. Unmapped locality is
  // included in address text, never silently dropped from a selected address.
  const form=input.closest('form'),box=node('div');box.className='address-lookup';
- const status=node('p','Type at least four characters for Australian address suggestions. Manual entry always works.');status.className='field-help';status.setAttribute('role','status');
+ const lookupHint='Type at least four characters for Australian address suggestions. Manual entry always works.';
+ const status=node('p',lookupHint);status.className='field-help';status.setAttribute('role','status');
  const list=node('div');list.className='address-suggestions';const id='address-'+crypto.randomUUID();list.id=id;list.setAttribute('role','listbox');list.setAttribute('aria-label','Address suggestions');
  input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-controls',id);input.setAttribute('aria-expanded','false');input.autocomplete='off';
  const attribution=node('p');attribution.className='field-help';const providerLink=node('a','Geoapify'),osm=node('a','OpenStreetMap contributors');providerLink.href='https://www.geoapify.com/';osm.href='https://www.openstreetmap.org/copyright';for(const a of [providerLink,osm]){a.target='_blank';a.rel='noopener noreferrer';}attribution.append('Online address text is sent to the selected service. Powered by ',providerLink,' / Photon · © ',osm,'.');
  box.append(list,status,attribution);input.parentElement.after(box);
  let timer,controller,revision=0,active=-1,items=[],applying=false;
  const close=()=>{list.replaceChildren();input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');active=-1;};
+ const dismiss=()=>{
+  if(list.children.length||status.textContent==='Finding addresses…')status.textContent=lookupHint;
+  revision++;controller?.abort();clearTimeout(timer);close();
+ };
  // Resolve controls by the supplied elements, avoiding assumptions about labels.
  const set=(key,value)=>{draft[key]=value;const control=fields.elements?.[key]??(key===fields.street?input:null);if(control){control.value=value;control.dispatchEvent(new Event(control.tagName==='SELECT'?'change':'input',{bubbles:true}));}};
  const values=()=>fields.keys.map(key=>draft[key]);
@@ -74,11 +79,21 @@ export function attachAddressLookup(input,{draft,fields,geoField}={}){
  };
  const invalidate=()=>{if(applying)return;if(geoField)draft[geoField]=null;revision++;controller?.abort();clearTimeout(timer);close();};
  for(const key of fields.keys){const c=fields.elements?.[key]??(key===fields.street?input:null);c?.addEventListener(c.tagName==='SELECT'?'change':'input',invalidate);}
- input.addEventListener('input',()=>{if(applying)return;const own=++revision;clearTimeout(timer);controller?.abort();close();if(input.value.trim().length<4)return;
+ input.addEventListener('input',()=>{if(applying)return;const own=++revision;clearTimeout(timer);controller?.abort();close();status.textContent=lookupHint;if(input.value.trim().length<4)return;
   timer=setTimeout(async()=>{if(!input.isConnected||input.disabled)return;controller=new AbortController();status.textContent='Finding addresses…';try{items=await lookupAddress(input.value,controller.signal);if(own!==revision||!input.isConnected||input.disabled)return;close();for(const [index,item]of items.entries()){const option=node('button',item.label);option.type='button';option.id=id+'-'+index;option.setAttribute('role','option');option.setAttribute('aria-selected','false');option.tabIndex=-1;option.addEventListener('mousedown',e=>e.preventDefault());option.onclick=()=>choose(item);list.append(option);}input.setAttribute('aria-expanded',String(items.length>0));status.textContent=items.length?'Choose an address, or keep typing manually.':'No complete address found. Keep typing or enter it manually.';}catch(error){if(own===revision&&input.isConnected){close();status.textContent=error.name==='AbortError'?'Lookup timed out. Manual entry remains available.':error.message;}}},1000);
  });
- input.addEventListener('keydown',e=>{if(e.key==='Escape'){revision++;controller?.abort();clearTimeout(timer);close();return;}if(!list.children.length)return;if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;[...list.children].forEach((n,i)=>n.setAttribute('aria-selected',String(i===active)));input.setAttribute('aria-activedescendant',list.children[active].id);}else if(e.key==='Enter'&&active>=0){e.preventDefault();choose(items[active]);}});
- input.addEventListener('blur',()=>setTimeout(()=>{if(!box.contains(document.activeElement)){revision++;controller?.abort();clearTimeout(timer);close();}},150));
+ input.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){dismiss();return;}
+  if(!list.children.length)return;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+   e.preventDefault();
+   const forward=e.key==='ArrowDown';
+   active=active<0?(forward?0:items.length-1):(active+(forward?1:-1)+items.length)%items.length;
+   [...list.children].forEach((n,i)=>n.setAttribute('aria-selected',String(i===active)));
+   input.setAttribute('aria-activedescendant',list.children[active].id);
+  }else if(e.key==='Enter'&&active>=0){e.preventDefault();choose(items[active]);}
+ });
+ input.addEventListener('blur',()=>setTimeout(()=>{if(document.activeElement!==input&&!box.contains(document.activeElement))dismiss();},150));
  return box;
 }
 export function renderLookupSettings(parent){

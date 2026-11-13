@@ -22,13 +22,17 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
 .draft-review li{max-width:100%;flex-wrap:wrap}.draft-review li button{white-space:normal;overflow-wrap:anywhere;text-align:left;max-width:100%}
 .latest-quote-panel:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
-.project-register-layout:not(:has(.inspector:not([hidden]))){grid-template-columns:minmax(0,1fr)}
-.project-register-layout .inspector[hidden]{display:none}
-.project-register-layout .inspector{display:block}
-.project-register-layout .inspector-top{align-items:center;gap:10px;padding:10px 16px;border-right:0;border-bottom:1px solid var(--line)}
-.project-register-layout .inspector-top button{min-height:36px}
-.project-register-layout .inspector-body{padding:16px}
-.project-register-layout .inspector-body>.inspector-section{display:block;width:auto;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.directory-row-actions{display:flex;align-items:center;flex-wrap:wrap;column-gap:16px}
+.directory-row-actions > .text-button{font-size:14px;font-weight:600;line-height:1.35;min-height:44px;margin:0;padding:6px 0}
+.directory-row-actions > a{display:inline-flex;align-items:center}
+
+.paged-register-layout:not(:has(.inspector:not([hidden]))){grid-template-columns:minmax(0,1fr)}
+.paged-register-layout .inspector[hidden]{display:none}
+.paged-register-layout .inspector{display:block;min-width:0}
+.paged-register-layout .inspector-top{align-items:center;gap:10px;padding:10px 16px;border-right:0;border-bottom:1px solid var(--line)}
+.paged-register-layout .inspector-top button{min-height:36px}
+.paged-register-layout .inspector-body{padding:16px}
+.paged-register-layout .inspector-body>.inspector-section{display:block;width:auto;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .project-register-layout .inspector-section dl + dl{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
 .project-register-layout .inspector-section h3{margin:0 0 8px}
 .project-register-layout .inspector-section h3:not(:first-child){margin-top:14px}
@@ -47,10 +51,11 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
 .project-register-layout .projects-table th:nth-child(5){width:11%}
 .project-register-layout .projects-table .project-stage-cell{font-weight:650}
 @media(max-width:1099px){
- .project-register-layout .inspector{grid-row:1}
+ .paged-register-layout .inspector{grid-row:1}
 }
 @media(max-width:800px){
  .project-register-layout .projects-table .row-preview{display:inline-flex;align-items:center;min-height:36px}
+ .directory-row-actions > .row-preview{display:inline-flex;align-items:center}
 }
 @media(max-width:540px){
  .project-register-layout .projects-table :is(th,td){min-width:0;padding:7px 5px}

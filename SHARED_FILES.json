@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "889597bd527e6ee34cf3a4081260757f0d2346e2",
+  "sourceRevision": "3a81e24e7c175256c0ee551276f35e73d6ae179b",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "draft-review.js": {
@@ -9,7 +9,7 @@
     },
     "customer-feedback.css": {
       "source": "public/customer-feedback.css",
-      "sha256": "f984002f8383de9bb128eaa90d9b88f46fbeb76a7013b382a526f68c1db9a79f",
+      "sha256": "874117fb926d6b1357dce63b9cc2bc3f5fe05e5a592edce1379911fddf1d6796",
       "transform": null
     },
     "availability.css": {
@@ -59,7 +59,7 @@
     },
     "address-lookup.js": {
       "source": "public/address-lookup.js",
-      "sha256": "1dfa77e9d2913d27291b16a99dc6637eac55c2e4dfdea6fba01883b5e3e1f88a",
+      "sha256": "c63e13390324564ff3853938982876439d3a35545ef2bd14e7b8e1b288eba131",
       "transform": null
     },
     "location-geocode.js": {
@@ -184,7 +184,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "02ba463f21e8a83f0e200e7cda83c669347d8965167c5300aba2bfe75fae546a",
+      "sha256": "0a1ac352203b183ac8f3f21add14483319ea5378598da234f3929566b381d515",
       "transform": null
     },
     "settings.js": {
@@ -275,5 +275,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "e33427e86886c2af4bff53afa9910d9f4880b58edbeeeb47c8d8b291a07a0f46"
+  "shellHash": "99d8bd324a7c78d945a7dc070e356e85d341e6f8113b9e089cc7c109ec3906df"
 }
