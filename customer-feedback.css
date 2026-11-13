@@ -21,3 +21,42 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
 .environment-info{max-height:calc(100vh - 100px);overflow-y:auto}
 .draft-review li{max-width:100%;flex-wrap:wrap}.draft-review li button{white-space:normal;overflow-wrap:anywhere;text-align:left;max-width:100%}
 .latest-quote-panel:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+.project-register-layout:not(:has(.inspector:not([hidden]))){grid-template-columns:minmax(0,1fr)}
+.project-register-layout .inspector[hidden]{display:none}
+.project-register-layout .inspector{display:block}
+.project-register-layout .inspector-top{align-items:center;gap:10px;padding:10px 16px;border-right:0;border-bottom:1px solid var(--line)}
+.project-register-layout .inspector-top button{min-height:36px}
+.project-register-layout .inspector-body{padding:16px}
+.project-register-layout .inspector-body>.inspector-section{display:block;width:auto;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.project-register-layout .inspector-section dl + dl{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
+.project-register-layout .inspector-section h3{margin:0 0 8px}
+.project-register-layout .inspector-section h3:not(:first-child){margin-top:14px}
+.project-register-layout .detail-pairs{gap:7px}
+.project-register-layout .project-preview-summary{display:flex;align-items:start;justify-content:space-between;gap:12px}
+.project-register-layout .project-preview-summary .detail-pairs>div{display:block;text-align:right}
+.project-register-layout .project-preview-summary .detail-pairs dd{max-width:none;margin-top:4px;font-weight:650}
+.project-register-layout .project-preview-comments{white-space:pre-wrap;overflow-wrap:anywhere}
+.project-register-layout .inspector h2{overflow-wrap:anywhere}
+.project-register-layout .projects-table :is(th,td){padding:8px 10px}
+.project-register-layout .projects-table th{white-space:normal}
+.project-register-layout .projects-table th:first-child{width:36%}
+.project-register-layout .projects-table th:nth-child(2){width:20%}
+.project-register-layout .projects-table th:nth-child(3){width:15%}
+.project-register-layout .projects-table th:nth-child(4){width:18%}
+.project-register-layout .projects-table th:nth-child(5){width:11%}
+.project-register-layout .projects-table .project-stage-cell{font-weight:650}
+@media(max-width:1099px){
+ .project-register-layout .inspector{grid-row:1}
+}
+@media(max-width:800px){
+ .project-register-layout .projects-table .row-preview{display:inline-flex;align-items:center;min-height:36px}
+}
+@media(max-width:540px){
+ .project-register-layout .projects-table :is(th,td){min-width:0;padding:7px 5px}
+ .project-register-layout .projects-table th:first-child{width:38%}
+ .project-register-layout .projects-table th:nth-child(2){width:22%}
+ .project-register-layout .projects-table th:nth-child(3){width:19%}
+ .project-register-layout .projects-table th:nth-child(4){width:21%}
+ .project-register-layout .projects-table .project-status .badge:not(.invoice){white-space:normal}
+}

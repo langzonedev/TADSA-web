@@ -77,17 +77,61 @@ function projectLinks(projects) {
   for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference}`));const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, projectStatus(p)); list.append(a); }
   box.append(list); return box;
 }
-function inspect(item, kind, slot) {
-  const type = typeOf(kind); slot.replaceChildren(); slot.append(el('div', 'Quick view', 'inspector-top'));
+const workflowStageLabels = {enquiry:'Enquiry',assessment:'Assessment',assessment_review:'Assessment review',work_request:'Project request',finance_handoff:'With finance',quote:'Preparing quote',peer_review:'Technical review',client_acceptance:'Client acceptance',finance_clearance:'Invoice / payment clearance',work:'Technical work',customer_signoff:'Customer sign-off',finance_finalisation:'Final finance review',ready_to_close:'Ready to close',closed:'Completed'};
+const workflowStageLabel = stage => Object.hasOwn(workflowStageLabels,stage) ? workflowStageLabels[stage] : 'Not started';
+async function projectPreviewContext(project, row) {
+  const safeRead = path => api(path).catch(() => null);
+  const members = project.relationships ?? [];
+  const identities = new Map();
+  for (const member of members) {
+    const key = member.type+':'+member.id;
+    const directory = member.type === 'organisation' ? 'organisations' : 'people';
+    if (!identities.has(key)) identities.set(key,safeRead('selections/'+directory+'/'+encodeURIComponent(member.id)));
+  }
+  const [client,lifecycle] = await Promise.all([
+    safeRead('selections/clients/'+encodeURIComponent(project.clientId)),
+    row ? null : safeRead('projects/'+encodeURIComponent(project.id)+'/lifecycle')
+  ]);
+  const profile = client?.item?.personId ? safeRead('people/'+encodeURIComponent(client.item.personId)+'/profile-details') : null;
+  const people = await Promise.all([...identities].map(async ([key,value]) => [key,(await value)?.item]));
+  return {client:client?.item,people:new Map(people),stage:row ? row.workflowStage : lifecycle?.effectiveStage,
+    comments:(await profile)?.contact?.additionalComments};
+}
+function inspect(item, kind, slot, options = {}) {
+  const type = typeOf(kind), top = el('div', 'Quick view', 'inspector-top');
+  if (options.closeControl) top.append(options.closeControl);
+  slot.replaceChildren(top);
   const body = el('div', undefined, 'inspector-body');
   if (!item) { body.append(empty('Select a record', 'Choose a row to see its details here.')); slot.append(body); return; }
   if (kind === 'projects') {
-    body.append(el('span', item.reference, 'inspector-reference'), el('h2', item.title), projectStatus(item), el('p', item.summary));
-    const context = el('div', undefined, 'inspector-section'); context.append(el('h3', 'Project details'), details([['Client', link(item.clientName, `client/${item.clientId}`)], ...(item.status==='closed'?[]:[['Target date', date(item.dueDate)]])])); body.append(context);
-    const people = el('div', undefined, 'inspector-section'); people.append(el('h3', 'Working together'));
-    for (const r of [...item.relationships].sort((a, b) => Number(b.role === 'Technician') - Number(a.role === 'Technician'))) { const a = link('', `${r.type}/${r.id}`, 'person-line'); const text = el('span'); text.append(el('strong', r.name), el('small', r.role)); a.append(avatar(r.name), text); people.append(a); }
-    if (!item.relationships.length) people.append(el('p', 'No assignments recorded.'));
-    body.append(people);
+    const {client,people,stage,comments} = options.context ?? {};
+    function phone(record) {
+      if (!record) return 'Could not load';
+      const value = String(record.displayPhone ?? record.phone ?? '').trim();
+      if (!value) return 'Not recorded';
+      const dial = value.replace(/[\s().-]/g,'');
+      if (!/^\+?[0-9]{5,20}$/.test(dial)) return value;
+      const telephone = el('a',value); telephone.href = 'tel:'+dial; return telephone;
+    }
+    const summary = el('div',undefined,'project-preview-summary');
+    summary.append(el('strong',item.reference,'inspector-reference'),details([['Workflow status',workflowStageLabel(stage)]]));
+    body.append(summary,el('h2',item.title),projectStatus(item));
+    if (item.summary) body.append(el('p',item.summary));
+    const context = el('div',undefined,'inspector-section');
+    context.append(el('h3','Project details'),details([
+      ['Client',link(item.clientName,'client/'+item.clientId)], ['Client phone',phone(client)],
+      ...(item.status==='closed' ? [] : [['Target date',date(item.dueDate)]])
+    ]));
+    if (comments?.trim()) context.append(el('h3','Additional comments'),el('p',comments,'project-preview-comments'));
+    body.append(context);
+    const contacts = el('div',undefined,'inspector-section');
+    contacts.append(el('h3','Working together'));
+    for (const member of [...item.relationships].sort((a,b) => Number(a.role==='Technician') - Number(b.role==='Technician'))) {
+      contacts.append(details([[member.role,link(member.name,member.type+'/'+member.id)],
+        ['Phone',phone(people?.get(member.type+':'+member.id))]]));
+    }
+    if (!item.relationships.length) contacts.append(el('p','No assignments recorded.'));
+    body.append(contacts);
   } else {
     const name = nameOf(item); body.append(avatar(name), el('h2', name), el('p', kind === 'clients' ? 'Client record' : item.role));
     const context = el('div', undefined, 'inspector-section');
@@ -101,28 +145,60 @@ function inspect(item, kind, slot) {
 }
 async function register(view, kind) {
   if(['people','organisations','projects'].includes(kind)){
-    const isProject=kind==='projects',state=registers.get(kind)??{query:'',filter:isProject?'all':'current',sort:isProject?'reference':'name',selected:null};state.after??='';state.previous??=[];state.offset??=0;registers.set(kind,state);returnRoute=kind;
-    const routeTicket=renderVersion,head=heading(cap(kind),'Search all records. Open a record to review its details.','Administration'),count=el('span','Loading…','meta-note');head.append(count,link(isProject?'New project':kind==='people'?'New person':'New organisation',isProject?'new-project':kind==='people'?'new-person':'new-organisation','button primary'));if(kind==='people')head.append(link('New client','new-client','button secondary'));if(isProject)head.append(link('Review projects','reviews','button secondary'));view.append(head);
+    const isProject=kind==='projects',state=registers.get(kind)??{query:'',filter:isProject?'active':'current',sort:isProject?'reference':'name',selected:null};state.after??='';state.previous??=[];state.offset??=0;registers.set(kind,state);returnRoute=kind;
+    const routeTicket=renderVersion,head=heading(cap(kind),isProject?'Open a project for its full workflow and history.':'Search all records. Open a record to review its details.','Administration'),count=el('span','Loading…','meta-note');head.append(count,link(isProject?'New project':kind==='people'?'New person':'New organisation',isProject?'new-project':kind==='people'?'new-person':'new-organisation','button primary'));if(kind==='people')head.append(link('New client','new-client','button secondary'));if(isProject)head.append(link('Review projects','reviews','button secondary'));view.append(head);
     const tabs=el('div',undefined,'filter-tabs');tabs.setAttribute('aria-label','Filter '+kind);
-    const layout=el('div',undefined,'register-layout'),box=el('section',undefined,'register-panel'),inspector=el('aside',undefined,'inspector');box.setAttribute('aria-label',cap(kind)+' register');inspector.setAttribute('aria-label','Selected record');
+    const layout=el('div',undefined,isProject?'register-layout project-register-layout':'register-layout'),box=el('section',undefined,'register-panel'),inspector=el('aside',undefined,'inspector');box.setAttribute('aria-label',cap(kind)+' register');inspector.setAttribute('aria-label','Selected record');
     const tools=el('div',undefined,'register-tools'),label=el('label'),q=el('input');q.type='search';q.maxLength=100;q.value=state.query;q.placeholder=isProject?'Project number, title, client or summary':'Name, reference, address, phone or email';q.setAttribute('aria-label',isProject?'Search projects by project number, title or client':'Filter '+kind+' by name or reference');if(isProject)label.append(el('span','Search projects','field-label'));label.append(q);const sortLabel=el('label'),sort=el('select');sortLabel.append(el('span','Sort by'),sort);sort.setAttribute('aria-label','Sort '+kind);for(const[value,text]of isProject?[['reference','Project number (newest first)'],['name','Project title'],['date','Target date'],['client','Client name']]:[['name','Name A–Z'],['reverse','Name Z–A']]){const option=el('option',text);option.value=value;sort.append(option);}if(isProject&&state.filter==='closed'){if(state.sort==='date')state.sort='reference';for(const option of sort.options)if(option.value==='date'){option.hidden=true;option.disabled=true;}}sort.value=state.sort;tools.append(label,sortLabel);
-    const tableSlot=el('div',undefined,'table-wrap'),foot=el('div',undefined,'table-footer');box.append(tools,tableSlot,foot);layout.append(box,inspector);view.append(tabs,el('p',isProject?'Counts cover all projects matching the search.':'Counts cover all records matching the search. Current includes Needs review; role filters include all directory statuses.','field-help'),layout);inspector.append(empty('Quick view','Choose Quick view beside a record to load its details.'));
+    const tableSlot=el('div',undefined,'table-wrap'),foot=el('div',undefined,'table-footer');box.append(tools,tableSlot,foot);layout.append(box,inspector);view.append(tabs);
+    if (!isProject) view.append(el('p','Counts cover all records matching the search. Current includes Needs review; role filters include all directory statuses.','field-help'));
+    view.append(layout);
+    inspector.append(empty('Quick view','Choose Quick view beside a record to load its details.'));
+    if (isProject) {inspector.hidden=true;inspector.setAttribute('id','project-quick-view');}
     let generation=0,detailGeneration=0,controller,timer,currentItems=[],focusFilter=false,focusPage='';
     const active=current=>current===generation&&routeTicket===renderVersion;
     const reset=()=>{state.after='';state.previous=[];state.offset=0;};
-    async function preview(id){const current=++detailGeneration;state.selected=id;inspector.replaceChildren(el('p','Loading selected record…'));try{const item=await api(kind+'/'+encodeURIComponent(id));if(current!==detailGeneration||routeTicket!==renderVersion)return;inspect(item,kind,inspector);if(!currentItems.some(row=>row.id===id))inspector.prepend(el('p','Selected record is outside this page or filter.','field-help'));}catch(error){if(current===detailGeneration&&routeTicket===renderVersion)inspector.replaceChildren(message('Selected record could not be loaded. '+error.message,true));}}
-    async function load(){if(routeTicket!==renderVersion)return;controller?.abort();controller=new AbortController();const current=++generation;detailGeneration++;currentItems=[];inspector.replaceChildren(empty('Quick view','Choose Quick view to load exact details.'));count.textContent='Loading…';tabs.replaceChildren();tableSlot.replaceChildren(el('p','Loading matching records…'));foot.replaceChildren();
+    function closePreview(id) {
+      detailGeneration++; state.selected=null; inspector.hidden=true; inspector.replaceChildren();
+      for (const control of tableSlot.querySelectorAll('.row-preview')) control.setAttribute('aria-expanded','false');
+      (tableSlot.querySelector('tr[data-id="'+CSS.escape(id)+'"] .row-preview') || q).focus();
+    }
+    async function preview(id, trigger) {
+      const current=++detailGeneration;state.selected=id;
+      const live=()=>current===detailGeneration&&routeTicket===renderVersion;
+      const closeControl=isProject?button('Close quick view',()=>closePreview(id),'text-button'):null;
+      inspector.hidden=false;
+      if (isProject) {
+        for (const control of tableSlot.querySelectorAll('.row-preview')) control.setAttribute('aria-expanded',String(control.closest('tr').dataset.id===id));
+        const top=el('div','Quick view','inspector-top');top.append(closeControl);
+        inspector.replaceChildren(top,el('p','Loading selected record…','inspector-body'));
+      } else inspector.replaceChildren(el('p','Loading selected record…'));
+      try {
+        const item=await api(kind+'/'+encodeURIComponent(id));if(!live())return;
+        const row=currentItems.find(row=>row.id===id);
+        const context=isProject && item.clientId ? await projectPreviewContext(item,row) : null;if(!live())return;
+        const keepCloseFocus=isProject&&document.activeElement===closeControl;
+        inspect(item,kind,inspector,isProject?{context,closeControl}:undefined);
+        if(!row)inspector.prepend(el('p','Selected record is outside this page or filter.','field-help'));
+        if(isProject&&(keepCloseFocus||(trigger&&document.activeElement===trigger)))closeControl.focus();
+      }catch(error){
+        if(!live())return;
+        const failure=message('Selected record could not be loaded. '+error.message,true);
+        if(isProject)inspector.lastElementChild?.replaceWith(failure);else inspector.replaceChildren(failure);
+      }
+    }
+    async function load(){if(routeTicket!==renderVersion)return;controller?.abort();controller=new AbortController();const current=++generation;detailGeneration++;currentItems=[];if(isProject)inspector.hidden=true;inspector.replaceChildren(empty('Quick view','Choose Quick view to load exact details.'));count.textContent='Loading…';tabs.replaceChildren();tableSlot.replaceChildren(el('p','Loading matching records…'));foot.replaceChildren();
       const directory=isProject||['all','current','inactive','needs-review'].includes(state.filter),status=isProject?state.filter:directory?({all:'all',current:'active',inactive:'inactive','needs-review':'review'}[state.filter]):'all',role=directory?'':state.filter;
       const params=new URLSearchParams({kind,q:state.query,status,role,direction:state.sort==='reverse'||isProject&&state.sort==='reference'?'desc':'asc',limit:'50',...(isProject?{sort:state.sort}:{}),...(state.after?{after:state.after}:{})});
       try{const response=await fetch('/api/registers?'+params,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(12000)])}),data=await response.json();if(!response.ok)throw Object.assign(Error(data.error||'Register unavailable'),{status:response.status});if(!active(current))return;currentItems=data.items;count.textContent=data.total+' matching '+kind;
-        const filters=isProject?[['all','All projects',data.statuses.all],['open','Open',data.statuses.open],['review','Review',data.statuses.review],['closed','Closed',data.statuses.closed],['feedback','Feedback',data.statuses.feedback],['invoice','Invoice',data.statuses.invoice]]:[['all','All '+kind,data.statuses.all],['current','Current',data.statuses.active],['inactive','Inactive',data.statuses.inactive],['needs-review','Needs review',data.statuses.review],...(kind==='people'?data.roles.map(r=>[r.role,r.role,r.total]):[])];
+        const filters=isProject?[['active','Active projects',data.statuses.active],['all','All projects',data.statuses.all],['open','Open',data.statuses.open],['review','Review',data.statuses.review],['closed','Closed',data.statuses.closed],['feedback','Feedback',data.statuses.feedback],['invoice','Invoice',data.statuses.invoice]]:[['all','All '+kind,data.statuses.all],['current','Current',data.statuses.active],['inactive','Inactive',data.statuses.inactive],['needs-review','Needs review',data.statuses.review],...(kind==='people'?data.roles.map(r=>[r.role,r.role,r.total]):[])];
         for(const[key,text,total]of filters){const tab=button('',()=>{state.filter=key;if(isProject&&key==='closed'&&state.sort==='date'){state.sort='reference';sort.value='reference';}for(const option of sort.options)if(option.value==='date'){option.hidden=isProject&&key==='closed';option.disabled=option.hidden;}reset();focusFilter=true;void load();},'filter-tab');tab.setAttribute('aria-pressed',String(state.filter===key));tab.append(el('span',text),el('span',String(total),'filter-count'));tabs.append(tab);}if(focusFilter){tabs.querySelector('[aria-pressed=true]')?.focus({preventScroll:true});focusFilter=false;}tabs.setAttribute('aria-description',isProject?'Counts cover all projects matching the search text.':'Counts cover all records matching the search text; role counts include all directory statuses.');
-        const table=el('table',undefined,kind+'-table'),thead=el('thead'),header=el('tr');for(const text of isProject?['Project','Client','Status',...(state.filter==='closed'?[]:['Target'])]:kind==='people'?['Person','Role','Projects']:['Organisation','Type','Category','Projects']){const th=el('th',text);th.scope='col';header.append(th);}thead.append(header);table.append(thead);const tbody=el('tbody');
-        for(const item of data.items){const row=el('tr');row.dataset.id=item.id;const first=el('td'),open=link('',typeOf(kind)+'/'+item.id,'row-open');open.setAttribute('aria-label','Open '+(isProject?item.title:item.name));const name=el('span');name.append(el('span',isProject?item.title:item.name,'row-title'),el('span',(isProject?[item.reference]:[item.reference,item.email,item.suburb,item.postcode]).filter(Boolean).join(' · '),'row-sub'));if(!isProject&&item.directoryStatus!=='current')name.append(el('small',item.directoryStatus==='inactive'?'Inactive':'Needs review'));open.append(name);first.append(open);if(!isProject&&item.clientId)first.append(link('Client record','client/'+item.clientId,'text-button'));const quick=button('Quick view',()=>{if(matchMedia('(max-width:800px)').matches)location.hash=typeOf(kind)+'/'+item.id;else void preview(item.id);},'text-button row-preview');quick.setAttribute('aria-label','Preview '+(isProject?item.title:item.name));first.append(quick);row.append(first);if(isProject){row.append(el('td',item.clientName));const projectState=el('td');projectState.append(projectStatus(item));row.append(projectState);if(state.filter!=='closed')row.append(el('td',item.status==='closed'?'—':date(item.dueDate),'optional-col'));}else{row.append(el('td',item.roles.join(', ')||'No current role'));if(kind==='organisations')row.append(el('td',item.category||'Not specified'));row.append(el('td',String(item.projectCount)));}row.addEventListener('click',event=>{if(!event.target.closest('button,a'))location.hash=typeOf(kind)+'/'+item.id;});tbody.append(row);}
+        const table=el('table',undefined,kind+'-table'),thead=el('thead'),header=el('tr');for(const text of isProject?['Project','Client','Status','Workflow status',...(state.filter==='closed'?[]:['Target'])]:kind==='people'?['Person','Role','Projects']:['Organisation','Type','Category','Projects']){const th=el('th',text,isProject&&text==='Target'?'optional-col':undefined);th.scope='col';header.append(th);}thead.append(header);table.append(thead);const tbody=el('tbody');
+        for(const item of data.items){const row=el('tr');row.dataset.id=item.id;const first=el('td'),open=link('',typeOf(kind)+'/'+item.id,'row-open');open.setAttribute('aria-label','Open '+(isProject?item.title:item.name));const name=el('span');name.append(el('span',isProject?item.title:item.name,'row-title'),el('span',(isProject?[item.reference]:[item.reference,item.email,item.suburb,item.postcode]).filter(Boolean).join(' · '),'row-sub'));if(!isProject&&item.directoryStatus!=='current')name.append(el('small',item.directoryStatus==='inactive'?'Inactive':'Needs review'));open.append(name);first.append(open);if(!isProject&&item.clientId)first.append(link('Client record','client/'+item.clientId,'text-button'));const quick=button('Quick view',()=>{if(!isProject&&matchMedia('(max-width:800px)').matches)location.hash=typeOf(kind)+'/'+item.id;else void preview(item.id,quick);},'text-button row-preview');quick.setAttribute('aria-label','Preview '+(isProject?item.title:item.name));if(isProject){quick.setAttribute('aria-controls','project-quick-view');quick.setAttribute('aria-expanded','false');}first.append(quick);row.append(first);if(isProject){row.append(el('td',item.clientName));const projectState=el('td');projectState.append(projectStatus(item));row.append(projectState,el('td',workflowStageLabel(item.workflowStage),'project-stage-cell'));if(state.filter!=='closed')row.append(el('td',item.status==='closed'?'—':date(item.dueDate),'optional-col'));}else{row.append(el('td',item.roles.join(', ')||'No current role'));if(kind==='organisations')row.append(el('td',item.category||'Not specified'));row.append(el('td',String(item.projectCount)));}row.addEventListener('click',event=>{if(!event.target.closest('button,a'))location.hash=typeOf(kind)+'/'+item.id;});tbody.append(row);}
         table.append(tbody);tableSlot.replaceChildren(data.items.length?table:empty('No matching records','Try another filter or clear your search.'));const pages=el('div',undefined,'actions');if(state.previous.length)pages.append(button('Previous',()=>{state.after=state.previous.pop();state.offset=Math.max(0,state.offset-data.limit);focusPage='Previous';void load();}));if(data.nextAfter)pages.append(button('Next',()=>{state.previous.push(state.after);state.after=data.nextAfter;state.offset+=data.items.length;focusPage='Next';void load();}));foot.replaceChildren(el('span',data.items.length?'Showing '+(state.offset+1)+'–'+(state.offset+data.items.length)+' of '+data.total+' matching records':'0 of '+data.total+' matching records'),pages);if(focusPage){([...pages.querySelectorAll('button')].find(b=>b.textContent===focusPage)||pages.querySelector('button')||q).focus({preventScroll:true});focusPage='';}if(state.selected)void preview(state.selected);
       }catch(error){if(error.name==='AbortError'||!active(current))return;count.textContent='Register unavailable';tableSlot.replaceChildren(message(error.message+' No current results are shown.',true));foot.replaceChildren(button('Try again',()=>void load()));if(error.status===401)void render();}
     }
-    q.addEventListener('input',()=>{state.query=q.value;reset();controller?.abort();generation++;detailGeneration++;currentItems=[];inspector.replaceChildren(empty('Quick view','Searching; the saved selection is retained.'));clearTimeout(timer);count.textContent='Searching…';tabs.replaceChildren();tableSlot.replaceChildren(el('p','Searching all records…'));foot.replaceChildren();timer=setTimeout(()=>void load(),250);});q.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(timer);void load();}});sort.addEventListener('change',()=>{state.sort=sort.value;reset();void load();});await load();return;
+    q.addEventListener('input',()=>{state.query=q.value;reset();controller?.abort();generation++;detailGeneration++;currentItems=[];if(isProject)inspector.hidden=true;inspector.replaceChildren(empty('Quick view','Searching; the saved selection is retained.'));clearTimeout(timer);count.textContent='Searching…';tabs.replaceChildren();tableSlot.replaceChildren(el('p','Searching all records…'));foot.replaceChildren();timer=setTimeout(()=>void load(),250);});q.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(timer);void load();}});sort.addEventListener('change',()=>{state.sort=sort.value;reset();void load();});await load();return;
   }
   const { items, limit } = await api(kind);
   const state = registers.get(kind) ?? { query: '', filter: ['people','clients','organisations'].includes(kind) ? 'current' : 'all', sort: kind === 'projects' ? 'reference' : 'name', selected: null };
@@ -334,7 +410,7 @@ async function project(view, id) {
   async function navigate(name){tab=name;menu.hidden=true;more.setAttribute('aria-expanded','false');draw();await loadEmbedded(name);if(name==='Files')await loadFiles();if(tab!==name)return;const destination=embedded.get(name)?.pane??(name==='Task'?task:name==='Overview'?overview:name==='Files'?filesPane:name==='Costs & invoices'?costsPane:name==='Workflow history'?recordPane:name==='Edit details'?editPane:name==='Audit trail'?auditPane:name==='Case-note history'?caseNotesPane:actionPanes.get(name)?.pane);destination?.focus({preventScroll:true});(tabs.getClientRects().length?tabs:header).scrollIntoView({block:'nearest'});}
   function draw(){
     projectTabs.set(id,tab);header.querySelector('h1').textContent=p.title;header.querySelector('.eyebrow').replaceChildren(el('small','Project no.'),el('strong',p.reference,'project-number'));financeFacts.lastElementChild.querySelector('dd').textContent=p.invoiceRequired?'Yes':'No';meta.replaceChildren();
-    for(const [label,value]of [['Status',projectStatus(p)],['Workflow state',el('span',({enquiry:'Enquiry',assessment:'Assessment',assessment_review:'Assessment review',work_request:'Project request',finance_handoff:'With finance',quote:'Preparing quote',peer_review:'Technical review',client_acceptance:'Client acceptance',finance_clearance:'Invoice / payment clearance',work:'Technical work',customer_signoff:'Customer sign-off',finance_finalisation:'Final finance review',ready_to_close:'Ready to close',closed:'Completed'})[stage]||'Not started','workflow-stage')],...(p.status==='closed'?[]:[['Review date',el('span',fullDate(adminDetails.followUpOn))]]),['Latest quote',el('span',quote?money(quote.totalCents)+' · '+(quoteIssued?'Sent '+fullDate(quoteIssued.data.sentOn):'Not recorded as sent'):'Not recorded')]]){const fact=el('div',undefined,'project-header-fact');const destination=label==='Status'?(lifecycle.managed?'Task':'Edit details'):label==='Workflow state'?'Task':label==='Review date'?'Edit details':'Print documents';const jump=button(label,async()=>{await navigate(destination);if(tab!==destination)return;const target=label==='Review date'?editPane.querySelector('[aria-label="Review date"]'):label==='Latest quote'?embedded.get('Print documents')?.pane.querySelector('[data-quote-panel]'):null;if(target){target.scrollIntoView({block:'center'});target.focus({preventScroll:true});}},'summary-heading-link');jump.setAttribute('aria-label',label+' — open '+(destination==='Task'?'workflow':destination.toLowerCase()));fact.append(jump,value);meta.append(fact);}header.append(meta,headerActions);
+    for(const [label,value]of [['Status',projectStatus(p)],['Workflow state',el('span',workflowStageLabel(stage),'workflow-stage')],...(p.status==='closed'?[]:[['Review date',el('span',fullDate(adminDetails.followUpOn))]]),['Latest quote',el('span',quote?money(quote.totalCents)+' · '+(quoteIssued?'Sent '+fullDate(quoteIssued.data.sentOn):'Not recorded as sent'):'Not recorded')]]){const fact=el('div',undefined,'project-header-fact');const destination=label==='Status'?(lifecycle.managed?'Task':'Edit details'):label==='Workflow state'?'Task':label==='Review date'?'Edit details':'Print documents';const jump=button(label,async()=>{await navigate(destination);if(tab!==destination)return;const target=label==='Review date'?editPane.querySelector('[aria-label="Review date"]'):label==='Latest quote'?embedded.get('Print documents')?.pane.querySelector('[data-quote-panel]'):null;if(target){target.scrollIntoView({block:'center'});target.focus({preventScroll:true});}},'summary-heading-link');jump.setAttribute('aria-label',label+' — open '+(destination==='Task'?'workflow':destination.toLowerCase()));fact.append(jump,value);meta.append(fact);}header.append(meta,headerActions);
     const section=sections.find(group=>group.items.some(([key])=>key===tab))??sections[0];
     tabs.replaceChildren();sections.forEach((group,i)=>tabs.append(tabButton(group.label,group===section?tab:group.items[0][0],i,group===section,tabs,'project-tab-')));
     more.textContent='Sections · '+section.label+' ▾';more.setAttribute('aria-label','Project sections: '+section.label);

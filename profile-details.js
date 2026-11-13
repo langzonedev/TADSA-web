@@ -3,7 +3,7 @@ import {attachAddressLookup} from './address-lookup.js';
 import {createRecordPicker} from './record-picker.js';
 import {residentialAddressText} from './client-address.js';
 import {clientNdisControl,clientNdisIsEditing,clientHistory} from './client-details.js';
-import {EQUIPMENT_OPTIONS,ALLIED_HEALTH_PROFESSIONS,DIRECTORY_STATUSES,normaliseProfileDetails} from './profile-details-model.js';
+import {EQUIPMENT_OPTIONS,ALLIED_HEALTH_PROFESSIONS,DIRECTORY_STATUSES,normaliseProfileDetails,profileContactPhone} from './profile-details-model.js';
 const editing=new Set();
 const yesNo=[['unknown','Not recorded'],['yes','Yes'],['no','No']];
 function summary(parent,entries){const filled=entries.filter(([,value])=>value&&value!=='Not recorded');if(!filled.length){parent.append(node('p','No additional details recorded.','field-help'));return;}const dl=node('dl',null,'detail-list');for(const [label,value]of filled){dl.append(node('dt',label),node('dd',value));}parent.append(dl);}
@@ -11,15 +11,17 @@ function input(form,label,d,key,max,type='text'){const control=field(form,label,
 const phoneIdentity=value=>{const digits=String(value||'').replace(/\D/g,'');return digits.length>=5?digits:String(value||'').trim().toLowerCase();};
 const normal=value=>String(value||'').replace(/[\s,]+/g,' ').trim().toLowerCase();
 const displayDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')?new Intl.DateTimeFormat('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(value+'T12:00:00')):value||'Not recorded';
+const hasRole=(person,role)=>(person.roles??[person.role]).includes(role);
+const alliedHealth=person=>hasRole(person,'Occupational therapist')||hasRole(person,'Allied-health contact');
 export function contactOverviewValues(person,profile,client=null){
  const d=profile.contact,phones=new Map(),addresses=new Map();
  for(const [label,value]of [['Primary phone',person.phone],['Home phone',d.homePhone],['Work phone',d.workPhone],['Mobile phone',d.mobilePhone]]){if(!value)continue;const key=phoneIdentity(value);if(phones.has(key))phones.get(key)[0]+=' / '+label.toLowerCase();else phones.set(key,[label,value]);}
  const addAddress=(label,value)=>{if(!value)return;const key=normal(value);if(addresses.has(key))addresses.get(key)[0]+=' / '+label.toLowerCase();else addresses.set(key,[label,value]);};
  addAddress('Contact address',[d.addressLine1,d.addressLine2,d.suburb,d.state,d.postcode].filter(Boolean).join(', '));
  if(client){const c=client.details,suffix=[c.residentialSuburb,c.residentialState,c.residentialPostcode].filter(Boolean).join(' '),residential=suffix&&normal(c.residentialAddress).endsWith(' '+normal(suffix))?c.residentialAddress:residentialAddressText(c);addAddress('Residential address',residential);if(!c.sameAsResidential)addAddress('Work address',c.workAddress);}
- const preferred=d.preferredPhone&&d[d.preferredPhone+'Phone'],phone=preferred||person.phone||d.mobilePhone||d.homePhone||d.workPhone||'',primaryAddress=[...addresses.values()][0],phoneKey=phoneIdentity(phone);
- const contact=[['Email',person.email||'Not recorded'],[primaryAddress?.[0]||'Address',primaryAddress?.[1]||'Not recorded'],[preferred?'Phone ('+d.preferredPhone+')':'Phone',phone||'Not recorded']];
- const personal=[['Disability',d.disability||'Not recorded'],['Additional comments',d.additionalComments||'Not recorded'],['Language',d.language||'Not recorded'],...(client?[['NDIS participant number',client.ndis?.number||'Not recorded']]:[]),['Date of birth',displayDate(d.dateOfBirth)]];
+ const {number:phone,preferredChannel}=profileContactPhone(person.phone,d),primaryAddress=[...addresses.values()][0],phoneKey=phoneIdentity(phone);
+ const contact=[['Email',person.email||'Not recorded'],[primaryAddress?.[0]||'Address',primaryAddress?.[1]||'Not recorded'],[preferredChannel?'Phone ('+preferredChannel+')':'Phone',phone||'Not recorded']];
+ const personal=[...(client||hasRole(person,'Client')||d.disability?[['Disability',d.disability||'Not recorded']]:[]),['Additional comments',d.additionalComments||'Not recorded'],['Language',d.language||'Not recorded'],...(client?[['NDIS participant number',client.ndis?.number||'Not recorded']]:[]),['Date of birth',displayDate(d.dateOfBirth)]];
  if(client?.details.contactNeeds)personal.push(['Contact needs or preferences',client.details.contactNeeds]);
  if(client?.details.preferredContact==='representative')personal.push(['Preferred contact',client.contacts.find(p=>p.personId===client.details.representativePersonId)?.name||'Representative no longer linked — review required']);
  const other=[...[...phones.values()].filter(([,value])=>phoneIdentity(value)!==phoneKey),...[...addresses.values()].slice(1),...(client?.details.sameAsResidential?[['Work address','Same as residential address']]:[])];
@@ -74,11 +76,13 @@ export async function renderProfileDetails(parent,person,{client=null}={}){
   form.append(node('p','The primary name, email and phone are edited using Edit profile & roles above. Client residential and work addresses are edited using Edit contact, addresses & preferences. The contact address below is a separate recorded contact location.','field-help'));
   input(form,'Home phone',d,'homePhone',40,'tel');input(form,'Work phone',d,'workPhone',40,'tel');input(form,'Mobile phone',d,'mobilePhone',40,'tel');
   field(form,'Preferred phone',d,'preferredPhone','text',[['','Not recorded'],['home','Home'],['work','Work'],['mobile','Mobile']]);
-  input(form,'Disability',d,'disability',1000,'textarea');input(form,'Additional comments',d,'additionalComments',2000,'textarea');input(form,'Language',d,'language',120);input(form,'Date of birth',d,'dateOfBirth',10,'date');
+  if(client||hasRole(person,'Client')||profile.contact.disability||d.disability)input(form,'Disability',d,'disability',1000,'textarea');
+  input(form,'Additional comments',d,'additionalComments',2000,'textarea');input(form,'Language',d,'language',120);input(form,'Date of birth',d,'dateOfBirth',10,'date');
   const affiliation=createRecordPicker({label:'Organisation affiliation',kind:'organisations',selectedId:d.organisationId,onChange:id=>{d.organisationId=id;}});affiliation.element.setAttribute('data-profile-affiliation-picker','true');affiliation.element.recordPicker=affiliation;form.affiliationPicker=affiliation;form.append(affiliation.element);
-  const profession=field(form,'Allied health profession',d,'alliedHealthProfession','text',ALLIED_HEALTH_PROFESSIONS),other=input(form,'Other allied health profession',d,'alliedHealthProfessionOther',120);
-  const updateProfession=()=>{other.parentElement.hidden=d.alliedHealthProfession!=='other';other.required=d.alliedHealthProfession==='other';if(d.alliedHealthProfession!=='other'){d.alliedHealthProfessionOther='';other.value='';}};profession.addEventListener('change',updateProfession);updateProfession();
-  form.append(node('p','Record a profession when relevant. This does not grant a role or application access.','field-help'));
+  if(alliedHealth(person)||profile.contact.alliedHealthProfession||d.alliedHealthProfession){
+   const profession=field(form,'Allied health profession',d,'alliedHealthProfession','text',ALLIED_HEALTH_PROFESSIONS),other=input(form,'Other allied health profession',d,'alliedHealthProfessionOther',120);
+   const updateProfession=()=>{other.parentElement.hidden=d.alliedHealthProfession!=='other';other.required=d.alliedHealthProfession==='other';if(d.alliedHealthProfession!=='other'){d.alliedHealthProfessionOther='';other.value='';}};profession.addEventListener('change',updateProfession);updateProfession();
+  }
   field(form,'Record status',d,'directoryStatus','text',DIRECTORY_STATUSES);
   form.append(node('p','Inactive records remain available in history and search. Choose Current when the person returns. Needs review marks information to check; it does not merge or delete records. This status does not change sign-in accounts or permissions.','field-help'));
   const elements={addressLine1:input(form,'Contact address line 1',d,'addressLine1',250),addressLine2:input(form,'Contact address line 2',d,'addressLine2',250),suburb:input(form,'Contact suburb or town',d,'suburb',120),state:input(form,'Contact state or region',d,'state',80),postcode:input(form,'Contact postcode',d,'postcode',20)};

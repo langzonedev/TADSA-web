@@ -1,4 +1,8 @@
 import {preserveGeocode} from './location-geocode.js';
+export function profileContactPhone(primary, contact = {}) {
+ const preferred=contact.preferredPhone&&contact[contact.preferredPhone+'Phone'];
+ return {number:preferred||primary||contact.mobilePhone||contact.homePhone||contact.workPhone||'',preferredChannel:preferred?contact.preferredPhone:''};
+}
 export const contactGeocodeValues=d=>[d.addressLine1,d.addressLine2,d.suburb,d.state,d.postcode];
 export const EQUIPMENT_OPTIONS=['Electric welding','MIG welding','Gas welding','Aluminium welding','Metal lathe','Wood lathe','Milling machine','Bandsaw','Guillotine','Bender','Tube bender','Saw bench'];
 const contactDefaults={homePhone:'',workPhone:'',mobilePhone:'',preferredPhone:'',language:'',addressLine1:'',addressLine2:'',suburb:'',state:'',postcode:'',organisationId:''};

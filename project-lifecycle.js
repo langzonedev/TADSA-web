@@ -135,7 +135,14 @@ export async function renderLifecycle(parent,project,options={}){
    const picker=field(f,'Step to revisit',d,'target','text',returnTargets.map(target=>[target,names[target]]));
    field(f,'Reason for returning',d,'reason','textarea').required=true;
    const impact=node('p',null,'message warning');f.append(impact);
-   const update=()=>{impact.textContent=['enquiry','assessment','quote'].includes(picker.value)?'A new quote revision will need technical review, client acceptance and Finance clearance. Any work already started pauses. Earlier quotes, comments, files, invoices and receipts remain in the record.':'This step and later confirmations must be recorded again. Earlier history, files, invoices and receipts remain in the record.';};picker.addEventListener('change',update);update();
+   const nextStep=node('p',null,'field-help');
+   f.append(nextStep);
+   const update=()=>{
+    impact.textContent=['enquiry','assessment','quote'].includes(picker.value)?'A new quote revision will need technical review, client acceptance and Finance clearance. Any work already started pauses. Earlier quotes, comments, files, invoices and receipts remain in the record.':'This step and later confirmations must be recorded again. Earlier history, files, invoices and receipts remain in the record.';
+    nextStep.hidden=picker.value!=='enquiry';
+    nextStep.textContent=s.schema===2?'Returning to Enquiry reopens the assessment decision. Saving that decision starts Assessment if it is needed, or goes to Assessment review if it is skipped.':'Returning to Enquiry reopens the assessment decision.';
+   };
+   picker.addEventListener('change',update);update();
   },d=>({target:d.target,reason:d.reason}));
  }
  const assessment=stageSection(box,'Assessment (AP)',['enquiry','assessment','assessment_review'].includes(stage));
@@ -143,7 +150,26 @@ export async function renderLifecycle(parent,project,options={}){
  if(s.assessmentDecision)assessment.append(node('p',s.assessmentDecision.required?'Assessment required':'Assessment not required — '+s.assessmentDecision.reason));
  if(s.assessment){assessment.append(node('p',s.assessment.notes||'Assessment recorded.'));const estimate=s.assessment.estimate;if(estimate){const entries=[['Materials',estimate.materialCostCents===undefined?'Not recorded':money(estimate.materialCostCents)],['Work time',estimate.workMinutes===undefined?'Not recorded':estimate.workMinutes/60+' hours'],['Return travel time',estimate.travelMinutes===undefined?'Not recorded':estimate.travelMinutes/60+' hours'],['Travel distance',estimate.travelDistanceMilliKm===undefined?'Not recorded':estimate.travelDistanceMilliKm/1000+' km']];for(const [label,value]of entries)assessment.append(node('p',label+': '+value));}}
  if(stage==='assessment_review'&&s.assessmentReview?.approved===false){const feedback=notice('The latest assessment review requires changes. Quotation remains blocked. Use Return to an earlier step to update the assessment, then record a fresh review.');feedback.classList.add('warning');assessment.append(feedback,node('h3','Latest review feedback'),node('p',s.assessmentReview.notes),node('p','Evidence: '+s.assessmentReview.reference+' · '+s.assessmentReview.reviewedOn,'field-help'));}
- if(stage==='enquiry')form(assessment,id,current,'assessmentDecision','Save assessment decision',{required:(s.history.findLast(item=>item.action==='assessmentDecision')?.data.required??true)?'yes':'no',reason:s.history.findLast(item=>item.action==='assessmentDecision')?.data.reason??''},(f,d)=>{field(f,'Assessment needed?',d,'required','text',[['yes','Yes — arrange an assessment'],['no','No — record the reason']]);field(f,'Assessment decision reason',d,'reason','textarea').required=true;f.append(node('p','Record why an assessment is needed, or why the available information is sufficient to proceed without one.','field-help'));},d=>({required:d.required==='yes',reason:d.reason}));
+ if(stage==='enquiry'){
+  const previousDecision=s.history.findLast(item=>item.action==='assessmentDecision')?.data;
+  form(assessment,id,current,'assessmentDecision','Save assessment decision',{required:(previousDecision?.required??true)?'yes':'no',reason:previousDecision?.reason??''},(f,d)=>{
+   const choice=field(f,'Assessment needed?',d,'required','text',[['yes','Yes — arrange an assessment'],['no','No — proceed with available information']]);
+   field(f,'Assessment decision reason',d,'reason','textarea').required=true;
+   const nextStep=node('p',null,'field-help');
+   nextStep.id='assessment-decision-next-step';
+   choice.setAttribute('aria-describedby',nextStep.id);
+   const explainNextStep=()=>{
+    nextStep.textContent=choice.value==='yes'
+     ?'After saving, the next step is Assessment.'
+     :s.schema===2
+      ?'After saving, the next step is Assessment review. Engineering quality, safety and costs still need to be reviewed before preparing a quote.'
+      :'After saving, the next step is Costing and quote.';
+   };
+   choice.addEventListener('change',explainNextStep);
+   explainNextStep();
+   f.append(node('p','Record why an assessment is needed, or why the available information is sufficient to proceed without one.','field-help'),nextStep);
+  },d=>({required:d.required==='yes',reason:d.reason}));
+ }
  if(stage==='assessment'){
   renderWorkflowRequestDownloads(assessment,project,{assessment:true,task:false});
   if(options.openFiles)assessment.append(action('Add assessment documents',options.openFiles));

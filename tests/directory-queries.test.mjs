@@ -11,7 +11,7 @@ function fixture(){
   if(i===2)p.roles=['Technician','Administrator'];if(i===3){p.roles=['Technician','Invalid role'];p.technician={skills:['Assessment']};}
   d.people.push(p);d.clients.push({id:'client-'+i,personId:id,details:{residentialAddress:'Synthetic address '+i,residentialSuburb:'Synthetic suburb',residentialState:'SA',residentialPostcode:'5000',workAddress:'Synthetic work '+i,contactNeeds:'NEVER_RETURN'}});
   d.organisations.push({id:'org-'+i,name:p.name,roles:['Funder','Referrer'],directoryStatus:i%11===0?'inactive':i%7===0?'review':'current',email:'organisation'+i+'@example.test',description:'Synthetic description',category:'Synthetic category',privateSecret:'NEVER_RETURN'});
-  d.profileDetails[id]={contact:{directoryStatus:i%11===0?'inactive':i%7===0?'review':'current'}};
+  d.profileDetails[id]={contact:{directoryStatus:i%11===0?'inactive':i%7===0?'review':'current',...(i===5?{organisationId:'org-12'}:{})}};
  }
  d.projects=[{id:'project-1',clientId:'client-231'},{id:'project-2',clientId:'client-1'}];d.relationships=[{projectId:'project-1',type:'person',id:'person-231'},{projectId:'project-2',type:'person',id:'person-231'},{projectId:'project-2',type:'person',id:'person-231'},{projectId:'project-1',type:'organisation',id:'org-231'},{projectId:'project-2',type:'organisation',id:'org-231',active:false}];return d;
 }
@@ -19,6 +19,8 @@ const call=(d,path,query={},who=actor,method='GET')=>deviceDirectoryQuery(d,path
 test('selection pages reach every identity, retain dual roles and inactive direct identities without hydrating private graphs',()=>{
  const d=fixture(),before=JSON.stringify(d);for(const kind of ['clients','people','organisations']){let after='',ids=[];do{const page=call(d,'selections',{kind,status:'all',limit:'100',after});assert.ok(page.items.length<=100);ids.push(...page.items.map(r=>r.id));after=page.nextAfter;}while(after);assert.equal(ids.length,1037);assert.equal(new Set(ids).size,1037);}
  const dual=call(d,'selections/people/person-5').item;assert.deepEqual(dual.roles,['Client','Occupational therapist']);assert.equal(dual.clientId,'client-5');assert.equal(call(d,'selections/people/person-11').item.directoryStatus,'inactive');
+ assert.equal(dual.organisationName,'Synthetic 0012');
+ assert.equal(call(d,'selections',{kind:'people',q:'person-5',status:'all'}).items.find(row=>row.id==='person-5').organisationName,dual.organisationName);
  assert.deepEqual(call(d,'selections',{kind:'people',role:'Technician',status:'all'}).items.map(r=>r.id),['person-2']);
  const missingProfile=structuredClone(d);delete missingProfile.people[1].technician;assert.equal(call(missingProfile,'selections',{kind:'people',role:'Technician',status:'all'}).items.length,0);
  const address=call(d,'selections',{kind:'clients',q:'Synthetic address 231',status:'all'}).items;assert.equal(address[0].id,'client-231');assert.equal(call(d,'selections',{kind:'people',q:'Synthetic address 231',status:'all'}).items.length,0);

@@ -1,6 +1,9 @@
 // Shared record search: committed identity is separate from an editable query.
 export function selectionLabel(item){
- const detail=[item.reference||item.id,item.phone,item.email,item.address,item.suburb,item.postcode].filter(Boolean).join(' · ');
+ const details=item.type==='person'
+  ? [item.roles?.filter(Boolean).join(', '),item.organisationName,item.id]
+  : [item.reference||item.id,item.phone,item.email,item.address,item.suburb,item.postcode];
+ const detail=details.filter(Boolean).join(' · ');
  return item.name+(detail?' · '+detail:'')+(item.directoryStatus!=='current'?' · '+(item.directoryStatus==='inactive'?'Inactive':'Needs review'):'');
 }
 async function selectionRequest(path,signal){

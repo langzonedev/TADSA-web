@@ -301,8 +301,18 @@ async function personProfile(view, id) {
   selectField(tech,'General allocation status',d,'availability',catalogue.availability.map(v=>[v,v==='unknown'?'Not recorded':v==='unavailable'?'Unavailable':v==='limited'?'Limited availability':'Available']));
   for(const role of catalogue.roles){const input=check(roles,role,d.roles.includes(role),on=>{d.roles=on?[...d.roles,role]:d.roles.filter(r=>r!==role);tech.hidden=!d.roles.includes('Technician');touch(d);});if(role==='Client'&&person?.clientId){input.disabled=true;input.dataset.keepDisabled='true';}}
   if(person?.clientId)roles.append(el('p','The linked client role is retained. Other roles can be recorded on this same person.','field-help'));
+  const followUp=el('p',null,'field-help');
+  function showRoleDetails(){
+    const details=[];
+    if(d.roles.includes('Technician'))details.push('Record the technician’s base location and service areas on their profile after saving.');
+    if(d.roles.some(role=>role==='Occupational therapist'||role==='Allied-health contact'))details.push('Record their allied health profession under Edit contact details after saving.');
+    followUp.textContent=details.join(' ');
+    followUp.hidden=!details.length;
+  }
+  roles.addEventListener('change',showRoleDetails);
+  showRoleDetails();
   tech.hidden=!d.roles.includes('Technician');
-  form.append(roles,tech,el('p','Administrator is a recorded role only. It does not create a login or grant access to this application.','field-help'));
+  form.append(roles,tech,followUp,el('p','Administrator is a recorded role only. It does not create a login or grant access to this application.','field-help'));
   const notice=el('div'), actions=el('div',null,'actions'), submit=saveButton(id?'Save profile':'Save person');
   actions.append(submit,cancel(form,d,key,id?'person/'+id:'people'));form.append(notice,actions);box.append(form);view.append(box);
   function duplicate(candidates) {

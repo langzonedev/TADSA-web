@@ -11,8 +11,18 @@ test('device projects register traverses >1000 projects for every sort both dire
 });
 test('device project filter facets reflect every match, canonical flags/private fields and cursor scope remain exact and read only',async()=>{
  const d=fixture(),before=JSON.stringify(d),first=await call(d,{limit:'2'}),cursor=JSON.parse(Buffer.from(first.nextAfter,'base64url').toString());assert.equal(cursor.scope,createHash('sha256').update(JSON.stringify({kind:'projects',q:'',status:'all',sort:'reference',direction:'asc'})).digest('hex'));
+ d.lifecycles['project-7']={stage:'work',quotes:[{version:1}],acceptance:{quoteVersion:1}};d.projectAdminDetails={'project-7':{programme:'FW'}};
+ const active=await call(d,{status:'active',limit:'100'});assert.equal(active.total,692);assert.equal(active.statuses.active,692);assert.ok(active.items.every(p=>p.status!=='closed'));assert.equal(active.items.find(p=>p.id==='project-7')?.workflowStage,'finance_clearance');
+ delete d.lifecycles['project-7'];delete d.projectAdminDetails;
  assert.equal(first.statuses.feedback,207);assert.equal(first.statuses.invoice,148);for(const status of ['open','review','closed','feedback','invoice']){const page=await call(d,{status,limit:'5'});assert.equal(page.statuses.all,1037);assert.equal(page.total,d.projects.filter(p=>status==='feedback'?p.feedbackRequired:status==='invoice'?p.invoiceRequired:p.status===status).length);}
+ const phoneFixture=structuredClone(d);phoneFixture.organisations=[];phoneFixture.people[0].phone='0400 000 001';phoneFixture.profileDetails={'person-1':{contact:{preferredPhone:'mobile',mobilePhone:'0400 000 002',additionalComments:'Synthetic comment not part of selection'}}};
+ const select=(path,params={})=>dispatch(phoneFixture,path,'GET',{},new URLSearchParams(params),actor);
+ const selectedPhone=select('selections/people/person-1').item;
+ assert.equal(selectedPhone.phone,'0400 000 001');assert.equal(selectedPhone.displayPhone,'0400 000 002');
+ assert.equal(select('selections/clients/client-1').item.displayPhone,'0400 000 002');
+ assert.ok(!Object.hasOwn(selectedPhone,'contactDetails'));
+ const listedPhone=select('selections',{kind:'people',q:'0400 000 001'}).items[0];assert.ok(listedPhone&&!Object.hasOwn(listedPhone,'displayPhone'));
  const exact=await call(d,{q:'ZZ Synthetic project 231'});assert.equal(exact.total,1);assert.equal(exact.items[0].id,'project-231');assert.equal(exact.items[0].cancelled,true);assert.equal(exact.items[0].financeHandoff,true);assert.equal(exact.items[0].clientName,'Synthetic client');for(const key of ['summary','audit','sortKey','suburb','lifecycles'])assert.equal(Object.hasOwn(exact.items[0],key),false);assert.equal((await call(d,{q:'summarymark'})).total,1037);assert.equal((await call(d,{q:'locationmark'})).total,1037);
- for(const change of [{q:'different'},{status:'review'},{sort:'date'},{direction:'desc'}])await assert.rejects(call(d,{...change,after:first.nextAfter}),e=>e.status===422);for(const query of ['kind=projects&kind=projects','kind=projects&sort=sql','kind=projects&role=Client','kind=projects&status=active','kind=projects&limit=101','kind=projects&q=%00','kind=projects&after=invalid'])await assert.rejects(async()=>dispatch(d,'registers','GET',{},new URLSearchParams(query),actor),e=>e.status===422);
+ for(const change of [{q:'different'},{status:'review'},{sort:'date'},{direction:'desc'}])await assert.rejects(call(d,{...change,after:first.nextAfter}),e=>e.status===422);for(const query of ['kind=projects&kind=projects','kind=projects&sort=sql','kind=projects&role=Client','kind=projects&status=unknown','kind=projects&limit=101','kind=projects&q=%00','kind=projects&after=invalid'])await assert.rejects(async()=>dispatch(d,'registers','GET',{},new URLSearchParams(query),actor),e=>e.status===422);
  assert.throws(()=>call(d,{},null),e=>e.status===401);assert.equal((await call(d,{}, {...actor,role:'administrator'})).total,1037);assert.equal(JSON.stringify(d),before);
 });
