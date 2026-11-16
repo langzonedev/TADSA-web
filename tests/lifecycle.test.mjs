@@ -22,3 +22,27 @@ test('guided workflow does not create a hold-review request and preserves explic
  save({remainingMinutes:60,fundingContributors:[{type:'client',id:d.clients[0].id,amountCents:10000}]});clear(ctx);assert.equal(call('projects/'+p.id+'/operations').reviewRequired,false);
  save({reviewRequired:true});act('revise',{reason:'Check measurements'});assert.equal(call('projects/'+p.id+'/operations').reviewRequired,true);assert.equal(call('projects/'+p.id+'/lifecycle').workGate.allowed,false);
 });
+
+test('pristine managed enquiry cancels without Finance and restores; a recorded invoice requirement or saved invoice blocks that path',async()=>{
+ const d=normalise(seed({enriched:false}));
+ const call=(path,method='GET',body={})=>dispatch(d,path,method,body,new URLSearchParams(),admin);
+ const newEnquiry=suffix=>call('projects','POST',{requestId:crypto.randomUUID(),clientId:'client-1',title:'Synthetic enquiry '+suffix,summary:'Finance decision test',kind:'Assessment',requiredSkills:[],technicianId:null,fundingStatus:'unknown',payerId:null,fundingNotes:''});
+ const cancel=id=>call('projects/'+id+'/lifecycle','PUT',{requestId:crypto.randomUUID(),version:call('projects/'+id).version,action:'cancel',data:{reason:'Synthetic enquiry withdrawn'}});
+ const pristine=newEnquiry('without costs'),pristinePath='projects/'+pristine.id;
+ assert.equal(call(pristinePath+'/lifecycle').canCancelEnquiryWithoutFinance,true);
+ const closed=cancel(pristine.id);assert.equal(closed.effectiveStage,'closed');assert.equal(closed.state.cancellation.closedWithoutFinance,true);
+ assert.equal(call(pristinePath).status,'closed');assert.equal(call(pristinePath+'/operations').invoices.length,0);
+ assert.equal(d.statusEvents.filter(e=>e.id===pristine.id&&e.toStatus==='closed').length,1);
+ assert.deepEqual((await validateBackup(d)).lifecycles[pristine.id],closed.state);
+ const required=newEnquiry("invoice required, no draft"),requiredPath="projects/"+required.id;
+ call(requiredPath,'PATCH',{version:required.version,title:required.title,status:'open',feedbackRequired:false,invoiceRequired:true});
+ assert.equal(call(requiredPath+"/lifecycle").canCancelEnquiryWithoutFinance,false);
+ assert.equal(cancel(required.id).effectiveStage,'finance_handoff');
+ assert.equal(call(requiredPath).invoiceRequired,true);
+ assert.equal(call(requiredPath+"/operations").invoices.length,0);
+ const payable=newEnquiry('with invoice'),payablePath='projects/'+payable.id;
+ call(payablePath+'/invoices','POST',{requestId:crypto.randomUUID(),version:payable.version,milestone:'deposit',billingMode:'nominated',payerType:'client',payerId:'client-1',lines:[{description:'Synthetic external cost',quantityMilli:1000,unitPriceCents:300}],milestoneReached:true});
+ assert.equal(call(payablePath+'/lifecycle').canCancelEnquiryWithoutFinance,false);
+ const pending=cancel(payable.id);assert.equal(pending.effectiveStage,'finance_handoff');assert.equal(pending.state.cancellation.closedWithoutFinance,undefined);assert.equal(call(payablePath).status,'open');
+ assert.equal(call(payablePath+'/operations').invoices.length,1);
+});

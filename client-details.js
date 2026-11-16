@@ -31,6 +31,8 @@ export function clientDetailsSummary(client) {
 }
 export async function renderClientDetails(view,id,host) {
   const client=await host.request('clients/'+id);const current=client.details;
+  let profile=null,contactUnavailable=false;
+  if(!current.residentialAddress)try{profile=await host.request('people/'+client.person.id+'/profile-details');}catch{contactUnavailable=true;}
   const previous=drafts.get(id);if(previous&&!previous.dirty&&!previous.pending&&previous.version!==current.version)drafts.delete(id);
   if(!drafts.has(id))drafts.set(id,{...current,name:client.person.name,email:client.person.email,phone:client.person.phone,dirty:false,pending:false});
   const d=reconcileContactDraft(drafts.get(id),client.person);baselineDraft(d,!d.dirty&&!d.pending);view.append(el('h1','Client contact and addresses'),el('p','Phone, email and name are shared with the person profile. Saving here updates that same contact record. Complete the address and preferred-contact details for intake.'));
@@ -46,6 +48,16 @@ export async function renderClientDetails(view,id,host) {
   field('residentialSuburb','Residential suburb',100);
   controls.residentialState=select('residentialState','Residential state',[['','Not recorded'],...AUSTRALIAN_STATES.map(state=>[state,state])]);
   field('residentialPostcode','Residential postcode',4);controls.residentialPostcode.inputMode='numeric';controls.residentialPostcode.pattern='[0-9]{4}';
+  const contact=profile?.contact;
+  if(contactUnavailable)form.append(el('p','The separate contact address could not be loaded. You can still enter and save the residential address manually.'));
+  if(contact?.addressLine1&&!current.residentialAddress){
+    const copy=el('button','Use saved contact address');copy.type='button';const text=[contact.addressLine1,contact.addressLine2].filter(Boolean).join(', '),source=el('p','Already recorded contact address: '+[text,contact.suburb,contact.state,contact.postcode].filter(Boolean).join(', '));source.className='field-help';
+    const unsupported=Boolean(contact.state&&!AUSTRALIAN_STATES.includes(contact.state)||contact.postcode&&!/^\d{4}$/.test(contact.postcode)||contact.suburb?.length>100||text.length>500);
+    if(unsupported)source.append(' This address needs review before reuse; enter the residential details below without changing the original.');
+    const canCopy=()=>{copy.disabled=Boolean(d.pending||d.residentialAddress||d.residentialSuburb||d.residentialState||d.residentialPostcode||unsupported);};
+    copy.onclick=()=>{canCopy();if(copy.disabled)return;const values={residentialAddress:text,residentialSuburb:contact.suburb||'',residentialState:AUSTRALIAN_STATES.includes(contact.state)?contact.state:'',residentialPostcode:/^\d{4}$/.test(contact.postcode)?contact.postcode:''};if(values.residentialSuburb.length>100){source.textContent='Review the saved contact suburb before copying it; it is longer than the client suburb field allows.';return;}for(const [key,value]of Object.entries(values)){controls[key].value=value;controls[key].dispatchEvent(new Event(controls[key].tagName==='SELECT'?'change':'input',{bubbles:true}));}d.residentialGeocode=null;d.dirty=draftChanged(d);refreshDraftReview();canCopy();controls.residentialAddress.focus();};
+    for(const key of ['residentialAddress',...RESIDENTIAL_FIELDS])controls[key].addEventListener(controls[key].tagName==='SELECT'?'change':'input',canCopy);canCopy();form.append(source,copy,el('p','Copy only if this is also the residential address, then check and save. The original contact address stays unchanged.'));
+  }
   const same=el('label');const checkbox=el('input');checkbox.type='checkbox';checkbox.checked=d.sameAsResidential;same.append(checkbox,el('span','Work address is the same as residential'));form.append(same);
   field('workAddress','Work address',500,'textarea');
   attachAddressLookup(controls.residentialAddress,{draft:d,geoField:'residentialGeocode',fields:{street:'residentialAddress',suburb:'residentialSuburb',state:'residentialState',postcode:'residentialPostcode',keys:['residentialAddress','residentialSuburb','residentialState','residentialPostcode'],elements:controls}});

@@ -68,12 +68,12 @@ export async function renderProfileDetails(parent,person,{client=null}={}){
   const open=editing.has(editKey)||client&&clientNdisIsEditing(client.id);editArea.hidden=!open;edit.setAttribute('aria-expanded',String(Boolean(open)));if(!open||editArea.children.length)return;
   editArea.append(node('h3','Edit contact details'),node('p','Use the section for the details you want to change. Each section saves to the same person record.','field-help'));
   const actions=node('div',null,'contact-edit-actions');actions.append(link('Edit profile & roles','edit-person/'+person.id));if(client)actions.append(link('Edit contact, addresses & preferences','client-details/'+client.id));editArea.append(actions);
-  editArea.append(node('h3','Other contact information'),node('p','Phones, language, personal details, contact address and record status.','field-help'));
+  editArea.append(node('h3','Additional contact information'),node('p','Add optional details here. The name, primary phone and email you already saved remain on this person.','field-help'));
   const forms=node('div');editArea.append(forms);prepareEditor(profileEditor(forms,'contact',contactFields,'Contact information'),forms);
   if(client)editArea.append(clientNdisControl(client));
  }
  function contactFields(form,d){
-  form.append(node('p','The primary name, email and phone are edited using Edit profile & roles above. Client residential and work addresses are edited using Edit contact, addresses & preferences. The contact address below is a separate recorded contact location.','field-help'));
+  form.append(node('p','The primary name, email and phone are edited using Edit profile & roles above. Extra phone numbers below are optional; you do not need to enter the primary number again.','field-help'));
   input(form,'Home phone',d,'homePhone',40,'tel');input(form,'Work phone',d,'workPhone',40,'tel');input(form,'Mobile phone',d,'mobilePhone',40,'tel');
   field(form,'Preferred phone',d,'preferredPhone','text',[['','Not recorded'],['home','Home'],['work','Work'],['mobile','Mobile']]);
   if(client||hasRole(person,'Client')||profile.contact.disability||d.disability)input(form,'Disability',d,'disability',1000,'textarea');
@@ -85,7 +85,12 @@ export async function renderProfileDetails(parent,person,{client=null}={}){
   }
   field(form,'Record status',d,'directoryStatus','text',DIRECTORY_STATUSES);
   form.append(node('p','Inactive records remain available in history and search. Choose Current when the person returns. Needs review marks information to check; it does not merge or delete records. This status does not change sign-in accounts or permissions.','field-help'));
-  const elements={addressLine1:input(form,'Contact address line 1',d,'addressLine1',250),addressLine2:input(form,'Contact address line 2',d,'addressLine2',250),suburb:input(form,'Contact suburb or town',d,'suburb',120),state:input(form,'Contact state or region',d,'state',80),postcode:input(form,'Contact postcode',d,'postcode',20)};
+  let addressParent=form;
+  if(client){
+   const residential=residentialAddressText(client.details);form.append(node('p',residential?'Saved residential address: '+residential:'Residential address has not been recorded.','field-help'),link(residential?'Edit residential / work address and preferences':'Add residential address and preferences','client-details/'+client.id));
+   addressParent=node('details',null,'care-details');addressParent.open=Boolean(d.addressLine1||d.addressLine2||d.suburb||d.state||d.postcode);addressParent.append(node('summary','Separate contact address (optional)'),node('p','Only record an address here if it serves a different contact purpose. The residential address above does not need to be entered twice. Existing separate addresses are retained.','field-help'));form.append(addressParent);
+  }
+  const elements={addressLine1:input(addressParent,'Contact address line 1',d,'addressLine1',250),addressLine2:input(addressParent,'Contact address line 2',d,'addressLine2',250),suburb:input(addressParent,'Contact suburb or town',d,'suburb',120),state:input(addressParent,'Contact state or region',d,'state',80),postcode:input(addressParent,'Contact postcode',d,'postcode',20)};
   attachAddressLookup(elements.addressLine1,{draft:d,geoField:'geocode',fields:{street:'addressLine1',suburb:'suburb',state:'state',postcode:'postcode',keys:['addressLine1','addressLine2','suburb','state','postcode'],elements}});
  }
  drawContactEditor();if(client)box.append(clientHistory(client));

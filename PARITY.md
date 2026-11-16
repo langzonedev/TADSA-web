@@ -2,6 +2,14 @@
 
 Shared UI files are byte-identical; index entry is explicitly transformed. Content hashes in SHARED_FILES.json are authoritative. The local adapter is a separate persistence implementation, not production security equivalence.
 
+## 16 November 2026 feedback delivery
+
+The register uses saved review dates and recorded project milestones, with cancelled work outside active queues. An untouched enquiry can close without Finance only when its current records show no prior progression, work, invoice or invoice requirement. Both adapters retain prior cancellation history and validate the new direct-cancellation marker on backup replay. Use the updated build to restore backups containing that marker.
+
+Both versions share explicit contact-address reuse, South Australian address preference, branded printable requests/quotes and the permission-controlled technician expiry report. The same sensitive-details permission protects the report and individual credentials. Device sign-in simulates account permissions within one browser; there is no shared customer server. Shared imports and the offline cache include the new date/report helper.
+
+The original matrix below is historical. Later deliveries added multi-role profiles, browser demo accounts, optional geocoding and more complete restore coverage; it should not be read as a current feature inventory.
+
 | Workflow | Local behavior | Boundary |
 |---|---|---|
 | Registers/search | Shared UI; identities, references, email/phone/address | Fictional/device-only records |

@@ -11,9 +11,15 @@ test('device projects register traverses >1000 projects for every sort both dire
 });
 test('device project filter facets reflect every match, canonical flags/private fields and cursor scope remain exact and read only',async()=>{
  const d=fixture(),before=JSON.stringify(d),first=await call(d,{limit:'2'}),cursor=JSON.parse(Buffer.from(first.nextAfter,'base64url').toString());assert.equal(cursor.scope,createHash('sha256').update(JSON.stringify({kind:'projects',q:'',status:'all',sort:'reference',direction:'asc'})).digest('hex'));
- d.lifecycles['project-7']={stage:'work',quotes:[{version:1}],acceptance:{quoteVersion:1}};d.projectAdminDetails={'project-7':{programme:'FW'}};
- const active=await call(d,{status:'active',limit:'100'});assert.equal(active.total,692);assert.equal(active.statuses.active,692);assert.ok(active.items.every(p=>p.status!=='closed'));assert.equal(active.items.find(p=>p.id==='project-7')?.workflowStage,'finance_clearance');
- delete d.lifecycles['project-7'];delete d.projectAdminDetails;
+ d.lifecycles['project-7']={stage:'work',quotes:[{version:1}],acceptance:{quoteVersion:1}};d.projectAdminDetails={'project-7':{programme:'FW',followUpOn:'2027-01-04'},'project-5':{followUpOn:'2027-01-15'},'project-4':{followUpOn:'2026-01-01'},'project-231':{followUpOn:'2026-01-01'}};d.lifecycles['project-4']={stage:'finance_handoff',cancellation:{},quotes:[]};
+ const active=await call(d,{status:'active',limit:'100'});assert.equal(active.total,691);assert.equal(active.statuses.active,691);assert.ok(active.items.every(p=>p.status!=='closed'));assert.equal(active.items.find(p=>p.id==='project-7')?.workflowStage,'finance_clearance');
+ const cancelled=await call(d,{status:'cancelled'});assert.equal(cancelled.total,2);assert.equal(cancelled.statuses.cancelled,2);
+ assert.deepEqual(cancelled.items.map(row=>[row.id,row.projectStatus,row.reviewDate]),[['project-231','Cancelled',null],['project-4','Cancelled · Finance pending',null]]);
+ for(const [direction,expected] of [['asc',['project-7','project-5']],['desc',['project-5','project-7']]]){
+  let after='';for(const id of expected){const next=await call(d,{sort:'review-date',direction,limit:'1',...(after?{after}:{})});assert.equal(next.items[0].id,id);assert.ok(next.items[0].reviewDate);after=next.nextAfter;}
+  assert.equal((await call(d,{sort:'review-date',direction,limit:'1',after})).items[0].reviewDate,null);
+ }
+ delete d.lifecycles['project-4'];delete d.lifecycles['project-7'];delete d.projectAdminDetails;
  assert.equal(first.statuses.feedback,207);assert.equal(first.statuses.invoice,148);for(const status of ['open','review','closed','feedback','invoice']){const page=await call(d,{status,limit:'5'});assert.equal(page.statuses.all,1037);assert.equal(page.total,d.projects.filter(p=>status==='feedback'?p.feedbackRequired:status==='invoice'?p.invoiceRequired:p.status===status).length);}
  const phoneFixture=structuredClone(d);phoneFixture.organisations=[];phoneFixture.people[0].phone='0400 000 001';phoneFixture.profileDetails={'person-1':{contact:{preferredPhone:'mobile',mobilePhone:'0400 000 002',additionalComments:'Synthetic comment not part of selection'}}};
  const select=(path,params={})=>dispatch(phoneFixture,path,'GET',{},new URLSearchParams(params),actor);

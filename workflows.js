@@ -178,7 +178,7 @@ async function newProject(view, clientId) {
       form.append(el('p','Assessment, quote acceptance and technical work will be recorded as stages of this project.','field-help'));
       form.append(el('p','Use one project for related work on the same item. Create separate projects for different items or independently managed jobs. Staff can decide after assessment when the scope is clearer.','field-help'));
       form.append(el('p','For a correction to earlier work, check the existing project first and record the follow-up there. A request for different equipment usually needs a new project.','field-help'));
-      form.append(el('p','Creating a project does not authorise work or spending. Complete assessment review and quote approval, then record the project request before technical work begins.','field-help'));
+      form.append(el('p','Creating a project does not authorise work or spending. Complete assessment review and quote approval, then record the sent Work Request before technical work begins.','field-help'));
     } else if (d.step === 3) {form.append(note('Client work location: '+(selected?.details?.workAddress||selected?.details?.residentialAddress||'Not recorded. Open the client record to add an address.')));coordinationFields(form,d,dirs);}
     else {
       const payer = d.fundingStatus==='unknown' ? 'Not known yet — follow up' : d.fundingStatus==='self' ? `Client: ${selected?.person.name}` : d.payerLabel||d.payerId||'Choose a payer';

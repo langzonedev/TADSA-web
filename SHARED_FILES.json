@@ -1,7 +1,12 @@
 {
-  "sourceRevision": "3a81e24e7c175256c0ee551276f35e73d6ae179b",
+  "sourceRevision": "39cfccca82b3ab70a381eb06c232b343094d1026",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
+    "credential-expiry.js": {
+      "source": "public/credential-expiry.js",
+      "sha256": "75f9f1de5aa8a724beaec0ebabc083a0a0547fce4dceb5e707291503510dd3ec",
+      "transform": null
+    },
     "draft-review.js": {
       "source": "public/draft-review.js",
       "sha256": "14162f3c6d08f38b0f1c664081786b78a195b0479c7b76b9db31c0ee2fc4ab59",
@@ -9,7 +14,7 @@
     },
     "customer-feedback.css": {
       "source": "public/customer-feedback.css",
-      "sha256": "874117fb926d6b1357dce63b9cc2bc3f5fe05e5a592edce1379911fddf1d6796",
+      "sha256": "39eaa230ead8bd96100bbacde5c8d15614eee1dae18da84691ae1afdf6cea176",
       "transform": null
     },
     "availability.css": {
@@ -59,7 +64,7 @@
     },
     "address-lookup.js": {
       "source": "public/address-lookup.js",
-      "sha256": "c63e13390324564ff3853938982876439d3a35545ef2bd14e7b8e1b288eba131",
+      "sha256": "6c43c9396388c9d46fae8e7f830d1f177afda6c55ef2bdb61f739d4293f8a9f3",
       "transform": null
     },
     "location-geocode.js": {
@@ -104,7 +109,7 @@
     },
     "profile-details.js": {
       "source": "public/profile-details.js",
-      "sha256": "a9488089739f6e80f8c22d50ea8c85e21304bdb7e5e2ff43a180ec61a99cd4ce",
+      "sha256": "8f7b9f4077d59e4f15463f845b1ea437b75b9b66684d65b01d0d5490e5f3176d",
       "transform": null
     },
     "profile-details-model.js": {
@@ -134,27 +139,27 @@
     },
     "lifecycle-model.js": {
       "source": "public/lifecycle-model.js",
-      "sha256": "f10a599eb1aadf4d6ac07c690a2788dbc09f88d5977749e3149cda5a01b5c81d",
+      "sha256": "843cf89e626753fb76765363c8d1800f10365a0c4a78b49c62af106796fff601",
       "transform": null
     },
     "lifecycle-validation.js": {
       "source": "public/lifecycle-validation.js",
-      "sha256": "642858bb6c272212e82b45c1c475485f5ddcc69127512e18dcc2c73957321f2c",
+      "sha256": "778f5a524f104990547bb2b33c714d969e0f7b35909e0a8f103fcf52c33855bc",
       "transform": null
     },
     "project-lifecycle.js": {
       "source": "public/project-lifecycle.js",
-      "sha256": "763b802dc24c741852efad67e49133ed57752c8b061548cfb258ec6608609b42",
+      "sha256": "989a942f256489abe00c01416df446eda44857da339fe8e0c579ee5f05efd9cb",
       "transform": null
     },
     "finance-pack.js": {
       "source": "public/finance-pack.js",
-      "sha256": "1d848012f7154324595b47bcf6cd2a622ffd9d397f72b6f6f1370ff029525d32",
+      "sha256": "5d0ed4f9e0b301610bdbc1ab5eefa1206c41a4303cba31babbd0403ef253e863",
       "transform": null
     },
     "technician-credentials.js": {
       "source": "public/technician-credentials.js",
-      "sha256": "d222a3f5538834718cf84a1f543e26be0893431baf9ac6eff3d8bd4cbefa2ce1",
+      "sha256": "361f7c7210d3fec8341c25b669fb05f1828f0df02cc5751c4b28900226c16127",
       "transform": null
     },
     "accounts.js": {
@@ -164,7 +169,7 @@
     },
     "reports.js": {
       "source": "public/reports.js",
-      "sha256": "1e85d4581522df7321f4660f3f1db9112fa8d3f783b4660cc22521675d7ac964",
+      "sha256": "53ca785c3057e62f4d589eac14393ad0c78a72f70c72ccff3e905ef64fa0d852",
       "transform": null
     },
     "report-model.js": {
@@ -184,7 +189,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "0a1ac352203b183ac8f3f21add14483319ea5378598da234f3929566b381d515",
+      "sha256": "979459a87cee7f8eb290e0bb78654e27b4c104f9fbce7c40c270bd35944711ba",
       "transform": null
     },
     "settings.js": {
@@ -194,7 +199,7 @@
     },
     "assessment-templates.js": {
       "source": "public/assessment-templates.js",
-      "sha256": "c98829e5f4878c44d406de6039f3fa88e60683c5cd8556900f841e0189070c39",
+      "sha256": "106c4e11f64f4bcb6a75963bf8feb6c6535087e0100ece01eeb3081c96702ebe",
       "transform": null
     },
     "appearance.js": {
@@ -204,17 +209,17 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "54ef7c9b25977580dc8d35fe1f729b18d6e8f20df5625ad381b132756e773e0e",
+      "sha256": "a0c27341de82ef3a4416159e7f1c60ba1bbd964ded776448741d89f36f301b1f",
       "transform": null
     },
     "operations.js": {
       "source": "public/operations.js",
-      "sha256": "c5cbd633f7e81afcad143106e5ca339479760208b2cbf5f5b603edfe07574148",
+      "sha256": "df191782f60824a04d36fe23885ca3860660aadd707454e5ec26435cda0e89c2",
       "transform": null
     },
     "client-details.js": {
       "source": "public/client-details.js",
-      "sha256": "8a8fe72808293dc52ed9d5305308be3368ea412afb3f3db47c87f28dac9b8436",
+      "sha256": "b8792b5f117553bf73194d2c576984477ae43ba050708332b31d5bb2ce6a5c49",
       "transform": null
     },
     "local-login.js": {
@@ -244,7 +249,7 @@
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "20247e2de84eb064732857e71ab9f3ef21da120da995865c10ef35ff3d57d018",
+      "sha256": "8fa4c2cf8e8f0f047915dbf8c27ea35909d7afdab86f78a16ecfaa72661b08ae",
       "transform": null
     },
     "boot.js": {
@@ -275,5 +280,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "99d8bd324a7c78d945a7dc070e356e85d341e6f8113b9e089cc7c109ec3906df"
+  "shellHash": "ba02bf1d14ab33f10a9647b46011b7fb9715e676d1e2bff3b460ac7e2d10ef8d"
 }

@@ -477,3 +477,15 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 }
 
 .record-picker-field{display:flex;align-items:flex-end;gap:8px;min-width:0}.record-picker-field>label{flex:1;min-width:0;margin:0}.record-picker-field input{width:100%;min-width:0}.record-picker-clear{flex:0 0 auto;min-height:44px}.record-picker.has-selection input{border-left:4px solid var(--action-green)}.record-picker [hidden]{display:none!important}
+/* Keep expiry details readable; narrow screens scroll within the report. */
+.credential-expiry-scroll{max-width:100%;margin:12px 0;background:var(--surface,#fff);border:1px solid var(--line);border-radius:6px}
+.credential-expiry-scroll:focus-visible{outline:3px solid #4c55a4;outline-offset:2px}
+.credential-expiry-table{min-width:720px;table-layout:auto}
+.credential-expiry-table th,.credential-expiry-table td{white-space:normal;overflow-wrap:break-word;vertical-align:top;padding:12px 14px;font-size:13px;line-height:1.5}
+.credential-expiry-table th:first-child{min-width:150px}
+.credential-expiry-table th:nth-child(3){min-width:180px}
+.credential-expiry-table th:nth-child(4){min-width:112px}
+.credential-expiry-table th:last-child{min-width:150px}
+.credential-expiry-scroll-help{display:none}
+@media(max-width:750px){.credential-expiry-scroll-help{display:block}}
+@media print{.credential-expiry-scroll{overflow:visible;border:0}.credential-expiry-table{min-width:0}.credential-expiry-table th{min-width:0!important}.credential-expiry-table th,.credential-expiry-table td{padding:6px;font-size:10pt}.credential-expiry-scroll-help{display:none}}

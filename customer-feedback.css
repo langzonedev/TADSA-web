@@ -44,12 +44,12 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
 .project-register-layout .inspector h2{overflow-wrap:anywhere}
 .project-register-layout .projects-table :is(th,td){padding:8px 10px}
 .project-register-layout .projects-table th{white-space:normal}
-.project-register-layout .projects-table th:first-child{width:36%}
+.project-register-layout .projects-table th:first-child{width:38%}
 .project-register-layout .projects-table th:nth-child(2){width:20%}
-.project-register-layout .projects-table th:nth-child(3){width:15%}
+.project-register-layout .projects-table th:nth-child(3){width:24%}
 .project-register-layout .projects-table th:nth-child(4){width:18%}
-.project-register-layout .projects-table th:nth-child(5){width:11%}
 .project-register-layout .projects-table .project-stage-cell{font-weight:650}
+.project-register-layout .project-stage-cell .invoice{display:block;width:fit-content;margin-top:4px;white-space:normal}
 @media(max-width:1099px){
  .paged-register-layout .inspector{grid-row:1}
 }
@@ -61,7 +61,7 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
  .project-register-layout .projects-table :is(th,td){min-width:0;padding:7px 5px}
  .project-register-layout .projects-table th:first-child{width:38%}
  .project-register-layout .projects-table th:nth-child(2){width:22%}
- .project-register-layout .projects-table th:nth-child(3){width:19%}
- .project-register-layout .projects-table th:nth-child(4){width:21%}
+ .project-register-layout .projects-table th:nth-child(3){width:21%}
+ .project-register-layout .projects-table th:nth-child(4){width:19%}
  .project-register-layout .projects-table .project-status .badge:not(.invoice){white-space:normal}
 }

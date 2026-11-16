@@ -31,6 +31,24 @@ async function renderMonthlyReports(view){
 }
 export async function renderReports(view){
  view.append(node('h1','Reports'));const nav=node('div',null,'record-tabs'),body=node('div');let cleanup;
- const builder=action('Build a report',()=>open('builder')),monthly=action('Monthly overview',()=>open('monthly'));nav.append(builder,monthly);view.append(nav,body);
- function open(mode){selectedMode=mode;cleanup?.();cleanup=null;body.replaceChildren();builder.setAttribute('aria-pressed',String(mode==='builder'));monthly.setAttribute('aria-pressed',String(mode==='monthly'));if(mode==='builder')cleanup=renderReportBuilder(body);else renderMonthlyReports(body).catch(error=>body.replaceChildren(notice(error.message,true)));}open(selectedMode);
+ const builder=action('Build a report',()=>open('builder')),monthly=action('Monthly overview',()=>open('monthly')),credentials=action('Technician expiry',()=>open('credentials'));nav.append(builder,monthly,credentials);view.append(nav,body);
+ function open(mode){selectedMode=mode;cleanup?.();cleanup=null;body.replaceChildren();builder.setAttribute('aria-pressed',String(mode==='builder'));monthly.setAttribute('aria-pressed',String(mode==='monthly'));credentials.setAttribute('aria-pressed',String(mode==='credentials'));const pane=node('div');body.append(pane);if(mode==='builder')cleanup=renderReportBuilder(pane);else (mode==='credentials'?renderCredentialExpiry(pane):renderMonthlyReports(pane)).catch(error=>pane.replaceChildren(notice(error.message,true)));}open(location.hash==='#reports/credentials'?'credentials':selectedMode);
+}
+
+async function renderCredentialExpiry(view){
+ view.append(node('h2','Technician credential expiry'),node('p','Current technicians with recorded qualifications, safety training and clearances. Expired entries and dates in the next 30 days are flagged. Missing dates need review; this report does not verify credentials or send reminders.'));
+ const report=await request('technician-expiry');if(!view.isConnected)return;
+ view.append(node('p',`As at ${report.today} (Adelaide) · ${report.technicianCount} technicians`,'field-help'));
+ const label=node('label','Show'),filter=node('select');filter.setAttribute('aria-label','Credential expiry filter');for(const [value,text]of [['attention','Expired, due within 30 days or missing dates'],['due','Expired or due within 30 days'],['all','All recorded credentials']]){const option=node('option',text);option.value=value;filter.append(option);}label.append(filter);view.append(label);
+ const output=node('div',null,'table-wrap credential-expiry-scroll');output.tabIndex=0;output.setAttribute('role','region');output.setAttribute('aria-label','Technician expiry results');view.append(node('p','On a narrow screen, scroll across the table to see all details.','field-help credential-expiry-scroll-help'),output);let shown=[];
+ function draw(){shown=report.rows.filter(row=>filter.value==='all'||filter.value==='due'?filter.value==='all'||['expired','due'].includes(row.status):row.status!=='current');output.replaceChildren();if(!shown.length){output.append(node('p','No credentials match this filter.'));return;}
+  const table=node('table',null,'credential-expiry-table'),head=node('thead'),header=node('tr'),body=node('tbody');for(const title of ['Technician','Type','Credential','Expiry date','Status']){const th=node('th',title);th.scope='col';header.append(th);}head.append(header);table.append(head,body);
+  for(const row of shown){const tr=node('tr'),name=node('td'),person=link(row.name,'person/'+row.personId);person.className='row-title';name.append(person);tr.append(name,...[row.category,row.title,row.expiresOn||'Not recorded',row.label].map(text=>node('td',text)));body.append(tr);}output.append(table);
+ }
+ filter.onchange=draw;draw();
+ const actions=node('div',null,'actions');actions.append(action('Download expiry CSV',()=>{
+  const csvCell=value=>'"'+String(value??'').replace(/^[\s]*[=+@-]/,match=>"'"+match).replaceAll('"','""')+'"';
+  const csv=[['Technician','Type','Credential','Expiry date','Status','Report date (Adelaide)'],...shown.map(row=>[row.name,row.category,row.title,row.expiresOn,row.label,report.today])].map(row=>row.map(csvCell).join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'})),a=node('a');a.href=url;a.download='tadsa-technician-expiry-'+report.today+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }),action('Print / save expiry report as PDF',()=>window.print()));view.append(actions);
 }
