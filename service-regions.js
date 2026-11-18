@@ -71,6 +71,9 @@ export function locationRegion(location={}) {
   if (!location) return '';
   const state = String(location.state || '').trim().toUpperCase();
   if (state && state !== 'SA' && state !== 'SOUTH AUSTRALIA') return '';
+  const address = String(location.address || location.baseAddress || '');
+  const suffix = address.match(/\b(SA|VIC|NSW|QLD|NT|ACT|TAS|WA)\s+([0-9]{4})(?:,?\s+Australia)?[.,\s]*$/i);
+  if (suffix && (suffix[1].toUpperCase() !== 'SA' || location.postcode && String(location.postcode).trim() !== suffix[2])) return '';
   const {latitude,longitude} = location.geocode || {};
   if (Number.isFinite(latitude) && Number.isFinite(longitude)) return pinRegion(latitude,longitude);
 
