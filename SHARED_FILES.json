@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "1cdb5deec474814b84b7573274d3ff9b76081065",
+  "sourceRevision": "121b974a9f5f07311a2d26971aafd89185d3e2da",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "credential-expiry.js": {
@@ -9,7 +9,7 @@
     },
     "draft-review.js": {
       "source": "public/draft-review.js",
-      "sha256": "14162f3c6d08f38b0f1c664081786b78a195b0479c7b76b9db31c0ee2fc4ab59",
+      "sha256": "cf5b81d41237ed936ca451ab8d41752d21881a57a5426411b0e41ba965728f58",
       "transform": null
     },
     "customer-feedback.css": {
@@ -65,6 +65,16 @@
     "address-lookup.js": {
       "source": "public/address-lookup.js",
       "sha256": "b754dc98e43281894b42612bd39f9d5652d8ddd56d68afdb25f7d80be233e5d5",
+      "transform": null
+    },
+    "service-regions.js": {
+      "source": "public/service-regions.js",
+      "sha256": "f8e70b40063f97b2cbf3861411a6c182d6a821bd41f64547bd9937e306fbaf1e",
+      "transform": null
+    },
+    "service-region-data.js": {
+      "source": "public/service-region-data.js",
+      "sha256": "dbb49a941d55c5d6c8da4c428e5db9eb1d06e1d110842ad300c3f810d82b8204",
       "transform": null
     },
     "postcode-locations.js": {
@@ -224,7 +234,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "34a3014d5a34726ff5abcb0e4a1adac6c753978c85a4d331ca90fdf9c10eafa9",
+      "sha256": "365e413e7e66e48b703280b4905134e6a3af746764ef605709e9bc32de6f33ca",
       "transform": null
     },
     "operations.js": {
@@ -249,12 +259,12 @@
     },
     "technician-location.js": {
       "source": "public/technician-location.js",
-      "sha256": "1f44cb81554be80199f37fb3077f16545c2a89006306d4f5c38894b0ebe37124",
+      "sha256": "de92be3fdac5c304e6eb6d0f75fd068a035990e57e9dbcdf75d1677d4306c7c7",
       "transform": null
     },
     "technician-location-model.js": {
       "source": "public/technician-location-model.js",
-      "sha256": "974521cb4eff2150abdfe8ae82249f32856a1e418f026b9f1913cc7781e7bcbe",
+      "sha256": "eab235ef2d1716d26575a84bb68ec388f71d367fae8e103ffba0ad9b3ef21814",
       "transform": null
     },
     "project-care.js": {
@@ -295,5 +305,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "662174ca61bb3c390581a51acd685e5eed3037161abc7b979df7aa8362af2ee1"
+  "shellHash": "ae26c7890d5166e4f0c61b1b8038c1d0696c94f7e2d18416adf74fbfcd9cae7c"
 }

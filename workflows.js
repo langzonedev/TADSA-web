@@ -1,4 +1,4 @@
-import {rankTechnicians,clientMatchLocation} from './technician-location-model.js';
+import {rankTechnicians,clientMatchLocation,workRegion,technicianMatchesFilters} from './technician-location-model.js';
 import {MEMBERSHIP_STATUSES,MAILING_COHORTS} from './profile-details-model.js';
 import {registerDraftSource,trackDraftForm,refreshDraftReview,baselineDraft,draftChanged} from './draft-review.js';
 import {organisationRoleSuggestions} from './organisation-model.js';
@@ -115,31 +115,63 @@ function coordinationFields(form, d, directories, focus, target={}) {
   const assignment = el('fieldset'); assignment.append(el('legend', 'Choose the technical team'), el('p', 'Use recorded skills to narrow the list. Confirm availability and suitability with the technician before work begins.', 'field-help'));
   const sourceLabel=({'client-work':'Client work address','client-residential':'Client residential address','project':'Project work location'})[target.source]??'Work location';
   assignment.append(el('p',sourceLabel+': '+([target.address,target.suburb,target.postcode].filter(Boolean).join(', ')||'Not recorded')+'. Matching skills come first. Within a skill group, unavailable technicians appear last. Distances are straight-line estimates.','field-help'));
-  const credit=el('a','Postcode locations: GeoNames');credit.href='https://www.geonames.org/';credit.target='_blank';credit.rel='noopener noreferrer';assignment.append(credit);
+  const credit=el('a','Postcode locations: GeoNames');credit.href='https://www.geonames.org/';credit.target='_blank';credit.rel='noopener noreferrer';
+  const regionsCredit=el('a','Region boundaries: Data SA');regionsCredit.href='https://data.sa.gov.au/data/dataset/south-australian-government-regions';regionsCredit.target='_blank';regionsCredit.rel='noopener noreferrer';
+  const credits=el('p',null,'field-help');credits.append(credit,el('span',' · '),regionsCredit);assignment.append(credits);
   const skills = el('div', null, 'skill-options'); const technicians = el('div');let technicianPage=d.technicianPage??0,technicianQuery=d.technicianQuery??'',calendarGeneration=0;
   for (const skill of directories.skills) check(skills, skill, d.requiredSkills.includes(skill), on => { d.requiredSkills = on ? [...d.requiredSkills,skill] : d.requiredSkills.filter(s => s !== skill); d.assignmentAcknowledged = false; touch(d); drawTechnicians(); });
   assignment.append(el('h3', 'Skills needed (optional)'), skills);
   check(assignment, 'Show technicians who do not match all selected skills', d.showAll ?? false, on => { d.showAll = on; drawTechnicians(); });
-  const areaFilter=selectField(assignment,'Technician service area filter',d,'filterArea',[['','Any service area'],...directories.serviceAreas.map(a=>[a.id,a.label])]);const postcodeFilter=field(assignment,'Technician postcode filter',d,'filterPostcode',{max:4,help:'Type a postcode to narrow the list using a saved technician base or person contact address. Leave blank to include nearby postcodes.'});postcodeFilter.inputMode='numeric';areaFilter.addEventListener('change',()=>{d.assignmentAcknowledged=false;drawTechnicians();});postcodeFilter.addEventListener('input',()=>{d.assignmentAcknowledged=false;drawTechnicians();});
+  const regionLabel=id=>directories.serviceAreas.find(area=>area.id===id)?.label||id;
+  const destinationRegion=workRegion(target);
+  if (!destinationRegion && d.filterArea==='work-region') d.filterArea='';
+  const areaOptions=[['','Any service area']];
+  if(destinationRegion) areaOptions.push(['work-region','Work location region — '+regionLabel(destinationRegion)]);
+  areaOptions.push(...directories.serviceAreas.map(a=>[a.id,a.label]));
+  const areaFilter=selectField(assignment,'Technician service area filter',d,'filterArea',areaOptions);
+  const modeFilter=selectField(assignment,'Region match',d,'regionMode',[
+    ['either','Serves or is located in the region'],['coverage','Recorded service coverage only'],['base','Base or contact location only']
+  ]);
+  const radiusFilter=selectField(assignment,'Distance from work location',d,'filterRadius',[
+    ['','Any distance'],...['10','25','50','100'].map(km=>[km,'Within '+km+' km (estimated)'])
+  ]);
+  const postcodeFilter=field(assignment,'Technician postcode filter',d,'filterPostcode',{max:4,help:'Use a postcode prefix for the technician’s location, or leave blank to include nearby postcodes.'});
+  postcodeFilter.inputMode='numeric';
+  const distanceHelp=el('small','A distance limit includes only technicians with a measured or estimated distance. A shared postcode alone does not establish a distance.','field-help');
+  assignment.append(distanceHelp);
+  function changeFilters(){
+    technicianPage=0;
+    d.assignmentAcknowledged=false;
+    drawTechnicians();
+  }
+  for(const control of [areaFilter,modeFilter,radiusFilter]) control.addEventListener('change',changeFilters);
+  postcodeFilter.addEventListener('input',changeFilters);
   assignment.append(link('View all technician calendars and service areas','availability'),technicians); form.append(assignment);
   const searchLabel=el('label',null,'workflow-field'),search=el('input');search.type='search';search.value=technicianQuery;search.maxLength=120;search.setAttribute('aria-label','Search technician names');searchLabel.append(el('span','Search technician names','field-label'),search);assignment.insertBefore(searchLabel,technicians);search.addEventListener('input',()=>{if(d.pending||host.isSaving()){search.value=technicianQuery;return;}technicianQuery=search.value;d.technicianQuery=technicianQuery;technicianPage=0;drawTechnicians();});
   function drawTechnicians(focusPage=false) {
     const generation=++calendarGeneration;
     technicians.replaceChildren();
     if(d.technicianId&&!directories.technicians.some(t=>t.id===d.technicianId)) technicians.append(note('The previously assigned person is no longer listed as a technician. Their saved assignment remains in the project history. Choose active technical members or clear the team selection before saving this allocation.',true));
-    const locationMatches=t=>(!d.filterArea||(t.serviceAreas||[]).includes(d.filterArea))&&(!d.filterPostcode||String(t.postcode||'').startsWith(d.filterPostcode.trim()));const visible = rankTechnicians(directories.technicians,target,d.requiredSkills).filter(t => d.technicianIds.includes(t.id) || ((d.showAll || d.requiredSkills.every(s => t.skills.includes(s)))&&locationMatches(t)));
+    const region=d.filterArea==='work-region'?destinationRegion:d.filterArea;
+    modeFilter.disabled=!region||Boolean(d.pending)||host.isSaving();
+    modeFilter.dataset.keepDisabled=String(!region);
+    distanceHelp.hidden=!d.filterRadius;
+    const locationMatches=t=>technicianMatchesFilters(t,{region,mode:d.regionMode,postcode:d.filterPostcode,radius:d.filterRadius});
+    const ranked=rankTechnicians(directories.technicians,target,d.requiredSkills);
+    const visible=ranked.filter(t=>d.technicianIds.includes(t.id)||((d.showAll||t.skillMatch)&&locationMatches(t)));
     const selectedRows=visible.filter(t=>d.technicianIds.includes(t.id)),matches=visible.filter(t=>!d.technicianIds.includes(t.id)&&t.name.toLocaleLowerCase('en-AU').includes(technicianQuery.trim().toLocaleLowerCase('en-AU')));technicianPage=Math.min(technicianPage,Math.max(0,Math.ceil(matches.length/50)-1));d.technicianPage=technicianPage;const start=technicianPage*50,rows=[...selectedRows,...matches.slice(start,start+50)];if(d.technicianIds.length)technicians.append(button('Clear team selection',()=>{d.technicianIds=[];d.technicianId='';d.assignmentAcknowledged=false;touch(d);drawTechnicians();}));technicians.append(el('p',d.technicianIds.length?`${d.technicianIds.length} technical members selected`:'No technician assigned yet. You can allocate the team later.','field-help'));
     const paging=el('div',null,'actions'),previous=button('Previous technicians',()=>{if(d.pending||host.isSaving())return;technicianPage--;drawTechnicians(true);}),next=button('Next technicians',()=>{if(d.pending||host.isSaving())return;technicianPage++;drawTechnicians(true);}),pageStatus=el('span',`${matches.length?start+1:0}–${Math.min(start+50,matches.length)} of ${matches.length} matching unselected technicians. ${selectedRows.length} selected members remain visible.`);pageStatus.tabIndex=-1;pageStatus.setAttribute('role','status');previous.disabled=start===0||Boolean(d.pending)||host.isSaving();next.disabled=start+50>=matches.length||Boolean(d.pending)||host.isSaving();paging.append(previous,pageStatus,next);technicians.append(paging);if(focusPage)pageStatus.focus({preventScroll:true});
     for (const t of rows) {
       const l = el('label', null, 'choice-card'); const radio = el('input'); radio.type = 'checkbox'; radio.name = 'technician'; radio.value = t.id; radio.checked = d.technicianIds.includes(t.id);
       const text = el('span'); text.append(el('strong', t.name),el('small',t.locationReason));
-      if (t.id) text.append(el('small', `${t.skills.join(' · ')}. ${t.openCount} open projects. Remaining work: ${t.remainingMinutes==null?'Not recorded':Math.round(t.remainingMinutes/60*100)/100+' hours'+(t.remainingWorkUnrecordedCount?' recorded; '+t.remainingWorkUnrecordedCount+' project'+(t.remainingWorkUnrecordedCount===1?'':'s')+' not estimated':' remaining')}. General allocation status: ${t.availability==='unknown'?'Not recorded':t.availability}. ${t.locationSource==='person-contact'?'Contact address':'Base'}: ${[t.suburb,t.postcode].filter(Boolean).join(' ')||'Not recorded'}. Service areas: ${(t.serviceAreas||[]).map(a=>({western:'Western suburbs',southern:'Southern suburbs',northern:'Northern suburbs',eastern:'Eastern suburbs','adelaide-hills':'Adelaide Hills',metro:'Metropolitan Adelaide',regional:'Regional South Australia'}[a]||a)).join(', ')||'Not recorded'}.`));
+      if (radio.checked && (!locationMatches(t)||!d.showAll&&!t.skillMatch)) text.append(el('small','Selected · outside current filters'));
+      if (t.id) text.append(el('small', `${t.skills.join(' · ')}. ${t.openCount} open projects. Remaining work: ${t.remainingMinutes==null?'Not recorded':Math.round(t.remainingMinutes/60*100)/100+' hours'+(t.remainingWorkUnrecordedCount?' recorded; '+t.remainingWorkUnrecordedCount+' project'+(t.remainingWorkUnrecordedCount===1?'':'s')+' not estimated':' remaining')}. General allocation status: ${t.availability==='unknown'?'Not recorded':t.availability}. ${t.locationSource==='person-contact'?'Contact address':'Base'}: ${[t.suburb,t.postcode].filter(Boolean).join(' ')||'Not recorded'}${t.baseRegion?' ('+regionLabel(t.baseRegion)+')':''}. Service areas: ${(t.serviceAreas||[]).map(regionLabel).join(', ')||'Not recorded'}.`));
       else text.append(el('small', 'Save the request now and allocate someone later.'));
       const calendarText=el('small',`Calendar today (${directories.calendarDay}): ${!t.calendarToday||t.calendarToday==='Could not load'?'Loading…':t.calendarToday}. Check future dates in the calendar.`);calendarText.dataset.calendarPerson=t.id;text.append(calendarText);
       radio.addEventListener('change', () => { d.technicianIds=radio.checked?[...d.technicianIds,t.id]:d.technicianIds.filter(id=>id!==t.id);if(!d.technicianIds.includes(d.technicianId))d.technicianId=d.technicianIds[0]||'';d.assignmentAcknowledged = false; touch(d);const status=drawTechnicians(),replacement=[...technicians.querySelectorAll('input[name=technician]')].find(input=>input.value===t.id);(replacement??status)?.focus({preventScroll:true}); }); l.append(radio,text); technicians.append(l);
     }
     if (!visible.length) technicians.append(note('No technicians match the selected skills and location filters. Clear a filter, review other technicians, or save unassigned.'));else if(!matches.length)technicians.append(note('No unselected technicians match the name search and current skill / location filters. Selected members remain visible.'));
-    const team=directories.technicians.filter(t=>d.technicianIds.includes(t.id));if(team.length){selectField(technicians,'Lead technician',d,'technicianId',team.map(t=>[t.id,t.name]));technicians.append(el('p','The lead is the main contact; every selected technical member is linked to this project.','field-help'));}
+    const team=selectedRows;if(team.length){selectField(technicians,'Lead technician',d,'technicianId',team.map(t=>[t.id,t.name]));technicians.append(el('p','The lead is the main contact; every selected technical member is linked to this project.','field-help'));}
     const selected = directories.technicians.find(t => t.id === d.technicianId);
     if(selected)technicians.append(link('View '+selected.name+' — qualifications & clearances','person/'+selected.id));
     d.needsAcknowledgement = team.some(t=>t.availability !== 'available'||!d.requiredSkills.every(s=>t.skills.includes(s))||!locationMatches(t));

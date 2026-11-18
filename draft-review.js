@@ -1,7 +1,7 @@
 // In-tab draft discovery only. Saving remains an explicit action in each form.
 const sources=new Map(),locations=new Map();let tray,openDraft,queued=false;
 const baselines=new WeakMap();
-const draftMetadata=new Set(['requestId','personRequestId','version','baseVersion','dirty','pending','personPending','contactBaseline','step','technicianQuery','technicianPage','needsAcknowledgement','payerLabel','filterArea','filterPostcode','forProject','showAll','saveUnconfirmed','reviewedConflict']);
+const draftMetadata=new Set(['requestId','personRequestId','version','baseVersion','dirty','pending','personPending','contactBaseline','step','technicianQuery','technicianPage','needsAcknowledgement','payerLabel','filterArea','filterPostcode','regionMode','filterRadius','forProject','showAll','saveUnconfirmed','reviewedConflict']);
 // Compare editable values, not navigation/search state or save bookkeeping.
 export function draftSnapshot(d){
  const normal=value=>{if(value==null||value===''||value===false)return undefined;if(Array.isArray(value)){const a=value.map(normal).filter(v=>v!==undefined);return a.length?a:undefined;}if(typeof value==='object'){const entries=Object.keys(value).sort().filter(k=>!draftMetadata.has(k)).map(k=>[k,normal(value[k])]).filter(([,v])=>v!==undefined);return entries.length?Object.fromEntries(entries):undefined;}return typeof value==='number'?String(value):value;};
