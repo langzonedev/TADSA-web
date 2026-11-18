@@ -4,7 +4,7 @@ export function validateGeocode(value,values){
  if(value===null)return null;
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!=='addressKey,latitude,longitude,matchedAt,provider')invalid();
  if(!Number.isFinite(value.latitude)||value.latitude < -90||value.latitude >90||!Number.isFinite(value.longitude)||value.longitude < -180||value.longitude >180)invalid();
- if(!['geoapify','photon'].includes(value.provider)||typeof value.matchedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value.matchedAt)||!Number.isFinite(Date.parse(value.matchedAt))||new Date(value.matchedAt).toISOString()!==value.matchedAt)invalid();
+ if(!['locationsa','geoapify','photon'].includes(value.provider)||typeof value.matchedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value.matchedAt)||!Number.isFinite(Date.parse(value.matchedAt))||new Date(value.matchedAt).toISOString()!==value.matchedAt)invalid();
  if(!addressKey(values)||value.addressKey!==addressKey(values))invalid();
  return {...value};
 }

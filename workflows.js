@@ -1,3 +1,4 @@
+import {rankTechnicians,clientMatchLocation} from './technician-location-model.js';
 import {MEMBERSHIP_STATUSES,MAILING_COHORTS} from './profile-details-model.js';
 import {registerDraftSource,trackDraftForm,refreshDraftReview,baselineDraft,draftChanged} from './draft-review.js';
 import {organisationRoleSuggestions} from './organisation-model.js';
@@ -99,7 +100,7 @@ async function newClient(view, arg) {
 }
 
 function coordinationValues(d) { return { requiredSkills: d.requiredSkills, technicianId: d.technicianId || null, technicianIds: d.technicianIds ?? (d.technicianId?[d.technicianId]:[]), fundingStatus: d.fundingStatus, payerId: ['person', 'organisation'].includes(d.fundingStatus) ? d.payerId || null : null, fundingNotes: d.fundingNotes.trim() }; }
-function coordinationFields(form, d, directories, focus) {
+function coordinationFields(form, d, directories, focus, target={}) {
   if (focus !== 'team') {
   const funding = el('fieldset'); funding.append(el('legend', 'Who is expected to pay?'),el('p','This is the expected funding contact. Agreed dollar contributions and the invoice recipient are recorded under Costs. Once contributions are saved, they are shown as the payers on the overview.','field-help'));
   selectField(funding, 'Payer', d, 'fundingStatus', [['unknown','Not known yet'],['self','The client'],['organisation','An organisation'],['person','Another person']], () => { d.payerId = '';d.payerLabel=''; drawPayer(); });
@@ -112,23 +113,26 @@ function coordinationFields(form, d, directories, focus) {
   if (focus === 'funding') return;
   d.technicianIds??=d.technicianId?[d.technicianId]:[];
   const assignment = el('fieldset'); assignment.append(el('legend', 'Choose the technical team'), el('p', 'Use recorded skills to narrow the list. Confirm availability and suitability with the technician before work begins.', 'field-help'));
+  const sourceLabel=({'client-work':'Client work address','client-residential':'Client residential address','project':'Project work location'})[target.source]??'Work location';
+  assignment.append(el('p',sourceLabel+': '+([target.address,target.suburb,target.postcode].filter(Boolean).join(', ')||'Not recorded')+'. Matching skills come first. Within a skill group, unavailable technicians appear last. Distances are straight-line estimates.','field-help'));
+  const credit=el('a','Postcode locations: GeoNames');credit.href='https://www.geonames.org/';credit.target='_blank';credit.rel='noopener noreferrer';assignment.append(credit);
   const skills = el('div', null, 'skill-options'); const technicians = el('div');let technicianPage=d.technicianPage??0,technicianQuery=d.technicianQuery??'',calendarGeneration=0;
   for (const skill of directories.skills) check(skills, skill, d.requiredSkills.includes(skill), on => { d.requiredSkills = on ? [...d.requiredSkills,skill] : d.requiredSkills.filter(s => s !== skill); d.assignmentAcknowledged = false; touch(d); drawTechnicians(); });
   assignment.append(el('h3', 'Skills needed (optional)'), skills);
   check(assignment, 'Show technicians who do not match all selected skills', d.showAll ?? false, on => { d.showAll = on; drawTechnicians(); });
-  const areaFilter=selectField(assignment,'Technician service area filter',d,'filterArea',[['','Any service area'],...directories.serviceAreas.map(a=>[a.id,a.label])]);const postcodeFilter=field(assignment,'Technician postcode filter',d,'filterPostcode',{max:4,help:'Type a postcode to narrow the list using a saved technician base or person contact address. No travel distance is inferred.'});postcodeFilter.inputMode='numeric';areaFilter.addEventListener('change',()=>{d.assignmentAcknowledged=false;drawTechnicians();});postcodeFilter.addEventListener('input',()=>{d.assignmentAcknowledged=false;drawTechnicians();});
+  const areaFilter=selectField(assignment,'Technician service area filter',d,'filterArea',[['','Any service area'],...directories.serviceAreas.map(a=>[a.id,a.label])]);const postcodeFilter=field(assignment,'Technician postcode filter',d,'filterPostcode',{max:4,help:'Type a postcode to narrow the list using a saved technician base or person contact address. Leave blank to include nearby postcodes.'});postcodeFilter.inputMode='numeric';areaFilter.addEventListener('change',()=>{d.assignmentAcknowledged=false;drawTechnicians();});postcodeFilter.addEventListener('input',()=>{d.assignmentAcknowledged=false;drawTechnicians();});
   assignment.append(link('View all technician calendars and service areas','availability'),technicians); form.append(assignment);
   const searchLabel=el('label',null,'workflow-field'),search=el('input');search.type='search';search.value=technicianQuery;search.maxLength=120;search.setAttribute('aria-label','Search technician names');searchLabel.append(el('span','Search technician names','field-label'),search);assignment.insertBefore(searchLabel,technicians);search.addEventListener('input',()=>{if(d.pending||host.isSaving()){search.value=technicianQuery;return;}technicianQuery=search.value;d.technicianQuery=technicianQuery;technicianPage=0;drawTechnicians();});
   function drawTechnicians(focusPage=false) {
     const generation=++calendarGeneration;
     technicians.replaceChildren();
     if(d.technicianId&&!directories.technicians.some(t=>t.id===d.technicianId)) technicians.append(note('The previously assigned person is no longer listed as a technician. Their saved assignment remains in the project history. Choose active technical members or clear the team selection before saving this allocation.',true));
-    const locationMatches=t=>(!d.filterArea||(t.serviceAreas||[]).includes(d.filterArea))&&(!d.filterPostcode||String(t.postcode||'').startsWith(d.filterPostcode.trim()));const visible = directories.technicians.filter(t => d.technicianIds.includes(t.id) || ((d.showAll || d.requiredSkills.every(s => t.skills.includes(s)))&&locationMatches(t)));
+    const locationMatches=t=>(!d.filterArea||(t.serviceAreas||[]).includes(d.filterArea))&&(!d.filterPostcode||String(t.postcode||'').startsWith(d.filterPostcode.trim()));const visible = rankTechnicians(directories.technicians,target,d.requiredSkills).filter(t => d.technicianIds.includes(t.id) || ((d.showAll || d.requiredSkills.every(s => t.skills.includes(s)))&&locationMatches(t)));
     const selectedRows=visible.filter(t=>d.technicianIds.includes(t.id)),matches=visible.filter(t=>!d.technicianIds.includes(t.id)&&t.name.toLocaleLowerCase('en-AU').includes(technicianQuery.trim().toLocaleLowerCase('en-AU')));technicianPage=Math.min(technicianPage,Math.max(0,Math.ceil(matches.length/50)-1));d.technicianPage=technicianPage;const start=technicianPage*50,rows=[...selectedRows,...matches.slice(start,start+50)];if(d.technicianIds.length)technicians.append(button('Clear team selection',()=>{d.technicianIds=[];d.technicianId='';d.assignmentAcknowledged=false;touch(d);drawTechnicians();}));technicians.append(el('p',d.technicianIds.length?`${d.technicianIds.length} technical members selected`:'No technician assigned yet. You can allocate the team later.','field-help'));
     const paging=el('div',null,'actions'),previous=button('Previous technicians',()=>{if(d.pending||host.isSaving())return;technicianPage--;drawTechnicians(true);}),next=button('Next technicians',()=>{if(d.pending||host.isSaving())return;technicianPage++;drawTechnicians(true);}),pageStatus=el('span',`${matches.length?start+1:0}–${Math.min(start+50,matches.length)} of ${matches.length} matching unselected technicians. ${selectedRows.length} selected members remain visible.`);pageStatus.tabIndex=-1;pageStatus.setAttribute('role','status');previous.disabled=start===0||Boolean(d.pending)||host.isSaving();next.disabled=start+50>=matches.length||Boolean(d.pending)||host.isSaving();paging.append(previous,pageStatus,next);technicians.append(paging);if(focusPage)pageStatus.focus({preventScroll:true});
     for (const t of rows) {
       const l = el('label', null, 'choice-card'); const radio = el('input'); radio.type = 'checkbox'; radio.name = 'technician'; radio.value = t.id; radio.checked = d.technicianIds.includes(t.id);
-      const text = el('span'); text.append(el('strong', t.name));
+      const text = el('span'); text.append(el('strong', t.name),el('small',t.locationReason));
       if (t.id) text.append(el('small', `${t.skills.join(' · ')}. ${t.openCount} open projects. Remaining work: ${t.remainingMinutes==null?'Not recorded':Math.round(t.remainingMinutes/60*100)/100+' hours'+(t.remainingWorkUnrecordedCount?' recorded; '+t.remainingWorkUnrecordedCount+' project'+(t.remainingWorkUnrecordedCount===1?'':'s')+' not estimated':' remaining')}. General allocation status: ${t.availability==='unknown'?'Not recorded':t.availability}. ${t.locationSource==='person-contact'?'Contact address':'Base'}: ${[t.suburb,t.postcode].filter(Boolean).join(' ')||'Not recorded'}. Service areas: ${(t.serviceAreas||[]).map(a=>({western:'Western suburbs',southern:'Southern suburbs',northern:'Northern suburbs',eastern:'Eastern suburbs','adelaide-hills':'Adelaide Hills',metro:'Metropolitan Adelaide',regional:'Regional South Australia'}[a]||a)).join(', ')||'Not recorded'}.`));
       else text.append(el('small', 'Save the request now and allocate someone later.'));
       const calendarText=el('small',`Calendar today (${directories.calendarDay}): ${!t.calendarToday||t.calendarToday==='Could not load'?'Loading…':t.calendarToday}. Check future dates in the calendar.`);calendarText.dataset.calendarPerson=t.id;text.append(calendarText);
@@ -150,11 +154,11 @@ function coordinationFields(form, d, directories, focus) {
   form.startTechnicianCalendars=()=>drawTechnicians();
   drawTechnicians();
 }
-async function directories(loadCalendars=true) {
-  const [technicians,areas] = await Promise.all([request('technicians'),request('availability-options')]);
+async function directories(loadCalendars=true,source='technicians') {
+  const [technicians,areas] = await Promise.all([request(source),request('availability-options')]);
   const calendarDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Adelaide'}).format(new Date()),calendars=new Map(),waiters=[];let active=0;
-  async function loadDisplayedCalendars(rows,isCurrent){if(!loadCalendars)return;await Promise.all(rows.map(async t=>{if(!isCurrent())return;if(calendars.has(t.id)){await calendars.get(t.id);return;}while(active>=4)await new Promise(resolve=>waiters.push(resolve));if(!isCurrent()){waiters.shift()?.();return;}if(calendars.has(t.id)){waiters.shift()?.();await calendars.get(t.id);return;}active++;const loading=(async()=>{try{const calendar=await request('availability/'+t.id);t.calendarToday=calendar.entries.find(e=>e.startDate<=calendarDay&&e.endDate>=calendarDay)?.status??'Not recorded';}catch{t.calendarToday='Could not load';calendars.delete(t.id);}finally{active--;waiters.shift()?.();}})();calendars.set(t.id,loading);await loading;}));}
-  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU')||a.id.localeCompare(b.id);return { calendarDay,loadCalendars:loadDisplayedCalendars,serviceAreas:[...areas.serviceAreas].sort((a,b)=>a.label.localeCompare(b.label,'en-AU')),technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort() };
+  async function loadDisplayedCalendars(rows,isCurrent){if(!loadCalendars)return;await Promise.all(rows.map(async t=>{if(!isCurrent())return;if(calendars.has(t.id)){t.calendarToday=await calendars.get(t.id);return;}while(active>=4)await new Promise(resolve=>waiters.push(resolve));if(!isCurrent()){waiters.shift()?.();return;}if(calendars.has(t.id)){waiters.shift()?.();t.calendarToday=await calendars.get(t.id);return;}active++;const loading=(async()=>{try{const calendar=await request('availability/'+t.id);return calendar.entries.find(e=>e.startDate<=calendarDay&&e.endDate>=calendarDay)?.status??'Not recorded';}catch{calendars.delete(t.id);return 'Could not load';}finally{active--;waiters.shift()?.();}})();calendars.set(t.id,loading);t.calendarToday=await loading;}));}
+  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU')||a.id.localeCompare(b.id);return { target:technicians.target,calendarDay,loadCalendars:loadDisplayedCalendars,serviceAreas:[...areas.serviceAreas].sort((a,b)=>a.label.localeCompare(b.label,'en-AU')),technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort() };
 }
 function allocationValid(form, d, notice) { if (!valid(form)) return false; if (d.needsAcknowledgement && !d.assignmentAcknowledged) { notice.replaceChildren(note('Review the technician warning and tick the acknowledgement, or leave the request unassigned.', true)); notice.scrollIntoView({block:'nearest'}); return false; } return true; }
 function reviewList(items) { const dl = el('dl', null, 'review-list'); for (const [label,value] of items) { dl.append(el('dt',label),el('dd',value)); } return dl; }
@@ -170,7 +174,7 @@ async function newProject(view, clientId) {
     slot.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.destroy());slot.replaceChildren(); steps.querySelectorAll('li').forEach((n,i) => i+1 === d.step ? n.setAttribute('aria-current','step') : n.removeAttribute('aria-current'));
     const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technical team','Review'][d.step-1]}`); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New project':key==='new-client'?'New client':'Person details'}); const notice = el('div');
     if (d.step === 1) {
-      const picker=createRecordPicker({label:'Existing client',kind:'clients',selectedId:d.clientId,required:true,onChange:async(id,item)=>{d.clientId=id;selected=item?{person:{name:item.name},details:{residentialAddress:item.address}}:null;touch(d);if(id){try{const client=await request('clients/'+id);if(d.clientId===id)selected=client;}catch{}}}});picker.element.recordPicker=picker;form.append(picker.element,link('Create new client','new-client/project','button secondary'),el('p','Search by name, reference, phone, email or address. Confirm the person’s details before choosing.','field-help'));
+      const picker=createRecordPicker({label:'Existing client',kind:'clients',selectedId:d.clientId,required:true,onChange:async(id,item)=>{d.clientId=id;selected=item?{person:{name:item.name},details:{residentialAddress:item.address}}:null;touch(d);if(id){try{const client=await request('clients/'+id);if(d.clientId===id){selected=client;if(d.step===3&&slot.isConnected)draw();}}catch{}}}});picker.element.recordPicker=picker;form.append(picker.element,link('Create new client','new-client/project','button secondary'),el('p','Search by name, reference, phone, email or address. Confirm the person’s details before choosing.','field-help'));
     } else if (d.step === 2) {
       form.append(note(`Client: ${selected?.person.name ?? 'Choose a client first'}`));
       field(form,'Project title',d,'title',{required:true,help:'A short description the client and team will recognise.'});
@@ -180,7 +184,7 @@ async function newProject(view, clientId) {
       form.append(el('p','Use one project for related work on the same item. Create separate projects for different items or independently managed jobs. Staff can decide after assessment when the scope is clearer.','field-help'));
       form.append(el('p','For a correction to earlier work, check the existing project first and record the follow-up there. A request for different equipment usually needs a new project.','field-help'));
       form.append(el('p','Creating a project does not authorise work or spending. Complete assessment review and quote approval, then record the sent Work Request before technical work begins.','field-help'));
-    } else if (d.step === 3) {form.append(note('Client work location: '+(selected?.details?.workAddress||selected?.details?.residentialAddress||'Not recorded. Open the client record to add an address.')));coordinationFields(form,d,dirs);}
+    } else if (d.step === 3) {coordinationFields(form,d,dirs,null,clientMatchLocation(selected?.details));}
     else {
       const payer = d.fundingStatus==='unknown' ? 'Not known yet — follow up' : d.fundingStatus==='self' ? `Client: ${selected?.person.name}` : d.payerLabel||d.payerId||'Choose a payer';
       form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technical team',dirs.technicians.filter(t=>(d.technicianIds??[]).includes(t.id)).map(t=>t.name+(t.id===d.technicianId?' (lead)':'')).join(', ')||'Not assigned yet']]));
@@ -199,17 +203,18 @@ async function newProject(view, clientId) {
 }
 async function editCoordination(view,id,options={}) {
   const focus=['team','funding'].includes(options.focus)?options.focus:null;
-  const [project,dirs,projectLocation]=await Promise.all([request('projects/'+id),directories(options.focus!=='funding'),request('projects/'+id+'/location')]);
+  const [project,dirs]=await Promise.all([request('projects/'+id),directories(focus!=='funding',focus==='funding'?'technicians':'projects/'+id+'/technician-matches')]);
+  const projectLocation=dirs.target??{};
   const key='coordination/'+id+(focus?'/'+focus:'');
   const previous=drafts.get(key);
   if(previous&&!previous.dirty&&!previous.pending)drafts.delete(key);
-  const d=getDraft(key,{...project.coordination,technicianId:project.coordination.technicianId||'',payerId:project.coordination.payerId||'',version:project.version,filterArea:projectLocation.serviceArea,filterPostcode:projectLocation.postcode});
+  const d=getDraft(key,{...project.coordination,technicianId:project.coordination.technicianId||'',payerId:project.coordination.payerId||'',version:project.version,filterArea:'',filterPostcode:''});
   const label=focus==='team'?'Team':focus==='funding'?'Funding':'Allocation';
   if(!options.embedded)title(view,focus?label:'Funding & technical team',project.title,'project/'+id);
-  if(focus!=='funding')view.append(note('Project location: '+([projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded. Set the location in Project details.')));
+
   const box=panel(focus?null:'Review the allocation');
   if(focus!=='funding')renderTravelComparison(box,projectLocation,dirs.technicians);
-  const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:focus==='funding'?'Funding':'Team',context:project.reference+' · '+project.title});coordinationFields(form,d,dirs,focus);
+  const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:focus==='funding'?'Funding':'Team',context:project.reference+' · '+project.title});coordinationFields(form,d,dirs,focus,projectLocation);
   const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Save '+label.toLowerCase());
   actions.append(submit,cancel(form,d,key,options.onCancel??('project/'+id)));form.append(notice,actions);box.append(form);view.append(box);
   function compare(latest) {

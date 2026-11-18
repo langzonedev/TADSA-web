@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "f1ba2a7a9c4d1882a04569e10220a875c1e20cc2",
+  "sourceRevision": "1cdb5deec474814b84b7573274d3ff9b76081065",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "credential-expiry.js": {
@@ -14,7 +14,7 @@
     },
     "customer-feedback.css": {
       "source": "public/customer-feedback.css",
-      "sha256": "a53658c4abb44b21d5c01c3aa69e619aa61a86c7e7a506d419561739b32cf78e",
+      "sha256": "3842ce9c8bf090e6474731c6adf6a1cae1c4db51dafb0d9115aeab25f8650798",
       "transform": null
     },
     "availability.css": {
@@ -64,12 +64,27 @@
     },
     "address-lookup.js": {
       "source": "public/address-lookup.js",
-      "sha256": "40f9648a3324d6f3b1c00050cf397d1513b17653340cce0d0f82d852be5e6f67",
+      "sha256": "b754dc98e43281894b42612bd39f9d5652d8ddd56d68afdb25f7d80be233e5d5",
+      "transform": null
+    },
+    "postcode-locations.js": {
+      "source": "public/postcode-locations.js",
+      "sha256": "dfacc649a8c74acef962526fb74f7f0bc88c1d0da39cf65e949bc48c52defde4",
+      "transform": null
+    },
+    "locality-picker.js": {
+      "source": "public/locality-picker.js",
+      "sha256": "c3676ec41127056306f2e52bdc484dd75df2fd2795eee4be434d3f3a266def0d",
+      "transform": null
+    },
+    "postal-localities.js": {
+      "source": "public/postal-localities.js",
+      "sha256": "7854c48e82477809f19754e26ac317dcd5b23394a8fee7090a61a3f8c984e117",
       "transform": null
     },
     "location-geocode.js": {
       "source": "public/location-geocode.js",
-      "sha256": "b48e9fda5e941d53bf34fa41049757f83ade99d628a499cca7c36b4d387eeb89",
+      "sha256": "e743f54f385444d5d7a7333197392a6043cccf2a2c254ad5449236a26793cf77",
       "transform": null
     },
     "appliance-updates.js": {
@@ -209,7 +224,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "829bbb4ad2cd5bec6c4adbebb0684bcf807522fa4197193a1240eb5cec83c311",
+      "sha256": "34a3014d5a34726ff5abcb0e4a1adac6c753978c85a4d331ca90fdf9c10eafa9",
       "transform": null
     },
     "operations.js": {
@@ -239,7 +254,7 @@
     },
     "technician-location-model.js": {
       "source": "public/technician-location-model.js",
-      "sha256": "0b285b0bd068fcb15ef0a44aa9aa2adadfd0ac2982ca56fbc5979131fe86f5cf",
+      "sha256": "974521cb4eff2150abdfe8ae82249f32856a1e418f026b9f1913cc7781e7bcbe",
       "transform": null
     },
     "project-care.js": {
@@ -280,5 +295,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "441d8f990980210a016aa90060d1c5f3d874ef7c254b495b5a718c00a3782445"
+  "shellHash": "662174ca61bb3c390581a51acd685e5eed3037161abc7b979df7aa8362af2ee1"
 }

@@ -1,3 +1,4 @@
+import {rankTechnicians,projectMatchLocation} from './technician-location-model.js';
 import {deviceTechnicianLocation} from './device-model.mjs';
 import {preserveGeocode} from './location-geocode.js';
 import {buildManagementReport} from './management-report.js';
@@ -22,7 +23,11 @@ installModelExtensions(ctx=>{
   const p=find('projects',id);if(method==='GET')return location(d,p,project);
   if(method==='PUT'){version(p,input.version);const next={address:str(input.address,500),suburb:str(input.suburb,120),postcode:str(input.postcode,4),serviceArea:str(input.serviceArea,80)};if(next.postcode&&!/^\d{4}$/.test(next.postcode))fail('Postcode must contain four digits or be blank.');if(next.serviceArea&&!areas.includes(next.serviceArea))fail('Select a known service area.');const old=location(d,p,project);next.geocode=preserveGeocode(input.geocode,old.geocode,[next.address,next.suburb,next.postcode]);if(Object.keys(next).some(k=>JSON.stringify(old[k])!==JSON.stringify(next[k]))){d.workPlans[id]={...d.workPlans[id],location:next.address,suburb:next.suburb,postcode:next.postcode,serviceArea:next.serviceArea,geocode:next.geocode};if(d.operations[id]&&['address','suburb','postcode','serviceArea'].some(k=>old[k]!==next[k])){d.operations[id].workApproved=false;if(!d.lifecycles?.[id])d.operations[id].reviewRequired=true;}bump(p,'Project location updated',{from:old,to:next});}return location(d,p,project);}
  }
- if(kind==='projects'&&sub==='technician-matches'&&method==='GET'){const p=find('projects',id),where=location(d,p,project),directory=dispatch(d,'technicians'),items=directory.items.map(t=>{const skillMatch=p.coordination.requiredSkills.every(s=>t.skills.includes(s)),postcodeMatch=where.postcode&&t.postcode?where.postcode===t.postcode:null,areaMatch=where.serviceArea?t.serviceAreas.includes(where.serviceArea):null;return {...t,skillMatch,postcodeMatch,areaMatch,matchLevel:!skillMatch?'missing-skills':postcodeMatch?'same-postcode':areaMatch?'service-area':'skills-only',matchReasons:[skillMatch?'All requested skills recorded':'Requested skills are missing',postcodeMatch?'Same recorded postcode':areaMatch?'Serves the selected area':'Location fit not established']};});const rank={'same-postcode':0,'service-area':1,'skills-only':2,'missing-skills':3};items.sort((a,b)=>rank[a.matchLevel]-rank[b.matchLevel]||a.openCount-b.openCount||a.name.localeCompare(b.name));return {projectId:id,location:where,items};}
+ if(kind==='projects'&&sub==='technician-matches'&&method==='GET'){
+  const p=find('projects',id),where=location(d,p,project),directory=dispatch(d,'technicians');
+  const target=projectMatchLocation(d.workPlans[p.id],d.clients.find(c=>c.id===p.clientId)?.details);
+  return {projectId:id,location:where,target,skills:directory.skills,items:rankTechnicians(directory.items,target,p.coordination.requiredSkills)};
+ }
  if(kind==='reports'&&method==='GET'){
   const month=ctx.query.get('month');
   if(typeof month!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||month.startsWith('0000-'))fail('Select a month using YYYY-MM.');

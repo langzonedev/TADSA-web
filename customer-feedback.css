@@ -77,3 +77,5 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
 .project-register-layout .overdue-date{display:inline-block;background:#ffe1e4;color:#812333;border-radius:4px;padding:1px 4px;font-weight:650}
 .project-register-layout .overdue-label{display:block;color:#812333}
 @media(max-width:620px){.project-register-layout .projects-table{min-width:510px}.project-register-layout .table-wrap{overflow-x:auto}}
+
+.locality-options:not([hidden]){display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .8rem;grid-column:1/-1}.locality-options button{white-space:normal;text-align:left}
