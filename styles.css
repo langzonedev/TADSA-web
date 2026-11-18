@@ -489,3 +489,5 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 .credential-expiry-scroll-help{display:none}
 @media(max-width:750px){.credential-expiry-scroll-help{display:block}}
 @media print{.credential-expiry-scroll{overflow:visible;border:0}.credential-expiry-table{min-width:0}.credential-expiry-table th{min-width:0!important}.credential-expiry-table th,.credential-expiry-table td{padding:6px;font-size:10pt}.credential-expiry-scroll-help{display:none}}
+
+main > [hidden], [data-section-loading=true] > :not(.project-section-loading) { display: none !important; }

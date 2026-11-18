@@ -65,3 +65,15 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
  .project-register-layout .projects-table th:nth-child(4){width:19%}
  .project-register-layout .projects-table .project-status .badge:not(.invoice){white-space:normal}
 }
+
+.project-register-layout .projects-table th:first-child{width:32%}
+.project-register-layout .projects-table th:nth-child(2){width:19%}
+.project-register-layout .projects-table th:nth-child(3){width:13%}
+.project-register-layout .projects-table th:nth-child(4){width:21%}
+.project-register-layout .projects-table th:nth-child(5){width:15%}
+.project-register-layout .projects-table td:first-child .row-open{display:inline-block;vertical-align:middle;margin-right:.6rem}
+.project-register-layout .projects-table .row-preview{margin-top:0}
+.project-register-layout .projects-table td{padding-block:5px}
+.project-register-layout .overdue-date{display:inline-block;background:#ffe1e4;color:#812333;border-radius:4px;padding:1px 4px;font-weight:650}
+.project-register-layout .overdue-label{display:block;color:#812333}
+@media(max-width:620px){.project-register-layout .projects-table{min-width:510px}.project-register-layout .table-wrap{overflow-x:auto}}

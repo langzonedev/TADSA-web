@@ -85,7 +85,7 @@ export async function loadLifecyclePeople(project,state,read=request){
  return {items:[...people.values()]};
 }
 export async function renderLifecycle(parent,project,options={}){
- const current=await request(`projects/${project.id}/lifecycle`),id=project.id;
+ const current=options.current??await request(`projects/${project.id}/lifecycle`),id=project.id;
  const form=(...args)=>lifecycleForm(...args,options.onSaved);
  const closedHistorical=!current.managed&&project.status==='closed';
  const box=node('section',null,'panel lifecycle-panel');box.append(node('h2',closedHistorical?'Closed historical project':current.managed?(names[current.effectiveStage??current.state.stage]||'Project workflow'):'Start guided workflow'));parent.append(box);

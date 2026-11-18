@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "39cfccca82b3ab70a381eb06c232b343094d1026",
+  "sourceRevision": "f1ba2a7a9c4d1882a04569e10220a875c1e20cc2",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "credential-expiry.js": {
@@ -14,7 +14,7 @@
     },
     "customer-feedback.css": {
       "source": "public/customer-feedback.css",
-      "sha256": "39eaa230ead8bd96100bbacde5c8d15614eee1dae18da84691ae1afdf6cea176",
+      "sha256": "a53658c4abb44b21d5c01c3aa69e619aa61a86c7e7a506d419561739b32cf78e",
       "transform": null
     },
     "availability.css": {
@@ -64,7 +64,7 @@
     },
     "address-lookup.js": {
       "source": "public/address-lookup.js",
-      "sha256": "6c43c9396388c9d46fae8e7f830d1f177afda6c55ef2bdb61f739d4293f8a9f3",
+      "sha256": "40f9648a3324d6f3b1c00050cf397d1513b17653340cce0d0f82d852be5e6f67",
       "transform": null
     },
     "location-geocode.js": {
@@ -109,12 +109,12 @@
     },
     "profile-details.js": {
       "source": "public/profile-details.js",
-      "sha256": "8f7b9f4077d59e4f15463f845b1ea437b75b9b66684d65b01d0d5490e5f3176d",
+      "sha256": "c0b308a13149c27f6b31d3c1e8921ecf5bc786a8b887fc60238799c48cd93d60",
       "transform": null
     },
     "profile-details-model.js": {
       "source": "public/profile-details-model.js",
-      "sha256": "bf51d144c42079f8ca4a2974d7dd37f9d01a9cc2ca225e21ae1ec1dd9da92384",
+      "sha256": "b723532b7b04c52cf88fb53dc8b5dba936d6a83f1fca71a2420dc27505a9982f",
       "transform": null
     },
     "project-details.js": {
@@ -149,7 +149,7 @@
     },
     "project-lifecycle.js": {
       "source": "public/project-lifecycle.js",
-      "sha256": "989a942f256489abe00c01416df446eda44857da339fe8e0c579ee5f05efd9cb",
+      "sha256": "49cbdcb6458445b7d6deebcbd89b495fdf39287847be0e10ace0f22b137ec509",
       "transform": null
     },
     "finance-pack.js": {
@@ -174,12 +174,12 @@
     },
     "report-model.js": {
       "source": "public/report-model.js",
-      "sha256": "3f7d7e0c3a907e7fa4b71fdec2772bf7b21fff572353c2931168b3be0f3c1287",
+      "sha256": "bf2ff8f2426760a4c59ef4b19f2d2792a15451179a8f5cb4c4b33c2748915951",
       "transform": null
     },
     "report-builder.js": {
       "source": "public/report-builder.js",
-      "sha256": "16db29af1059ff9f3baa0723e2ecf7a7481be4887c51e894b5bf72f935c323d0",
+      "sha256": "815864a649dc20fb90836ba878bbe7d01ada78a8d4dbbd7f1d53e6efec7b60db",
       "transform": null
     },
     "jpeg.js": {
@@ -189,7 +189,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "979459a87cee7f8eb290e0bb78654e27b4c104f9fbce7c40c270bd35944711ba",
+      "sha256": "59350d7fa04d20541956ef7674f9bf8c3e5616a3d31f6e398183e111b0d9fa20",
       "transform": null
     },
     "settings.js": {
@@ -209,7 +209,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "a0c27341de82ef3a4416159e7f1c60ba1bbd964ded776448741d89f36f301b1f",
+      "sha256": "829bbb4ad2cd5bec6c4adbebb0684bcf807522fa4197193a1240eb5cec83c311",
       "transform": null
     },
     "operations.js": {
@@ -244,12 +244,12 @@
     },
     "project-care.js": {
       "source": "public/project-care.js",
-      "sha256": "682319bb30ee9b717faee7bc32761af50adbb84914ac5c499d513cd6a87c14ff",
+      "sha256": "38357e74ebba2fcce674e42f3242364d5fbef2df01beac2f0edc524a1b1dbfa6",
       "transform": null
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "8fa4c2cf8e8f0f047915dbf8c27ea35909d7afdab86f78a16ecfaa72661b08ae",
+      "sha256": "760084609b702d7cd58f944e27be56e88ea7df3d34497e71932f4085181eb401",
       "transform": null
     },
     "boot.js": {
@@ -280,5 +280,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "ba02bf1d14ab33f10a9647b46011b7fb9715e676d1e2bff3b460ac7e2d10ef8d"
+  "shellHash": "441d8f990980210a016aa90060d1c5f3d874ef7c254b495b5a718c00a3782445"
 }

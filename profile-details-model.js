@@ -6,6 +6,22 @@ export function profileContactPhone(primary, contact = {}) {
 export const contactGeocodeValues=d=>[d.addressLine1,d.addressLine2,d.suburb,d.state,d.postcode];
 export const EQUIPMENT_OPTIONS=['Electric welding','MIG welding','Gas welding','Aluminium welding','Metal lathe','Wood lathe','Milling machine','Bandsaw','Guillotine','Bender','Tube bender','Saw bench'];
 const contactDefaults={homePhone:'',workPhone:'',mobilePhone:'',preferredPhone:'',language:'',addressLine1:'',addressLine2:'',suburb:'',state:'',postcode:'',organisationId:''};
+export const MEMBERSHIP_STATUSES=['Not recorded','Member','Non-member'];
+export const MAILING_COHORTS=['Board member','Life member','Honouree life member','Staff member','Technical member – active','Technical member – inactive','Technical member – past','Non-technical member','Accounting support','Marketing support','Donor','Client','Allied health','Occupational therapist','Physiotherapist','Other therapist','Funder','Carer','Parent','Referrer','Supplier','IT support','Other'];
+export function mailingDetails(input) {
+ const result={};
+ if(Object.hasOwn(input,'membershipStatus')){
+  if(!MEMBERSHIP_STATUSES.includes(input.membershipStatus))throw Error('Choose a membership status from the list.');
+  result.membershipStatus=input.membershipStatus;
+ }
+ if(Object.hasOwn(input,'cohorts')){
+  const selected=input.cohorts;
+  if(!Array.isArray(selected)||selected.length>MAILING_COHORTS.length||new Set(selected).size!==selected.length||selected.some(name=>!MAILING_COHORTS.includes(name)))throw Error('Select distinct mailing groups from the list.');
+  if(selected.filter(name=>name.startsWith('Technical member – ')).length>1)throw Error('Select one current technical membership status.');
+  result.cohorts=MAILING_COHORTS.filter(name=>selected.includes(name));
+ }
+ return result;
+}
 export const ALLIED_HEALTH_PROFESSIONS=[['','Not recorded'],['occupational-therapist','Occupational therapist (OT)'],['physiotherapist','Physiotherapist'],['psychologist','Psychologist'],['other','Other']];
 const overviewDefaults={disability:'',dateOfBirth:'',additionalComments:''};
 const professionDefaults={alliedHealthProfession:'',alliedHealthProfessionOther:''};

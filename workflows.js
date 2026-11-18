@@ -1,3 +1,4 @@
+import {MEMBERSHIP_STATUSES,MAILING_COHORTS} from './profile-details-model.js';
 import {registerDraftSource,trackDraftForm,refreshDraftReview,baselineDraft,draftChanged} from './draft-review.js';
 import {organisationRoleSuggestions} from './organisation-model.js';
 import {reconcileContactDraft} from './contact-draft.js';
@@ -287,13 +288,20 @@ export async function renderWorkflow(view,route,arg,options={}) {
 async function personProfile(view, id) {
   const [catalogue, person] = await Promise.all([request('person-options'), id ? request('people/' + id) : null]);
   const key = id ? 'person/' + id : 'new-person';
-  const d = getDraft(key, { name:person?.name ?? '', email:person?.email ?? '', phone:person?.phone ?? '', roles:person?.roles ?? [], skills:person?.technician?.skills ?? [], availability:person?.technician?.availability ?? 'unknown', version:person?.version, allowDuplicate:false });
+  const d = getDraft(key, { name:person?.name ?? '', email:person?.email ?? '', phone:person?.phone ?? '', roles:person?.roles ?? [], membershipStatus:person?.membershipStatus??'Not recorded', cohorts:person?.cohorts??[], skills:person?.technician?.skills ?? [], availability:person?.technician?.availability ?? 'unknown', version:person?.version, allowDuplicate:false });
   if(person)reconcileContactDraft(d,person);
   title(view, id ? 'Edit person' : 'New person', 'Record each person once and select all of their directory roles.');
   view.append(link('← Back to people', 'people', 'breadcrumb'));
   const box = panel('Person details'), form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:'Person details',context:person?person.name+' · '+person.id:'New person'});
   field(form,'Full name',d,'name',{required:true}); field(form,'Phone number',d,'phone',{type:'tel',max:40}); field(form,'Email address',d,'email',{type:'email',max:200});
   const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Directory roles'),el('p','Select all roles that apply. These roles do not grant account access.','field-help'));
+  const mailing=el('fieldset');mailing.append(el('legend','Membership and mailing groups'));
+  selectField(mailing,'Membership status',d,'membershipStatus',MEMBERSHIP_STATUSES.map(value=>[value,value]));
+  const groupList=el('details');groupList.open=Boolean(d.cohorts.length);
+  groupList.append(el('summary','Mailing groups'),el('p','Select all groups that apply. Record membership status separately for the All members mailing list.','field-help'));
+  const groupChecks=el('div',null,'skill-options');
+  for(const cohort of MAILING_COHORTS)check(groupChecks,cohort,d.cohorts.includes(cohort),on=>{d.cohorts=on?[...d.cohorts,cohort]:d.cohorts.filter(name=>name!==cohort);touch(d);});
+  groupList.append(groupChecks);mailing.append(groupList);
   const tech = el('fieldset'); tech.append(el('legend','Technician details'),el('p','Record skills and general allocation status. Dated calendar availability is recorded separately and does not change this status. These details do not establish clearance or permission to start work.','field-help'));
   const skills = el('div',null,'skill-options');
   for (const skill of catalogue.skills) check(skills,skill,d.skills.includes(skill),on=>{d.skills=on?[...d.skills,skill]:d.skills.filter(s=>s!==skill);touch(d);});
@@ -312,7 +320,7 @@ async function personProfile(view, id) {
   roles.addEventListener('change',showRoleDetails);
   showRoleDetails();
   tech.hidden=!d.roles.includes('Technician');
-  form.append(roles,tech,followUp,el('p','Administrator is a recorded role only. It does not create a login or grant access to this application.','field-help'));
+  form.append(roles,tech,followUp,mailing,el('p','Administrator is a recorded role only. It does not create a login or grant access to this application.','field-help'));
   const notice=el('div'), actions=el('div',null,'actions'), submit=saveButton(id?'Save profile':'Save person');
   actions.append(submit,cancel(form,d,key,id?'person/'+id:'people'));form.append(notice,actions);box.append(form);view.append(box);
   function duplicate(candidates) {
@@ -321,13 +329,13 @@ async function personProfile(view, id) {
     notice.append(button('These details are correct — save anyway',()=>{d.allowDuplicate=true;d.requestId=crypto.randomUUID();form.requestSubmit();}));
   }
   if(id&&d.version!==person.version&&!d.pending) {
-    notice.append(note('This profile changed since you started. Compare the latest details before saving your draft.',true),reviewList([['Name',person.name],['Phone',person.phone||'None'],['Email',person.email||'None'],['Roles',person.roles.join(', ')],['Skills',person.technician?.skills.join(', ')||'None'],['General allocation status',person.technician?.availability||'Not a technician']]));
+    notice.append(note('This profile changed since you started. Compare the latest details before saving your draft.',true),reviewList([['Name',person.name],['Phone',person.phone||'None'],['Email',person.email||'None'],['Roles',person.roles.join(', ')],['Membership status',person.membershipStatus??'Not recorded'],['Mailing groups',person.cohorts?.join(', ')||'None recorded'],['Skills',person.technician?.skills.join(', ')||'None'],['General allocation status',person.technician?.availability||'Not a technician']]));
     notice.append(button('Use latest version with my draft',()=>{d.version=person.version;d.reviewedConflict=true;d.requestId=crypto.randomUUID();notice.replaceChildren(note('Latest version acknowledged. Review your draft, then save.'));}));
   }
   form.addEventListener('submit',async e=>{
     e.preventDefault();if(!valid(form))return;
     if(!d.roles.length){notice.replaceChildren(note('Choose at least one role for this person.',true));return;}
-    const payload={requestId:d.requestId,name:d.name.trim(),email:d.email.trim(),phone:d.phone.trim(),roles:d.roles,technician:d.roles.includes('Technician')?{skills:d.skills,availability:d.availability}:null,allowDuplicate:d.allowDuplicate,...(id?{version:d.version}:{})};
+    const payload={requestId:d.requestId,name:d.name.trim(),email:d.email.trim(),phone:d.phone.trim(),roles:d.roles,membershipStatus:d.membershipStatus,cohorts:d.cohorts,technician:d.roles.includes('Technician')?{skills:d.skills,availability:d.availability}:null,allowDuplicate:d.allowDuplicate,...(id?{version:d.version}:{})};
     await save(form,d,notice,submit,id?`people/${id}/profile`:'people',id?'PUT':'POST',payload,p=>{drafts.delete(key);host.announce('Person profile saved.');location.hash='person/'+p.id;},candidates=>duplicate(candidates));
     if(id&&notice.querySelector('[role=alert]')&&!d.pending) notice.append(button('Compare latest profile',()=>host.refresh()));
   });

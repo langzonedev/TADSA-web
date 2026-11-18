@@ -59,3 +59,14 @@ test('monthly report caps details but retains complete counts and amounts',()=>{
  assert.equal(result.billing.invoicedCents,105000);assert.equal(result.billing.receivedCents,52500);assert.equal(result.billing.invoices.length,100);assert.equal(result.billing.payments.length,100);assert.equal(result.detailLimit,100);
  d.statusEvents=Array(100001).fill(d.statusEvents[0]);assert.throws(()=>dispatch(d,'reports','GET',{},new URLSearchParams({month:'2026-09'})),/too many activity/);
 });
+
+test('mailing report uses explicit membership and a person contact address',()=>{
+ const d=normalise(seed({enriched:false})),[member,unknown]=d.people;
+ Object.assign(member,{membershipStatus:'Member',cohorts:['Board member','Life member']});
+ d.profileDetails??={};
+ d.profileDetails[member.id]={contact:{addressLine1:'Synthetic PO Box 1',postcode:'0500'}};
+ unknown.roles=['Technician'];
+ const result=query(d,{dataset:'mailing',columns:['name','addressLine1','postcode'],filters:[
+  {field:'membershipStatus',operator:'eq',value:'Member'},{field:'cohorts',operator:'eq',value:'Board member'}]});
+ assert.deepEqual(result.rows,[{id:member.id,name:member.name,addressLine1:'Synthetic PO Box 1',postcode:'0500'}]);
+});

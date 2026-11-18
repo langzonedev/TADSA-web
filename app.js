@@ -1,3 +1,4 @@
+import {adelaideToday} from './credential-expiry.js';
 import {registerDraftSource,trackDraftForm,refreshDraftReview,installDraftReview,revealDraftForm} from './draft-review.js';
 import {renderProjectContacts} from './project-contacts.js';
 import {applyActionStyles,installActionStyles} from './action-styles.js';
@@ -34,6 +35,7 @@ const registers = new Map();
 const projectTabs = new Map();
 let renderVersion = 0;
 let saving = false;
+const hasUnsavedWork=()=>Boolean(drafts.size||workflowHasDrafts()||operationsHaveDrafts()||careHasDrafts()||clientDetailsHasDrafts());
 let returnRoute = 'projects';
 let workspaceRestored=false;
 configureSettings({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>render()});
@@ -44,6 +46,17 @@ configureCare({isSaving:()=>saving,setSaving:value=>{saving=value;},refresh:()=>
 const el = (tag, text, className) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; };
 const link = (text, hash, className) => { const a = el('a', text, className); a.href = `#${hash}`; return a; };
 const button = (text, action, className = 'secondary') => { const b = el('button', text, className); b.type = 'button'; b.addEventListener('click', action); return b; };
+if(document.documentElement.dataset.hostedStaging==='true'){
+  const updateStatus=el('p');
+  updateStatus.setAttribute('role','status');
+  document.querySelector('.environment-info').append(button('Update app',()=>{
+    if(saving||hasUnsavedWork()){
+      updateStatus.textContent='Finish saving or discard your drafts before updating.';
+      return;
+    }
+    location.reload();
+  }),updateStatus);
+}
 const cap = text => text ? text[0].toUpperCase() + text.slice(1) : 'Not recorded';
 const initials = name => name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('');
 const avatar = name => { const n = el('span', initials(name), 'avatar'); n.setAttribute('aria-hidden', 'true'); return n; };
@@ -78,6 +91,7 @@ function projectLinks(projects) {
   for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference}`));const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, projectStatus(p)); list.append(a); }
   box.append(list); return box;
 }
+const registerStatus = item => item.cancelled ? 'Cancelled' : item.status==='closed' ? 'Closed' : item.onHold ? 'On hold' : cap(item.status);
 const reviewDateText = value => value ? new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric',timeZone:'Australia/Adelaide'}).format(new Date(value+'T12:00:00Z')) : '';
 async function projectPreviewContext(project, row) {
   const safeRead = path => api(path).catch(() => null);
@@ -94,7 +108,7 @@ async function projectPreviewContext(project, row) {
   ]);
   const profile = client?.item?.personId ? safeRead('people/'+encodeURIComponent(client.item.personId)+'/profile-details') : null;
   const people = await Promise.all([...identities].map(async ([key,value]) => [key,(await value)?.item]));
-  return {client:client?.item,people:new Map(people),status:row?.projectStatus??projectLifecycleStatus(lifecycle?.state,{projectStatus:project.status,programme:lifecycle?.programme}),
+  return {row,client:client?.item,people:new Map(people),status:row?.projectStatus??projectLifecycleStatus(lifecycle?.state,{projectStatus:project.status,programme:lifecycle?.programme}),
     reviewDate:row?.reviewDate??(project.status!=='closed'&&!project.cancelled?project.followUpOn:null),comments:(await profile)?.contact?.additionalComments};
 }
 function inspect(item, kind, slot, options = {}) {
@@ -114,7 +128,7 @@ function inspect(item, kind, slot, options = {}) {
       const telephone = el('a',value); telephone.href = 'tel:'+dial; return telephone;
     }
     const summary = el('div',undefined,'project-preview-summary');
-    summary.append(el('strong',item.reference,'inspector-reference'),details([['Project status',status]]));
+    summary.append(el('strong',item.reference,'inspector-reference'),details([['Status',registerStatus(options.context?.row??item)],['Workflow status',status]]));
     body.append(summary,el('h2',item.title));
     if (item.summary) body.append(el('p',item.summary));
     const context = el('div',undefined,'inspector-section');
@@ -149,7 +163,7 @@ function inspect(item, kind, slot, options = {}) {
 async function register(view, kind) {
   if(['people','organisations','projects'].includes(kind)){
     const isProject=kind==='projects',state=registers.get(kind)??{query:'',filter:isProject?'active':'current',sort:isProject?'reference':'name',selected:null};state.after??='';state.previous??=[];state.offset??=0;registers.set(kind,state);returnRoute=kind;
-    const routeTicket=renderVersion,head=heading(cap(kind),isProject?'Open a project for its full workflow and history.':'Search all records. Open a record to review its details.','Administration'),count=el('span','Loading…','meta-note');head.append(count,link(isProject?'New project':kind==='people'?'New person':'New organisation',isProject?'new-project':kind==='people'?'new-person':'new-organisation','button primary'));if(kind==='people')head.append(link('New client','new-client','button secondary'));if(isProject)head.append(link('Review projects','reviews','button secondary'));view.append(head);
+    const routeTicket=renderVersion,head=heading(cap(kind),isProject?'Open a project for its full workflow and history.':'Search all records. Open a record to review its details.','Administration'),count=el('span','Loading…','meta-note');head.append(count,link(isProject?'New enquiry':kind==='people'?'New person':'New organisation',isProject?'new-project':kind==='people'?'new-person':'new-organisation','button primary'));if(kind==='people')head.append(link('New client','new-client','button secondary'));if(isProject)head.append(link('Review projects','reviews','button secondary'));view.append(head);
     const tabs=el('div',undefined,'filter-tabs');tabs.setAttribute('aria-label','Filter '+kind);
     const layout=el('div',undefined,isProject?'register-layout paged-register-layout project-register-layout':'register-layout paged-register-layout'),box=el('section',undefined,'register-panel'),inspector=el('aside',undefined,'inspector');box.setAttribute('aria-label',cap(kind)+' register');inspector.setAttribute('aria-label','Selected record');
     const tools=el('div',undefined,'register-tools'),label=el('label'),q=el('input');q.type='search';q.maxLength=100;q.value=state.query;q.placeholder=isProject?'Project number, title, client or summary':'Name, reference, address, phone or email';q.setAttribute('aria-label',isProject?'Search projects by project number, title or client':'Filter '+kind+' by name or reference');if(isProject)label.append(el('span','Search projects','field-label'));label.append(q);const sortLabel=el('label'),sort=el('select');sortLabel.append(el('span','Sort by'),sort);sort.setAttribute('aria-label','Sort '+kind);for(const[value,text]of isProject?[['reference','Project number (newest first)'],['name','Project title'],['review-date','Review date'],['client','Client name']]:[['name','Name A–Z'],['reverse','Name Z–A']]){const option=el('option',text);option.value=value;sort.append(option);}sort.value=state.sort;tools.append(label,sortLabel);
@@ -198,8 +212,9 @@ async function register(view, kind) {
       try{const response=await fetch('/api/registers?'+params,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(12000)])}),data=await response.json();if(!response.ok)throw Object.assign(Error(data.error||'Register unavailable'),{status:response.status});if(!active(current))return;currentItems=data.items;count.textContent=data.total+' matching '+kind;
         const filters=isProject?[['active','Active projects',data.statuses.active],['all','All projects',data.statuses.all],['open','Open',data.statuses.open],['review','Review',data.statuses.review],['closed','Closed',data.statuses.closed],['cancelled','Cancelled',data.statuses.cancelled],['feedback','Feedback',data.statuses.feedback],['invoice','Invoice',data.statuses.invoice]]:[['all','All '+kind,data.statuses.all],['current','Current',data.statuses.active],['inactive','Inactive',data.statuses.inactive],['needs-review','Needs review',data.statuses.review],...(kind==='people'?data.roles.map(r=>[r.role,r.role,r.total]):[])];
         for(const[key,text,total]of filters){const tab=button('',()=>{state.filter=key;reset();focusFilter=true;void load();},'filter-tab');tab.setAttribute('aria-pressed',String(state.filter===key));tab.append(el('span',text),el('span',String(total),'filter-count'));tabs.append(tab);}if(focusFilter){tabs.querySelector('[aria-pressed=true]')?.focus({preventScroll:true});focusFilter=false;}tabs.setAttribute('aria-description',isProject?'Counts cover all projects matching the search text.':'Counts cover all records matching the search text; role counts include all directory statuses.');
-        const table=el('table',undefined,kind+'-table'),thead=el('thead'),header=el('tr');for(const text of isProject?['Project','Client','Project status','Review date']:kind==='people'?['Person','Role','Projects']:['Organisation','Type','Category','Projects']){const th=el('th',text);th.scope='col';header.append(th);}thead.append(header);table.append(thead);const tbody=el('tbody');
-        for(const item of data.items){const row=el('tr');row.dataset.id=item.id;const first=el('td'),open=link('',typeOf(kind)+'/'+item.id,'row-open');open.setAttribute('aria-label','Open '+(isProject?item.title:item.name));const name=el('span');name.append(el('span',isProject?item.title:item.name,'row-title'),el('span',(isProject?[item.reference]:[item.reference,item.email,item.suburb,item.postcode]).filter(Boolean).join(' · '),'row-sub'));if(!isProject&&item.directoryStatus!=='current')name.append(el('small',item.directoryStatus==='inactive'?'Inactive':'Needs review'));open.append(name);first.append(open);const rowActions=isProject?first:el('div',undefined,'directory-row-actions');if(!isProject&&item.clientId){const clientRecord=link('Client record','client/'+item.clientId,'text-button');clientRecord.setAttribute('aria-label','Client record for '+item.name);rowActions.append(clientRecord);}const quick=button('Quick view',()=>void preview(item.id,quick),'text-button row-preview');quick.setAttribute('aria-label','Preview '+(isProject?item.title:item.name));quick.setAttribute('aria-controls',inspector.id);quick.setAttribute('aria-expanded','false');rowActions.append(quick);if(!isProject)first.append(rowActions);row.append(first);if(isProject){row.append(el('td',item.clientName));const projectState=el('td',item.projectStatus,'project-stage-cell');if(item.invoiceRequired&&item.status!=='closed')projectState.append(el('span','Invoice required','badge invoice'));row.append(projectState,el('td',reviewDateText(item.reviewDate),'project-review-date'));}else{row.append(el('td',item.roles.join(', ')||'No current role'));if(kind==='organisations')row.append(el('td',item.category||'Not specified'));row.append(el('td',String(item.projectCount)));}row.addEventListener('click',event=>{if(!event.target.closest('button,a'))location.hash=typeOf(kind)+'/'+item.id;});tbody.append(row);}
+        const table=el('table',undefined,kind+'-table'),thead=el('thead'),header=el('tr');for(const text of isProject?['Project','Client','Status','Workflow status','Review date']:kind==='people'?['Person','Role','Projects']:['Organisation','Type','Category','Projects']){const th=el('th',text);th.scope='col';header.append(th);}thead.append(header);table.append(thead);const tbody=el('tbody');
+        const today=isProject?adelaideToday():null;
+        for(const item of data.items){const row=el('tr');row.dataset.id=item.id;const first=el('td'),open=link('',typeOf(kind)+'/'+item.id,'row-open');open.setAttribute('aria-label','Open '+(isProject?item.title:item.name));const name=el('span');name.append(el('span',isProject?item.title:item.name,'row-title'),el('span',(isProject?[item.reference]:[item.reference,item.email,item.suburb,item.postcode]).filter(Boolean).join(' · '),'row-sub'));if(!isProject&&item.directoryStatus!=='current')name.append(el('small',item.directoryStatus==='inactive'?'Inactive':'Needs review'));open.append(name);first.append(open);const rowActions=isProject?first:el('div',undefined,'directory-row-actions');if(!isProject&&item.clientId){const clientRecord=link('Client record','client/'+item.clientId,'text-button');clientRecord.setAttribute('aria-label','Client record for '+item.name);rowActions.append(clientRecord);}const quick=button('Quick view',()=>void preview(item.id,quick),'text-button row-preview');quick.setAttribute('aria-label','Preview '+(isProject?item.title:item.name));quick.setAttribute('aria-controls',inspector.id);quick.setAttribute('aria-expanded','false');rowActions.append(quick);if(!isProject)first.append(rowActions);row.append(first);if(isProject){row.append(el('td',item.clientName),el('td',registerStatus(item)));const projectState=el('td',item.projectStatus,'project-stage-cell');if(item.invoiceRequired&&item.status!=='closed')projectState.append(el('span','Invoice required','badge invoice'));const date=el('td',undefined,'project-review-date');if(item.reviewDate){const overdue=item.reviewDate<today;date.append(el('span',reviewDateText(item.reviewDate),overdue?'overdue-date':''));if(overdue)date.append(el('small','Overdue','overdue-label'));}row.append(projectState,date);}else{row.append(el('td',item.roles.join(', ')||'No current role'));if(kind==='organisations')row.append(el('td',item.category||'Not specified'));row.append(el('td',String(item.projectCount)));}row.addEventListener('click',event=>{if(!event.target.closest('button,a'))location.hash=typeOf(kind)+'/'+item.id;});tbody.append(row);}
         table.append(tbody);tableSlot.replaceChildren(data.items.length?table:empty('No matching records','Try another filter or clear your search.'));const pages=el('div',undefined,'actions');if(state.previous.length)pages.append(button('Previous',()=>{state.after=state.previous.pop();state.offset=Math.max(0,state.offset-data.limit);focusPage='Previous';void load();}));if(data.nextAfter)pages.append(button('Next',()=>{state.previous.push(state.after);state.after=data.nextAfter;state.offset+=data.items.length;focusPage='Next';void load();}));foot.replaceChildren(el('span',data.items.length?'Showing '+(state.offset+1)+'–'+(state.offset+data.items.length)+' of '+data.total+' matching records':'0 of '+data.total+' matching records'),pages);if(focusPage){([...pages.querySelectorAll('button')].find(b=>b.textContent===focusPage)||pages.querySelector('button')||q).focus({preventScroll:true});focusPage='';}if(data.items.some(item=>item.id===state.selected))void preview(state.selected);else state.selected=null;
       }catch(error){if(error.name==='AbortError'||!active(current))return;count.textContent='Register unavailable';tableSlot.replaceChildren(message(error.message+' No current results are shown.',true));foot.replaceChildren(button('Try again',()=>void load()));if(error.status===401)void render();}
     }
@@ -309,7 +324,13 @@ function auditPanel(p,operationsPromise,managed=false) {
 }
 
 async function project(view, id) {
-  let p = await api(`projects/${id}`); let tab = location.hash.split('/')[2]==='costs'?'Costs & invoices':projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
+  let tab = location.hash.split('/')[2]==='costs'?'Costs & invoices':projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
+  const operationsPromise=api(`projects/${id}/operations`);
+  const [projectRecord,projectOperations,projectLocation,adminDetails,adminOptions,workPlan,currentLifecycle]=await Promise.all([
+    api(`projects/${id}`),operationsPromise,api(`projects/${id}/location`),api(`projects/${id}/admin-details`),
+    api('project-admin-options'),api(`projects/${id}/work-plan`),api(`projects/${id}/lifecycle`)
+  ]);
+  let p=projectRecord;
   const destinations=['Overview','Files','Costs & invoices','Workflow history'];
   if(!destinations.includes(tab)&&!['Task','Edit details','Audit trail','Case-note history','Hold or resume work','Record hours','Prepare invoices','Print documents','Contacts','Team','Funding','Feedback'].includes(tab)&&!tab.startsWith('Action:'))tab='Overview';
   view.classList.add('project-workspace');view.dataset.recordContext=p.reference+' · '+p.title;
@@ -318,32 +339,57 @@ async function project(view, id) {
   const tabs=el('div',undefined,'record-tabs project-nav');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Project detail');view.append(tabs);
   const subnav=el('div',undefined,'project-subnav');subnav.setAttribute('role','tablist');subnav.setAttribute('aria-label','Project section');view.append(subnav);view.insertBefore(tabs,header);view.insertBefore(subnav,header);
   const overview=el('section',undefined,'project-overview'),task=el('section',undefined,'project-task'),filesPane=el('section'),costsPane=el('section'),recordPane=el('section'),editPane=el('section');
-  const content=el('div'),auditPane=el('section'),caseNotesPane=el('section');editPane.append(content);const operationsPromise=api(`projects/${id}/operations`);auditPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),el('p','Loading history…'));caseNotesPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'));
+  const content=el('div'),auditPane=el('section'),caseNotesPane=el('section');editPane.append(content);auditPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),el('p','Loading history…'));caseNotesPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'));
   const taskForm=el('div',undefined,'project-task-form'),taskContext=el('aside',undefined,'project-task-context'),taskGrid=el('div',undefined,'project-task-grid');taskGrid.append(taskContext,taskForm);
   const taskNavigation=el('nav',undefined,'project-task-navigation actions');taskNavigation.setAttribute('aria-label','Workflow navigation');
   taskNavigation.append(button('← Project overview',()=>navigate('Overview'),'secondary'));
   task.append(taskNavigation,taskGrid);
   view.append(overview,task,filesPane,costsPane,recordPane,editPane,auditPane,caseNotesPane);
-  const actionSource=el('div'),care=el('div'),fundingReference=el('div');
-  const [projectOperations,projectLocation,adminDetails,adminOptions,workPlan]=await Promise.all([operationsPromise,api(`projects/${id}/location`),api(`projects/${id}/admin-details`),api('project-admin-options'),api(`projects/${id}/work-plan`)]);
-  await renderProjectDetails(editPane,id,{details:adminDetails});
-  const lifecycle=await renderLifecycle(taskForm,p,{operations:projectOperations,adminDetails,workPlan,recordTarget:recordPane,actionsTarget:actionSource,contextTarget:taskContext,onSaved:()=>projectTabs.set(id,'Task'),openHold:()=>navigate('Hold or resume work'),openAction:name=>{const entry=[...actionPanes].find(([,value])=>value.title.toLowerCase().includes(name.toLowerCase()));if(entry)navigate(entry[0]);},openFollowUp:()=>{navigate('Edit details');editPane.querySelector('input[type=date]')?.focus();},openFiles:()=>{navigate('Files');filesPane.querySelector('input[type=file]')?.focus();}});
+  const actionSource=el('div'),fundingReference=el('div');
+  const careContext={project:p,ops:projectOperations,plan:workPlan,location:projectLocation,lifecycle:currentLifecycle};
+  const [lifecycle]=await Promise.all([
+    renderLifecycle(taskForm,p,{current:currentLifecycle,operations:projectOperations,adminDetails,workPlan,recordTarget:recordPane,actionsTarget:actionSource,contextTarget:taskContext,onSaved:()=>projectTabs.set(id,'Task'),openHold:()=>navigate('Hold or resume work'),openAction:name=>{const entry=[...actionPanes].find(([,value])=>value.title.toLowerCase().includes(name.toLowerCase()));if(entry)navigate(entry[0]);},openFollowUp:async()=>{await navigate('Edit details');if(tab==='Edit details'&&view.isConnected)editPane.querySelector('input[type=date]')?.focus();},openFiles:async()=>{await navigate('Files');if(tab==='Files'&&view.isConnected)filesPane.querySelector('input[type=file]')?.focus();}}),
+    renderProjectDetails(editPane,id,{details:adminDetails})
+  ]);
   const earlierStep=taskForm.querySelector('.workflow-return-action');if(earlierStep)taskNavigation.append(earlierStep);
   auditPane.lastElementChild.replaceWith(auditPanel(p,operationsPromise,lifecycle.managed));
-  const careContext={project:p,ops:projectOperations,plan:workPlan,location:projectLocation,lifecycle};
-  await renderProjectCare(care,id,care,careContext);
   function flatten(section){for(const d of [...section.querySelectorAll('details')].reverse()){if(d.closest('.file-row'))continue;const summary=d.querySelector(':scope > summary'),replacement=el('section',undefined,'project-record-section');if(summary){replacement.append(el('h2',summary.textContent));summary.remove();}replacement.append(...d.childNodes);d.replaceWith(replacement);}}
-  for(const child of [...care.children]){const name=child.querySelector(':scope > summary')?.textContent;if(child.classList.contains('project-files'))filesPane.append(child);else if(name==='NDIS reference')fundingReference.append(child);else if(name==='Work location')editPane.append(child);else costsPane.append(child);}
-  flatten(filesPane);flatten(costsPane);flatten(recordPane);flatten(editPane);flatten(fundingReference);
+  flatten(recordPane);flatten(editPane);
   const documentLibrary=el('section',undefined,'project-document-library');filesPane.prepend(documentLibrary);let documentLibraryLoading;
-  async function loadFiles(){if(!documentLibraryLoading)documentLibraryLoading=(async()=>{renderFinancePack(documentLibrary,p,lifecycle,{expanded:true,library:true,adminDetails});await renderAssessmentTemplateDownloads(documentLibrary);})();return documentLibraryLoading;}
-  const ndisSave=fundingReference.querySelector('button[type="submit"]');if(ndisSave){ndisSave.dataset.label="Save NDIS reference";if(ndisSave.textContent==="Save")ndisSave.textContent="Save NDIS reference";}
+  async function loadFiles(){if(!documentLibraryLoading)documentLibraryLoading=(async()=>{const library=el('div');renderFinancePack(library,p,lifecycle,{expanded:true,library:true,adminDetails});await renderAssessmentTemplateDownloads(library);documentLibrary.replaceChildren(...library.childNodes);})().catch(error=>{documentLibraryLoading=null;throw error;});return documentLibraryLoading;}
   if(!recordPane.children.length){const empty=panel('Workflow history');empty.append(el('p','No workflow decisions have been recorded for this project yet. Operator notes are in Case notes; technical changes are in Audit trail.'));recordPane.append(empty);}
   filesPane.prepend(returnNavigation('Files'));costsPane.prepend(returnNavigation('Costs'));editPane.prepend(returnNavigation('Details'));
-  costsPane.prepend(el('h2','Costs & invoices'));await renderInvoiceReferences(costsPane,id,careContext);
-  for(const action of costsPane.querySelectorAll('a[href^="#operations/"]'))action.remove();
+  costsPane.prepend(el('h2','Costs & invoices'));
   const financeRelevant=!lifecycle.managed||['finance_clearance','work','customer_signoff','finance_finalisation','ready_to_close','closed'].includes(lifecycle.effectiveStage??lifecycle.state?.stage);
   if(financeRelevant)costsPane.append(link('Prepare or review invoices','operations/'+id+'/invoices','button secondary'));else costsPane.append(el('p','Assessment is free. Invoice preparation becomes available after the client accepts the quote.','field-help'));
+  let careLoading,invoiceReferencesLoading;
+  function loadCare(){
+    if(!careLoading)careLoading=(async()=>{
+      const care=el('div'),costDetails=el('div');
+      await renderProjectCare(care,id,care,careContext);
+      for(const child of [...care.children]){
+        const name=child.querySelector(':scope > summary')?.textContent;
+        if(child.classList.contains('project-files'))filesPane.append(child);
+        else if(name==='NDIS reference')fundingReference.append(child);
+        else if(name==='Work location')editPane.append(child);
+        else costDetails.append(child);
+      }
+      for(const action of costDetails.querySelectorAll('a[href^="#operations/"]'))action.remove();
+      costsPane.lastElementChild.before(costDetails);
+      for(const pane of [filesPane,costDetails,editPane,fundingReference])flatten(pane);
+      const ndisSave=fundingReference.querySelector('button[type="submit"]');
+      if(ndisSave){ndisSave.dataset.label='Save NDIS reference';if(ndisSave.textContent==='Save')ndisSave.textContent='Save NDIS reference';}
+    })().catch(error=>{careLoading=null;throw error;});
+    return careLoading;
+  }
+  function loadInvoiceReferences(){
+    if(!invoiceReferencesLoading)invoiceReferencesLoading=(async()=>{
+      const references=el('div');
+      await renderInvoiceReferences(references,id,careContext);
+      costsPane.lastElementChild.before(references);
+    })().catch(error=>{invoiceReferencesLoading=null;throw error;});
+    return invoiceReferencesLoading;
+  }
 
   const allNotes=panel('Case-note history');for(const n of projectOperations.notes){allNotes.append(el('p',n.text,'case-note'),el('small',`${n.actor||'Operator'} · ${new Date(n.at||n.createdAt).toLocaleString('en-AU')}`));}if(!projectOperations.notes.length)allNotes.append(el('p','No case notes recorded yet.','muted'));caseNotesPane.append(allNotes);
   const stages={assessment_review:['Review the assessment','Check engineering quality, safety and estimated costs before preparing the quote.','Record assessment review'],work_request:['Issue the Work Request','Record the request and instructions that authorise the technical team to start the approved work.','Record Work Request'],finance_handoff:['Send the cost summary to finance','Check the technical member’s cost return and receipts, then record the handoff to finance.','Record finance handoff'],enquiry:['Review the enquiry','Decide whether an assessment is needed for this work.','Record assessment decision'],assessment:['Complete the assessment','Arrange the assessment, keep its documents together and record the findings.','Record assessment findings'],quote:['Prepare the project quote','Use the assessment to set out the proposed work and estimated costs.','Prepare quote'],peer_review:['Arrange technical review','A technical member needs to review the solution and its quote.','Record technical review'],client_acceptance:['Confirm the client’s quote decision','Share the reviewed quote and record the confirmation you receive.','Record client decision'],finance_clearance:['Prepare the Finance handoff','Record Finance’s payment confirmation or approved exception before work begins.','Record Finance clearance'],work:['Carry out the agreed work','Keep progress notes and hours up to date, then record completion.','Update technical work'],customer_signoff:['Confirm the customer’s sign-off','Record acceptance of the completed work.','Record customer sign-off'],finance_finalisation:['Finalise the project costs','Record actual costs and Finance’s final confirmation.','Finalise costs'],ready_to_close:['Close the project','The final confirmations are recorded. Add the closure note.','Close project'],closed:['Project closed','Notes, documents and the full project history remain available.','Review completion']};
@@ -388,7 +434,7 @@ async function project(view, id) {
   const actionPanes=new Map();for(const [i,child] of [...actionSource.children].entries()){const title=child.querySelector(':scope > summary')?.textContent||child.querySelector('button[type=submit]')?.textContent||'Project action';const pane=el('section',undefined,'project-action-task');pane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),el('h2',title),child);flatten(pane);actionPanes.set('Action:'+i,{title,pane});view.append(pane);if(pane.querySelector(':scope > .project-record-section > h2'))pane.querySelector(':scope > h2')?.remove();}
   const embedded=new Map([['Contacts',{route:'contacts'}],['Hold or resume work',{route:'operations',focus:'holds'}],['Record hours',{route:'operations',focus:'hours'}],['Prepare invoices',{route:'operations',focus:'invoices'}],['Print documents',{route:'documents'}],['Feedback',{route:'feedback'}],['Team',{route:'coordination',focus:'team'}],['Funding',{route:'coordination',focus:'funding'}]].map(([name,config])=>{const pane=el('section',undefined,'project-embedded-pane');pane.hidden=true;pane.tabIndex=-1;view.append(pane);return [name,{...config,pane,loaded:false,loading:null}];}));
   function returnNavigation(name){const navigation=el('nav',undefined,'project-task-navigation actions');navigation.setAttribute('aria-label',name+' navigation');navigation.append(button('← Return to current workflow',()=>navigate('Task'),'secondary'),button('Project overview',()=>navigate('Overview'),'text-button'));return navigation;}
-  async function loadEmbedded(name){const entry=embedded.get(name);if(!entry||entry.loaded)return;if(entry.loading)return entry.loading;entry.pane.replaceChildren(el('p','Opening '+name.toLowerCase()+'…','loading'));entry.loading=(async()=>{const body=el('div');try{if(entry.route==='coordination')await renderWorkflow(body,'coordination',id,{embedded:true,focus:entry.focus,onCancel:()=>{entry.loaded=false;navigate('Overview');}});else if(entry.route==='contacts')await renderProjectContacts(body,id);else if(entry.route==='feedback')await renderProjectFeedback(body,id);else await renderOperations(body,entry.route,id,{embedded:true,focus:entry.focus,openWorkflow:()=>navigate('Task')});if(name==='Team')await renderProjectCoordinator(body,id);entry.pane.replaceChildren(returnNavigation(name),el('h2',name),body);body.querySelectorAll('form').forEach(form=>form.startTechnicianCalendars?.());if(name==='Funding')entry.pane.append(fundingReference);entry.loaded=true;}catch(error){entry.pane.replaceChildren(message(error.status?error.message:'This section could not load. Your project is still open.',true),button('Try again',()=>loadEmbedded(name),'secondary'));}finally{entry.loading=null;}})();return entry.loading;}
+  async function loadEmbedded(name){const entry=embedded.get(name);if(!entry||entry.loaded)return;if(entry.loading)return entry.loading;if(!entry.pane.dataset.sectionLoading)entry.pane.replaceChildren(el('p','Opening '+name.toLowerCase()+'…','loading'));entry.loading=(async()=>{const body=el('div');try{if(entry.route==='coordination')await renderWorkflow(body,'coordination',id,{embedded:true,focus:entry.focus,onCancel:()=>{entry.loaded=false;navigate('Overview');}});else if(entry.route==='contacts')await renderProjectContacts(body,id);else if(entry.route==='feedback')await renderProjectFeedback(body,id);else await renderOperations(body,entry.route,id,{embedded:true,focus:entry.focus,openWorkflow:()=>navigate('Task')});if(name==='Team')await renderProjectCoordinator(body,id);entry.pane.replaceChildren(returnNavigation(name),el('h2',name),body);body.querySelectorAll('form').forEach(form=>form.startTechnicianCalendars?.());if(name==='Funding')entry.pane.append(fundingReference);entry.loaded=true;}catch(error){entry.pane.replaceChildren(message(error.status?error.message:'This section could not load. Your project is still open.',true),button('Try again',()=>loadEmbedded(name),'secondary'));}finally{entry.loading=null;}})();return entry.loading;}
   const sections=[
     {label:'Overview',items:[['Overview','Overview']]},
     {label:'Case notes',items:[['Case-note history','Case notes']]},
@@ -409,10 +455,33 @@ async function project(view, id) {
   const panes=new Map([['Overview',overview],['Task',task],['Files',filesPane],['Costs & invoices',costsPane],['Workflow history',recordPane],['Edit details',editPane],['Audit trail',auditPane],['Case-note history',caseNotesPane],...[...embedded].map(([key,value])=>[key,value.pane]),...[...actionPanes].map(([key,value])=>[key,value.pane])]);
   function tabButton(label,key,index,active,container,prefix){
     const b=button(label,()=>navigate(key),'');b.id=prefix+index;b.dataset.destination=key;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;b.setAttribute('aria-controls','project-focused-pane');
-    b.addEventListener('keydown',async event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...container.querySelectorAll('[role=tab]')];const target=event.key==='Home'?buttons[0]:event.key==='End'?buttons.at(-1):buttons[(index+(event.key==='ArrowRight'?1:buttons.length-1))%buttons.length];const targetId=target.id;await navigate(target.dataset.destination);document.getElementById(targetId)?.focus();});return b;
+    b.addEventListener('keydown',async event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...container.querySelectorAll('[role=tab]')];const target=event.key==='Home'?buttons[0]:event.key==='End'?buttons.at(-1):buttons[(index+(event.key==='ArrowRight'?1:buttons.length-1))%buttons.length];const targetId=target.id;await navigate(target.dataset.destination);if(tab===target.dataset.destination&&view.isConnected)document.getElementById(targetId)?.focus();});return b;
   }
   view.addEventListener('click',event=>{const anchor=event.target.closest('a[href]');if(anchor&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&event.button===0){const [route,target,focus]=anchor.hash.slice(1).split('/');if(target===id){const section=route==='coordination'?(focus==='funding'?'Funding':'Team'):route==='documents'?'Print documents':route==='operations'?({hours:'Record hours',holds:'Hold or resume work',invoices:'Prepare invoices'})[focus]??'Prepare invoices':null;if(section){event.preventDefault();navigate(section);}}}if(!headerActions.contains(event.target)){menu.hidden=true;more.setAttribute('aria-expanded','false');}});
-  async function navigate(name){tab=name;menu.hidden=true;more.setAttribute('aria-expanded','false');draw();await loadEmbedded(name);if(name==='Files')await loadFiles();if(tab!==name)return;const destination=embedded.get(name)?.pane??(name==='Task'?task:name==='Overview'?overview:name==='Files'?filesPane:name==='Costs & invoices'?costsPane:name==='Workflow history'?recordPane:name==='Edit details'?editPane:name==='Audit trail'?auditPane:name==='Case-note history'?caseNotesPane:actionPanes.get(name)?.pane);destination?.focus({preventScroll:true});(tabs.getClientRects().length?tabs:header).scrollIntoView({block:'nearest'});}
+  const sectionLoads=new Map();
+  const carePanes=new Map([['Files',filesPane],['Costs & invoices',costsPane],['Edit details',editPane],['Funding',embedded.get('Funding').pane]]);
+  function loadProjectSection(name){
+    const carePane=carePanes.get(name);
+    if(!carePane)return loadEmbedded(name);
+    if(sectionLoads.has(name))return sectionLoads.get(name);
+    carePane.querySelector(':scope > .project-section-loading')?.remove();
+    const progress=el('p','Opening '+name.toLowerCase()+'…','loading project-section-loading');
+    progress.setAttribute('role','status');
+    carePane.prepend(progress);
+    carePane.dataset.sectionLoading='true';
+    carePane.setAttribute('aria-busy','true');
+    const pending=Promise.all([loadCare(),name==='Files'&&loadFiles(),name==='Costs & invoices'&&loadInvoiceReferences()])
+      .then(()=>loadEmbedded(name))
+      .then(()=>{progress.remove();delete carePane.dataset.sectionLoading;})
+      .catch(()=>{
+        progress.replaceChildren(el('span','This section could not load. '),button('Try again',()=>{progress.remove();loadProjectSection(name);}));
+        sectionLoads.delete(name);
+      })
+      .finally(()=>carePane.removeAttribute('aria-busy'));
+    sectionLoads.set(name,pending);
+    return pending;
+  }
+  async function navigate(name){tab=name;menu.hidden=true;more.setAttribute('aria-expanded','false');draw();await loadProjectSection(name);if(tab!==name)return;const destination=embedded.get(name)?.pane??(name==='Task'?task:name==='Overview'?overview:name==='Files'?filesPane:name==='Costs & invoices'?costsPane:name==='Workflow history'?recordPane:name==='Edit details'?editPane:name==='Audit trail'?auditPane:name==='Case-note history'?caseNotesPane:actionPanes.get(name)?.pane);destination?.focus({preventScroll:true});(tabs.getClientRects().length?tabs:header).scrollIntoView({block:'nearest'});}
   function draw(){
     projectTabs.set(id,tab);header.querySelector('h1').textContent=p.title;header.querySelector('.eyebrow').replaceChildren(el('small','Project no.'),el('strong',p.reference,'project-number'));financeFacts.lastElementChild.querySelector('dd').textContent=p.invoiceRequired?'Yes':'No';meta.replaceChildren();
     for(const [label,value]of [['Project status',el('span',projectLifecycleStatus(state,{projectStatus:p.status,programme:lifecycle.programme}),'workflow-stage')],...(p.status==='closed'||p.cancelled?[]:[['Review date',el('span',fullDate(adminDetails.followUpOn))]]),['Latest quote',el('span',quote?money(quote.totalCents)+' · '+(quoteIssued?'Sent '+fullDate(quoteIssued.data.sentOn):'Not recorded as sent'):'Not recorded')]]){const fact=el('div',undefined,'project-header-fact');const destination=label==='Project status'?(lifecycle.managed?'Task':'Edit details'):label==='Review date'?'Edit details':'Print documents';const jump=button(label,async()=>{await navigate(destination);if(tab!==destination)return;const target=label==='Review date'?editPane.querySelector('[aria-label="Review date"]'):label==='Latest quote'?embedded.get('Print documents')?.pane.querySelector('[data-quote-panel]'):null;if(target){target.scrollIntoView({block:'center'});target.focus({preventScroll:true});}},'summary-heading-link');jump.setAttribute('aria-label',label+' — open '+(destination==='Task'?'workflow':destination.toLowerCase()));fact.append(jump,value);meta.append(fact);}header.append(meta,headerActions);
@@ -455,7 +524,7 @@ async function project(view, id) {
     });
   }
   view.addEventListener('click',event=>{const a=event.target.closest('a');if(a?.getAttribute('href')==='#project/'+id+'/costs'){event.preventDefault();navigate('Costs & invoices');}});
-  draw();await loadEmbedded(tab);if(tab==='Files')await loadFiles();
+  draw();await loadProjectSection(tab);
 }
 async function entity(view,type,id){
   const item=await api(`${pathOf(type)}/${id}`);
@@ -481,11 +550,10 @@ function outlineEditActions(view){applyActionStyles(view);}
 async function render() {
   if (saving) { announce('Please wait for the save to finish.'); return; }
   const ticket=++renderVersion;
-  try{if(!await requireLocalSession(main,render,()=>ticket===renderVersion,()=>Boolean(drafts.size||workflowHasDrafts()||operationsHaveDrafts()||careHasDrafts()||clientDetailsHasDrafts()||saving)))return;if(ticket!==renderVersion)return;}catch{if(ticket!==renderVersion)return;showAuthFailure(render);return;}
+  try{if(!await requireLocalSession(main,render,()=>ticket===renderVersion,()=>hasUnsavedWork()||saving))return;if(ticket!==renderVersion)return;}catch{if(ticket!==renderVersion)return;showAuthFailure(render);return;}
   const [route = 'projects', raw = ''] = (location.hash.slice(1) || 'projects').split('/'); const view = el('div');
-  // Mount the route while it loads so record identity and progress are visible.
-  // The partial view stays inert until all its required data is ready.
-  const loading=el('p','Loading workspace…','loading');loading.setAttribute('role','status');view.append(loading);view.inert=true;main.replaceChildren(view);main.setAttribute('aria-busy','true');
+  // Keep the incoming route connected for its renderers, but reveal it in one step.
+  const loading=el('p','Loading workspace…','loading');loading.setAttribute('role','status');view.hidden=true;view.inert=true;main.replaceChildren(loading,view);main.setAttribute('aria-busy','true');
   const active = ({ project: 'projects', client: 'people', person: 'people', organisation: 'organisations', 'organisation-category':'organisations','new-organisation':'organisations','edit-organisation':'organisations', clients:'people', dashboard: 'projects', 'new-person': 'people', 'edit-person': 'people', 'new-client': 'people', 'new-project': 'projects', 'link-referrer':'people', 'link-contact':'people', coordination: 'projects', operations:'projects',documents:'projects','client-details':'people' })[route] ?? route;
   document.querySelectorAll('[data-nav]').forEach(a => { if (a.dataset.nav === active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   try {
@@ -506,7 +574,7 @@ async function render() {
     else if (route === 'person' || route === 'organisation') await entity(view, route, arg);
     else view.append(heading('Page not found', 'Return to your workspace to continue.'), link('Open projects', 'projects', 'button primary'));
   } catch (error) { view.replaceChildren(heading('Unable to load this view', 'Your unsaved project drafts are retained in this browser tab.'), message(error.status ? error.message : 'Check that the local application and database are running, then try again.', true), button('Try again', render, 'primary'), link('Back to projects', 'projects', 'text-button')); }
-  if (ticket === renderVersion) { showContactReturn(view,route);renderProjectDraftReturn(view,route);outlineEditActions(view);loading.remove();view.inert=false;main.replaceChildren(view); main.removeAttribute('aria-busy'); main.focus({ preventScroll: true }); window.scrollTo(0, 0); document.title = `TADSA · ${view.querySelector('h1')?.textContent ?? 'Workspace'}`;refreshDraftReview();if(requestedDraftReview){revealDraftForm(requestedDraftReview);requestedDraftReview=null;} }
+  if (ticket === renderVersion) { showContactReturn(view,route);renderProjectDraftReturn(view,route);outlineEditActions(view);loading.remove();view.hidden=false;view.inert=false;main.removeAttribute('aria-busy'); main.focus({ preventScroll: true }); window.scrollTo(0, 0); document.title = `TADSA · ${view.querySelector('h1')?.textContent ?? 'Workspace'}`;refreshDraftReview();if(requestedDraftReview){revealDraftForm(requestedDraftReview);requestedDraftReview=null;} }
 }
 // Debounced live suggestions keep focus in the field and reject stale responses.
 const searchForm=document.querySelector('#global-search');

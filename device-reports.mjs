@@ -3,8 +3,13 @@ import {validateReportQuery,applyReportQuery} from './report-model.js';
 // Deliberately project only the reporting allowlist; never include case notes,
 // credentials, banking information, file bodies, or other nested records.
 export function deviceReportRows(d,dataset){
- const source=d[dataset];
+ const source=dataset==='mailing'?d.people:d[dataset];
  if(!Array.isArray(source)||source.length>10000)fail('This device report is limited to 10,000 source records.');
+ if(dataset==='mailing')return source.map(person=>{
+  const contact=d.profileDetails?.[person.id]?.contact??{};
+  return {id:person.id,name:person.name,membershipStatus:person.membershipStatus??'Not recorded',cohorts:person.cohorts??[],email:person.email??'',
+   addressLine1:contact.addressLine1??'',addressLine2:contact.addressLine2??'',suburb:contact.suburb??'',state:contact.state??'',postcode:contact.postcode??''};
+ });
  if(dataset==='organisations')return source.map(o=>({id:o.id,name:o.name,category:o.category??'',email:o.email??'',role:o.role??'',description:o.description??''}));
  if(dataset==='people'){if(d.clients.length>10000)fail('This device report is limited to 10,000 linked clients.');const addresses=new Map(d.clients.map(c=>[c.personId,c.details??{}]));return source.map(p=>({residentialSuburb:addresses.get(p.id)?.residentialSuburb??'',residentialState:addresses.get(p.id)?.residentialState??'',residentialPostcode:addresses.get(p.id)?.residentialPostcode??'',id:p.id,name:p.name,email:p.email??'',phone:p.phone??'',roles:p.active===false?[]:[...(p.roles??[])]}));}
  if(d.people.length>10000||d.clients.length>10000)fail('This device report is limited to 10,000 linked people and clients.');
