@@ -491,3 +491,4 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 @media print{.credential-expiry-scroll{overflow:visible;border:0}.credential-expiry-table{min-width:0}.credential-expiry-table th{min-width:0!important}.credential-expiry-table th,.credential-expiry-table td{padding:6px;font-size:10pt}.credential-expiry-scroll-help{display:none}}
 
 main > [hidden], [data-section-loading=true] > :not(.project-section-loading) { display: none !important; }
+.session-expiry-notice{position:fixed;z-index:1000;bottom:1rem;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 2rem);padding:.75rem 1rem;border:1px solid var(--line);border-radius:.5rem;background:var(--surface,#fff);color:var(--ink,#172238);box-shadow:0 2px 10px #0002;font-size:.95rem}

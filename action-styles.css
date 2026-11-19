@@ -33,3 +33,12 @@ html body main#content summary.app-action{list-style:none}
 html body main#content summary.app-action::-webkit-details-marker{display:none}
 html body main#content .project-overview-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 html body main#content .project-overview-links .app-action{margin:0}
+
+/* Grid-based editors use the same compact actions as the main record forms. */
+html body main#content form > button.app-action,
+html body main#content form .actions > .app-action{
+ width:auto;justify-self:start;flex:0 1 auto;
+}
+html body main#content form .actions{
+ display:flex;justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:8px;
+}

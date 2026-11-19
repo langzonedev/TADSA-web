@@ -29,6 +29,11 @@ const capabilityDefaults={visitClients:'unknown',drives:'unknown',vehicle:'',int
 export const DIRECTORY_STATUSES=[['current','Current'],['inactive','Inactive'],['review','Needs review']];
 export const recordDirectoryStatus=record=>record.directoryStatus??record.person?.directoryStatus??(record.active===false?'inactive':record.role==='Unclassified'?'review':'current');
 export const createProfileDetails=()=>({contact:{...contactDefaults,...professionDefaults,...overviewDefaults,directoryStatus:'current'},capabilities:{...capabilityDefaults,equipment:[]}});
+export function initialLanguageDetails(language){
+ const details=createProfileDetails();
+ details.contact.language=text(language,120);
+ return details;
+}
 export function normaliseProfileDetails(saved={}){const defaults=createProfileDetails();return {contact:{...defaults.contact,...saved.contact},capabilities:{...defaults.capabilities,...saved.capabilities}};}
 const fail=message=>{throw Error(message);};
 function exact(value,keys){if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==keys.length||Object.keys(value).some(k=>!keys.includes(k)))fail('Supply exactly the fields for this profile section.');}

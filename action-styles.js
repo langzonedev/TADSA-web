@@ -18,6 +18,7 @@ export function actionIntent(control){
  }
  if(neutralVerb.test(text))return 'secondary';
  if(/^(?:Edit|Update)\b/.test(text)&&text!=='Update ready')return 'edit';
+ if(control.matches('button')&&/^Save(?:\s|$)/i.test(text))return 'primary';
  if(control.classList.contains('primary'))return 'primary';
  if(control.classList.contains('secondary'))return 'secondary';
  return null;

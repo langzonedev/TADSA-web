@@ -76,13 +76,14 @@ function saveButton(label) { const n = el('button', label, 'primary'); n.type = 
 function valid(form) { for (const n of form.querySelectorAll('[required]')) { n.setCustomValidity(''); if (!n.value.trim()) n.setCustomValidity('Please enter this information.'); } return form.reportValidity(); }
 
 async function newClient(view, arg) {
-  const key = 'new-client'; const d = getDraft(key, { name: '', email: '', phone: '', allowDuplicate: false, forProject: arg === 'project' });
+  const key = 'new-client'; const d = getDraft(key, { name: '', email: '', phone: '', language: 'English', allowDuplicate: false, forProject: arg === 'project' });
   if (arg === 'project') d.forProject = true;
   title(view, 'New client', 'Start with the details you know. A client can be saved before there is a project.');
   const box = panel('Client details'); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New project':key==='new-client'?'New client':'Person details'});
   field(form, 'Full name', d, 'name', { required: true, help: 'Use the name the client wants us to use. Required.' });
   field(form, 'Phone number', d, 'phone', { type: 'tel', max: 40, help: 'Optional. Helpful when checking whether this person already has a record.' });
   field(form, 'Email address', d, 'email', { type: 'email', max: 200, help: 'Optional. Do not invent an address if it is unknown.' });
+  field(form,'Language',d,'language',{max:120});
   const notice = el('div'); const actions = el('div', null, 'actions'); const submit = saveButton('Save client');
   actions.append(submit, cancel(form, d, key, d.forProject ? 'new-project' : 'people')); form.append(notice, actions); box.append(form); view.append(box);
   function duplicates(rows) {
@@ -91,7 +92,7 @@ async function newClient(view, arg) {
     for (const r of rows) match.append(link(`${r.name} · ${r.phone || r.email || 'No contact details'}`, `${r.type === 'client' ? 'client' : 'person'}/${r.id}`, 'duplicate-result'));
     match.append(button('This is a different person — create separate client', () => { d.allowDuplicate = true; d.requestId = crypto.randomUUID(); form.requestSubmit(); })); notice.append(match);
   }
-  form.addEventListener('submit', e => { e.preventDefault(); if (!valid(form)) return; save(form, d, notice, submit, 'clients', 'POST', { requestId: d.requestId, name: d.name.trim(), email: d.email.trim(), phone: d.phone.trim(), allowDuplicate: d.allowDuplicate }, result => {
+  form.addEventListener('submit', e => { e.preventDefault(); if (!valid(form)) return; save(form, d, notice, submit, 'clients', 'POST', { requestId: d.requestId, name: d.name.trim(), email: d.email.trim(), phone: d.phone.trim(), language:d.language.trim(), allowDuplicate: d.allowDuplicate }, result => {
     drafts.delete(key); host.announce('Client saved.');
     if (d.forProject) { const project = drafts.get('new-project'); if (project) { project.clientId = result.id; project.step = 2;  } location.hash = 'new-project/' + result.id; }
     else location.hash = 'client/' + result.id;
@@ -121,7 +122,7 @@ function coordinationFields(form, d, directories, focus, target={}) {
   const skills = el('div', null, 'skill-options'); const technicians = el('div');let technicianPage=d.technicianPage??0,technicianQuery=d.technicianQuery??'',calendarGeneration=0;
   for (const skill of directories.skills) check(skills, skill, d.requiredSkills.includes(skill), on => { d.requiredSkills = on ? [...d.requiredSkills,skill] : d.requiredSkills.filter(s => s !== skill); d.assignmentAcknowledged = false; touch(d); drawTechnicians(); });
   assignment.append(el('h3', 'Skills needed (optional)'), skills);
-  check(assignment, 'Show technicians who do not match all selected skills', d.showAll ?? false, on => { d.showAll = on; drawTechnicians(); });
+  const showAllSkills=check(assignment, 'Show technicians who do not match all selected skills', d.showAll ?? false, on => { d.showAll = on; drawTechnicians(); });
   const regionLabel=id=>directories.serviceAreas.find(area=>area.id===id)?.label||id;
   const destinationRegion=workRegion(target);
   if (!destinationRegion && d.filterArea==='work-region') d.filterArea='';
@@ -159,7 +160,9 @@ function coordinationFields(form, d, directories, focus, target={}) {
     const locationMatches=t=>technicianMatchesFilters(t,{region,mode:d.regionMode,postcode:d.filterPostcode,radius:d.filterRadius});
     const ranked=rankTechnicians(directories.technicians,target,d.requiredSkills);
     const visible=ranked.filter(t=>d.technicianIds.includes(t.id)||((d.showAll||t.skillMatch)&&locationMatches(t)));
-    const selectedRows=visible.filter(t=>d.technicianIds.includes(t.id)),matches=visible.filter(t=>!d.technicianIds.includes(t.id)&&t.name.toLocaleLowerCase('en-AU').includes(technicianQuery.trim().toLocaleLowerCase('en-AU')));technicianPage=Math.min(technicianPage,Math.max(0,Math.ceil(matches.length/50)-1));d.technicianPage=technicianPage;const start=technicianPage*50,rows=[...selectedRows,...matches.slice(start,start+50)];if(d.technicianIds.length)technicians.append(button('Clear team selection',()=>{d.technicianIds=[];d.technicianId='';d.assignmentAcknowledged=false;touch(d);drawTechnicians();}));technicians.append(el('p',d.technicianIds.length?`${d.technicianIds.length} technical members selected`:'No technician assigned yet. You can allocate the team later.','field-help'));
+    const query=technicianQuery.trim().toLocaleLowerCase('en-AU');
+    const nameMatches=t=>query.split(/\s+/).every(word=>t.name.toLocaleLowerCase('en-AU').includes(word));
+    const selectedRows=visible.filter(t=>d.technicianIds.includes(t.id)),matches=visible.filter(t=>!d.technicianIds.includes(t.id)&&nameMatches(t));technicianPage=Math.min(technicianPage,Math.max(0,Math.ceil(matches.length/50)-1));d.technicianPage=technicianPage;const start=technicianPage*50,rows=[...selectedRows,...matches.slice(start,start+50)];if(d.technicianIds.length)technicians.append(button('Clear team selection',()=>{d.technicianIds=[];d.technicianId='';d.assignmentAcknowledged=false;touch(d);drawTechnicians();}));technicians.append(el('p',d.technicianIds.length?`${d.technicianIds.length} technical members selected`:'No technician assigned yet. You can allocate the team later.','field-help'));
     const paging=el('div',null,'actions'),previous=button('Previous technicians',()=>{if(d.pending||host.isSaving())return;technicianPage--;drawTechnicians(true);}),next=button('Next technicians',()=>{if(d.pending||host.isSaving())return;technicianPage++;drawTechnicians(true);}),pageStatus=el('span',`${matches.length?start+1:0}–${Math.min(start+50,matches.length)} of ${matches.length} matching unselected technicians. ${selectedRows.length} selected members remain visible.`);pageStatus.tabIndex=-1;pageStatus.setAttribute('role','status');previous.disabled=start===0||Boolean(d.pending)||host.isSaving();next.disabled=start+50>=matches.length||Boolean(d.pending)||host.isSaving();paging.append(previous,pageStatus,next);technicians.append(paging);if(focusPage)pageStatus.focus({preventScroll:true});
     for (const t of rows) {
       const l = el('label', null, 'choice-card'); const radio = el('input'); radio.type = 'checkbox'; radio.name = 'technician'; radio.value = t.id; radio.checked = d.technicianIds.includes(t.id);
@@ -171,6 +174,34 @@ function coordinationFields(form, d, directories, focus, target={}) {
       radio.addEventListener('change', () => { d.technicianIds=radio.checked?[...d.technicianIds,t.id]:d.technicianIds.filter(id=>id!==t.id);if(!d.technicianIds.includes(d.technicianId))d.technicianId=d.technicianIds[0]||'';d.assignmentAcknowledged = false; touch(d);const status=drawTechnicians(),replacement=[...technicians.querySelectorAll('input[name=technician]')].find(input=>input.value===t.id);(replacement??status)?.focus({preventScroll:true}); }); l.append(radio,text); technicians.append(l);
     }
     if (!visible.length) technicians.append(note('No technicians match the selected skills and location filters. Clear a filter, review other technicians, or save unassigned.'));else if(!matches.length)technicians.append(note('No unselected technicians match the name search and current skill / location filters. Selected members remain visible.'));
+    if(query&&!matches.length&&!selectedRows.some(nameMatches)){
+      const outside=ranked.filter(t=>!visible.includes(t)&&nameMatches(t));
+      if(outside.length){
+        technicians.append(el('p',outside.length+' matching '+(outside.length===1?'technician is':'technicians are')+' outside your skill or location filters.','field-help'));
+        technicians.append(button('Show name matches across all areas and skills',()=>{
+          d.filterArea='';d.filterRadius='';d.filterPostcode='';d.showAll=true;
+          areaFilter.value='';radiusFilter.value='';postcodeFilter.value='';showAllSkills.checked=true;
+          changeFilters();search.focus();
+        }));
+      }else{
+        technicians.append(el('p','Check the person’s directory roles in People. Project teams use the Technician role. A login or a technical mailing group alone does not add a person to this list.','field-help'));
+        const refresh=button('Refresh technician list',async()=>{
+          if(d.pending||host.isSaving())return;
+          refresh.disabled=true;refresh.textContent='Refreshing…';
+          try{
+            const latest=await directories.readTechnicians();
+            if(!refresh.isConnected||d.pending||host.isSaving())return;
+            directories.technicians=latest;
+            drawTechnicians(true);
+          }catch{
+            if(refresh.isConnected)technicians.append(note('Could not refresh the technician list. Try again.',true));
+          }finally{
+            refresh.disabled=false;refresh.textContent='Refresh technician list';
+          }
+        });
+        technicians.append(refresh,link('Open People directory','people'));
+      }
+    }
     const team=selectedRows;if(team.length){selectField(technicians,'Lead technician',d,'technicianId',team.map(t=>[t.id,t.name]));technicians.append(el('p','The lead is the main contact; every selected technical member is linked to this project.','field-help'));}
     const selected = directories.technicians.find(t => t.id === d.technicianId);
     if(selected)technicians.append(link('View '+selected.name+' — qualifications & clearances','person/'+selected.id));
@@ -190,7 +221,9 @@ async function directories(loadCalendars=true,source='technicians') {
   const [technicians,areas] = await Promise.all([request(source),request('availability-options')]);
   const calendarDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Adelaide'}).format(new Date()),calendars=new Map(),waiters=[];let active=0;
   async function loadDisplayedCalendars(rows,isCurrent){if(!loadCalendars)return;await Promise.all(rows.map(async t=>{if(!isCurrent())return;if(calendars.has(t.id)){t.calendarToday=await calendars.get(t.id);return;}while(active>=4)await new Promise(resolve=>waiters.push(resolve));if(!isCurrent()){waiters.shift()?.();return;}if(calendars.has(t.id)){waiters.shift()?.();t.calendarToday=await calendars.get(t.id);return;}active++;const loading=(async()=>{try{const calendar=await request('availability/'+t.id);return calendar.entries.find(e=>e.startDate<=calendarDay&&e.endDate>=calendarDay)?.status??'Not recorded';}catch{calendars.delete(t.id);return 'Could not load';}finally{active--;waiters.shift()?.();}})();calendars.set(t.id,loading);t.calendarToday=await loading;}));}
-  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU')||a.id.localeCompare(b.id);return { target:technicians.target,calendarDay,loadCalendars:loadDisplayedCalendars,serviceAreas:[...areas.serviceAreas].sort((a,b)=>a.label.localeCompare(b.label,'en-AU')),technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort() };
+  const byName=(a,b)=>a.name.localeCompare(b.name,'en-AU')||a.id.localeCompare(b.id);
+  const readTechnicians=async()=>(await request(source)).items.sort(byName);
+  return {readTechnicians,target:technicians.target,calendarDay,loadCalendars:loadDisplayedCalendars,serviceAreas:[...areas.serviceAreas].sort((a,b)=>a.label.localeCompare(b.label,'en-AU')),technicians: [...technicians.items].sort(byName), skills: [...technicians.skills].sort() };
 }
 function allocationValid(form, d, notice) { if (!valid(form)) return false; if (d.needsAcknowledgement && !d.assignmentAcknowledged) { notice.replaceChildren(note('Review the technician warning and tick the acknowledgement, or leave the request unassigned.', true)); notice.scrollIntoView({block:'nearest'}); return false; } return true; }
 function reviewList(items) { const dl = el('dl', null, 'review-list'); for (const [label,value] of items) { dl.append(el('dt',label),el('dd',value)); } return dl; }
@@ -280,7 +313,7 @@ async function editCoordination(view,id,options={}) {
 }
 
 async function linkContact(view,id,initialRole='Occupational therapist') {
-  const client=await request('clients/'+id);const key='contact/'+id;const d=getDraft(key,{mode:'existing',personId:'',role:initialRole,relationshipLabel:'',name:'',phone:'',email:'',allowDuplicate:false,personRequestId:crypto.randomUUID()});
+  const client=await request('clients/'+id);const key='contact/'+id;const d=getDraft(key,{mode:'existing',personId:'',role:initialRole,relationshipLabel:'',name:'',phone:'',email:'',language:'English',allowDuplicate:false,personRequestId:crypto.randomUUID()});
   title(view,'Link a contact',`Client: ${client.person.name}. This links a person to the client, not to every project.`, 'client/'+id);
   const box=panel('Contact details');const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:'Client contact',context:client.person.name+' · '+client.id});selectField(form,'Relationship to client',d,'role',[['Occupational therapist','Occupational therapist (OT)'],['Carer','Carer'],['Referrer','Referrer']],()=>{d.personId='';drawPerson();});
   field(form,'Relationship description (optional)',d,'relationshipLabel',{max:120});form.append(el('p','For example: parent, guardian or support coordinator. Multiple contacts can be linked; the preferred contact is selected separately in Client details.','field-help'));
@@ -289,14 +322,14 @@ async function linkContact(view,id,initialRole='Occupational therapist') {
   const matchesRelationship=p=>p.active!==false&&p.directoryStatus!=='inactive'&&p.id!==client.person.id&&(p.roles??[p.role]).includes(d.role);
   function drawPerson(){
     slot.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.destroy());slot.replaceChildren();
-    if(d.mode==='new'&&!d.personId){field(slot,'Full name',d,'name',{required:true});field(slot,'Phone number',d,'phone',{type:'tel',max:40});field(slot,'Email address',d,'email',{type:'email',max:200});slot.append(el('p',`A ${d.role.toLowerCase()} profile will be created and linked to this client. This does not create a sign-in account.`,'field-help'));}
+    if(d.mode==='new'&&!d.personId){field(slot,'Full name',d,'name',{required:true});field(slot,'Phone number',d,'phone',{type:'tel',max:40});field(slot,'Email address',d,'email',{type:'email',max:200});field(slot,'Language',d,'language',{max:120});slot.append(el('p',`A ${d.role.toLowerCase()} profile will be created and linked to this client. This does not create a sign-in account.`,'field-help'));}
     else{const picker=createRecordPicker({label:'Existing person',kind:'people',role:d.role,selectedId:d.personId,required:true,onChange:(id,item)=>{if(id===client.person.id){d.personId='';void picker.setValue('');return;}d.personId=id;touch(d);}});picker.element.recordPicker=picker;slot.append(picker.element,el('p',`Search people with the ${d.role} role. A person can have multiple roles. Saved selections are retained for review; linking still checks the current role.`,'field-help'));}
 
   }
   drawPerson();const notice=el('div');const actions=el('div',null,'actions');const submit=saveButton('Link contact');actions.append(submit,cancel(form,d,key,'client/'+id));form.append(notice,actions);box.append(form);view.append(box);
   form.addEventListener('submit',async e=>{e.preventDefault();if(!valid(form)||host.isSaving())return;
     if(d.mode==='new'&&!d.personId){host.setSaving(true);lock(form,true);notice.replaceChildren(note('Saving the contact…'));
-      try{d.dirty=true;d.personPending??={requestId:d.personRequestId,name:d.name.trim(),email:d.email.trim(),phone:d.phone.trim(),role:d.role,allowDuplicate:d.allowDuplicate};const person=await request('people','POST',d.personPending);d.personPending=null;d.personId=person.id;d.mode='existing';drawPerson();}
+      try{d.dirty=true;d.personPending??={requestId:d.personRequestId,name:d.name.trim(),email:d.email.trim(),phone:d.phone.trim(),language:d.language.trim(),role:d.role,allowDuplicate:d.allowDuplicate};const person=await request('people','POST',d.personPending);d.personPending=null;d.personId=person.id;d.mode='existing';drawPerson();}
       catch(error){if(error.status){d.personPending=null;d.personRequestId=crypto.randomUUID();}notice.replaceChildren(note(error.status?error.message:'Contact save was not confirmed. Retry safely using the same details.',true));if(error.data?.candidates){for(const p of error.data.candidates){const candidateId=p.type==='client'?p.personId:p.id;let candidate;try{candidate=(await request('selections/people/'+candidateId)).item;}catch{}if(candidate&&matchesRelationship(candidate))notice.append(button(`Use ${p.name}`,()=>{d.personId=candidateId;d.mode='existing';drawPerson();notice.replaceChildren();}));else notice.append(el('p',`${p.name} already exists but is not available as a ${d.role.toLowerCase()}. Review their profile in People before linking.`,'field-help'));}notice.append(button('This is a different person — create separate contact',()=>{d.allowDuplicate=true;d.personRequestId=crypto.randomUUID();form.requestSubmit();}));}host.setSaving(false);return;}
       finally{refreshDraftReview();host.setSaving(false);lock(form,Boolean(d.personPending),submit);if(d.personPending)submit.textContent='Retry save safely';}
     }
@@ -325,13 +358,14 @@ export async function renderWorkflow(view,route,arg,options={}) {
 async function personProfile(view, id) {
   const [catalogue, person] = await Promise.all([request('person-options'), id ? request('people/' + id) : null]);
   const key = id ? 'person/' + id : 'new-person';
-  const d = getDraft(key, { name:person?.name ?? '', email:person?.email ?? '', phone:person?.phone ?? '', roles:person?.roles ?? [], membershipStatus:person?.membershipStatus??'Not recorded', cohorts:person?.cohorts??[], skills:person?.technician?.skills ?? [], availability:person?.technician?.availability ?? 'unknown', version:person?.version, allowDuplicate:false });
+  const d = getDraft(key, { name:person?.name ?? '', email:person?.email ?? '', phone:person?.phone ?? '', language:'English', roles:person?.roles ?? [], membershipStatus:person?.membershipStatus??'Not recorded', cohorts:person?.cohorts??[], skills:person?.technician?.skills ?? [], availability:person?.technician?.availability ?? 'unknown', version:person?.version, allowDuplicate:false });
   if(person)reconcileContactDraft(d,person);
   title(view, id ? 'Edit person' : 'New person', 'Record each person once and select all of their directory roles.');
   view.append(link('← Back to people', 'people', 'breadcrumb'));
   const box = panel('Person details'), form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:'Person details',context:person?person.name+' · '+person.id:'New person'});
   field(form,'Full name',d,'name',{required:true}); field(form,'Phone number',d,'phone',{type:'tel',max:40}); field(form,'Email address',d,'email',{type:'email',max:200});
-  const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Directory roles'),el('p','Select all roles that apply. These roles do not grant account access.','field-help'));
+  if(!id)field(form,'Language',d,'language',{max:120});
+  const roles = el('fieldset'); roles.classList.add('person-role-options'); roles.append(el('legend','Directory roles'),el('p','Select Technician to make this person available for project teams. Directory roles are separate from mailing groups and sign-in accounts.','field-help'));
   const mailing=el('fieldset');mailing.append(el('legend','Membership and mailing groups'));
   selectField(mailing,'Membership status',d,'membershipStatus',MEMBERSHIP_STATUSES.map(value=>[value,value]));
   const groupList=el('details');groupList.open=Boolean(d.cohorts.length);
@@ -372,7 +406,7 @@ async function personProfile(view, id) {
   form.addEventListener('submit',async e=>{
     e.preventDefault();if(!valid(form))return;
     if(!d.roles.length){notice.replaceChildren(note('Choose at least one role for this person.',true));return;}
-    const payload={requestId:d.requestId,name:d.name.trim(),email:d.email.trim(),phone:d.phone.trim(),roles:d.roles,membershipStatus:d.membershipStatus,cohorts:d.cohorts,technician:d.roles.includes('Technician')?{skills:d.skills,availability:d.availability}:null,allowDuplicate:d.allowDuplicate,...(id?{version:d.version}:{})};
+    const payload={requestId:d.requestId,name:d.name.trim(),email:d.email.trim(),phone:d.phone.trim(),roles:d.roles,...(id?{}:{language:d.language.trim()}),membershipStatus:d.membershipStatus,cohorts:d.cohorts,technician:d.roles.includes('Technician')?{skills:d.skills,availability:d.availability}:null,allowDuplicate:d.allowDuplicate,...(id?{version:d.version}:{})};
     await save(form,d,notice,submit,id?`people/${id}/profile`:'people',id?'PUT':'POST',payload,p=>{drafts.delete(key);host.announce('Person profile saved.');location.hash='person/'+p.id;},candidates=>duplicate(candidates));
     if(id&&notice.querySelector('[role=alert]')&&!d.pending) notice.append(button('Compare latest profile',()=>host.refresh()));
   });

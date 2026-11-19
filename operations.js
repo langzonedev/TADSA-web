@@ -43,13 +43,16 @@ function payerPicker(parent,label,target,onChange,excludePersonId=null){
 }
 function cents(value){if(!/^\d+(\.\d{1,2})?$/.test(String(value)))throw Error('Enter a positive dollar amount with at most two decimal places.');return Math.round(Number(value)*100);}
 const scalarKeys=['actualMinutes','remainingMinutes','assessmentComplete','workApproved','approvedBy','approvedOn','fundingExceptionReason','onHold','clientStopped','resumeClientConsent','reviewRequired'];
-async function send(form,d,key,path,method,payload,feedback,submit){
+async function send(form,d,key,path,method,payload,feedback,submit,onConfirmed){
   if(host.isSaving())return;const workspace=form.closest('main'),wasInert=workspace?.inert??false;let refreshed=false;
+  const updateInPlace=onConfirmed&&!d.pending;
   host.setSaving(true);d.pending??=payload;if(workspace){workspace.inert=true;workspace.setAttribute('aria-busy','true');}
   form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(true));form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=true);feedback.replaceChildren(notice('Saving…'));
-  try{const result=await api(path,method,d.pending);if(/^projects\/[^/]+\/notes$/.test(path))advanceLifecycleDraftAfterNote(path.split('/')[1],d.baseVersion,result.version);if(/^case\/[^/]+\/hours$/.test(key))advanceWorkDraftAfterHours(path.split('/')[1],d.pending.version,result.version);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);host.setSaving(false);await host.refresh();refreshed=true;}
+  try{const result=await api(path,method,d.pending);if(/^projects\/[^/]+\/notes$/.test(path))advanceLifecycleDraftAfterNote(path.split('/')[1],d.baseVersion,result.version);if(/^case\/[^/]+\/hours$/.test(key))advanceWorkDraftAfterHours(path.split('/')[1],d.pending.version,result.version);window.dispatchEvent(new Event('tadsa-saved'));drafts.delete(key);host.setSaving(false);// A retried request may replay an older response after another operator has saved.
+    if(updateInPlace)onConfirmed(result);else await host.refresh();
+    refreshed=true;}
   catch(e){if(e.status){d.pending=null;d.requestId=crypto.randomUUID();}feedback.replaceChildren(notice(e.status?e.message:'Save result not confirmed. Retry the same save safely.',true));if(e.status===401)feedback.append(button('Sign in and keep draft',()=>host.refresh()));if(e.status===409&&method==='PUT')feedback.append(button('Compare latest case',()=>host.refresh()));}
-  finally{refreshDraftReview();host.setSaving(false);if(workspace){workspace.inert=wasInert;workspace.removeAttribute('aria-busy');}form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(Boolean(d.pending)));form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=Boolean(d.pending)&&n!==submit);submit.disabled=false;submit.textContent=d.pending?'Retry save safely':submit.dataset.label;if(!wasInert){if(refreshed)workspace?.focus({preventScroll:true});else submit.focus({preventScroll:true});}}
+  finally{refreshDraftReview();host.setSaving(false);if(workspace){workspace.inert=wasInert;workspace.removeAttribute('aria-busy');}form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(Boolean(d.pending)));form.querySelectorAll('input,select,textarea,button').forEach(n=>n.disabled=Boolean(d.pending)&&n!==submit);submit.disabled=false;submit.textContent=d.pending?'Retry save safely':submit.dataset.label;if(!wasInert){if(updateInPlace&&refreshed)workspace?.querySelector('.case-note-form textarea')?.focus({preventScroll:true});else if(refreshed)workspace?.focus({preventScroll:true});else submit.focus({preventScroll:true});}}
 }
 export async function renderOperations(view,route,id,options={}){
   if(route==='review-queue'){view.append(node('h1','Needs attention'),node('p','Shared queue: any administrator or coordinator can pick up an item.','subtitle'));const q=await api('review-queue');if(!q.items.length)view.append(notice('No flagged cases.'));for(const p of q.items){const box=node('section',null,'panel');box.append(link(p.title||p.reference||p.projectId,'operations/'+(p.projectId||p.id)),node('p',p.reason||'Review the case, funding or hold details.'));view.append(box);}return true;}
@@ -99,7 +102,7 @@ export async function renderOperations(view,route,id,options={}){
   return true;
 }
 function currentHold(lifecycle){return lifecycle.workGate?.reasons?.some(r=>/hold|stop/i.test(r));}
-export function renderNotes(view,id,ops,compact=false){
+export function renderNotes(view,id,ops,compact=false,onConfirmed){
  const box=node('section',null,'panel workflow-panel case-notes-panel');box.append(node('h2','Case notes'));
  if(!compact)box.append(node('p','Latest updates for a quick handover.','field-help'));
  // The overview leads with the latest saved note, keeping the complete history one click away.
@@ -112,7 +115,7 @@ export function renderNotes(view,id,ops,compact=false){
  const key='note/'+id,d=drafts.get(key)??{requestId:crypto.randomUUID(),text:'',baseVersion:ops.version};
  baselineDraft(d);const form=node('form',null,'form-grid case-note-form');trackDraftForm(form,'operations',key,{label:'Case note'});input(form,'New case note',d,'text','textarea').required=true;form.oninput=()=>{if(draftChanged(d))drafts.set(key,d);else drafts.delete(key);refreshDraftReview();};
  const feedback=node('div',null,'case-note-feedback'),submit=node('button','Add case note','primary');submit.type='submit';submit.dataset.label='Add case note';const discard=button('Discard unsaved case note',()=>{if(d.pending||host.isSaving?.())return;drafts.delete(key);d.text='';form.querySelector('textarea').value='';feedback.replaceChildren();refreshDraftReview();form.querySelector('textarea').focus();});discard.disabled=Boolean(d.pending);const actions=node('div',null,'actions');actions.append(submit,discard);form.append(feedback,actions);
- form.onsubmit=e=>{e.preventDefault();drafts.set(key,d);send(form,d,key,`projects/${id}/notes`,'POST',{requestId:d.requestId,text:d.text.trim()},feedback,submit);};
+ form.onsubmit=e=>{e.preventDefault();drafts.set(key,d);send(form,d,key,`projects/${id}/notes`,'POST',{requestId:d.requestId,text:d.text.trim()},feedback,submit,onConfirmed);};
  if(d.pending){form.querySelector('textarea').disabled=true;submit.textContent='Retry save safely';}box.append(form);view.append(box);
 }
 function renderInvoices(view,id,p,ops,payers,business,identities,lifecycle,reviewFunding){

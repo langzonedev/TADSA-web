@@ -1,5 +1,7 @@
 import {fail} from './device-model.mjs';
 const KEY='tadsa-demo-account';
+const idleMs=30*60*1000, maximumMs=8*60*60*1000;
+const remainingMs=selection=>Math.min(selection.expiresAt,selection.lastActivityAt+idleMs)-Date.now();
 export const DEMO_PASSWORD='Willow-Lantern-57!';
 const DEMO_CREDENTIAL_REVISION=2;
 const canonical=x=>JSON.stringify(x,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
@@ -9,7 +11,14 @@ async function derive(password,value){const key=await crypto.subtle.importKey('r
 async function verifier(password){const value=salt();return {salt:value,hash:await derive(password,value),iterations:120000};}
 const validPassword=value=>{if(typeof value!=='string'||value.length<12||value.length>128)fail('Use a password of 12–128 characters.');return value;};
 const publicAccount=account=>Object.fromEntries(['id','username','displayName','personId','role','active','version','mustChangePassword','manageSensitiveDetails'].map(k=>[k,k==='manageSensitiveDetails'?account.role==='administrator'||account[k]===true:account[k]]));
-export const selectedDemoAccount=()=>{try{return JSON.parse(sessionStorage.getItem(KEY));}catch{return null;}};
+export function selectedDemoAccount(){
+ try{
+  const selection=JSON.parse(sessionStorage.getItem(KEY));
+  if(selection&&remainingMs(selection)>0)return selection;
+  sessionStorage.removeItem(KEY);
+ }catch{}
+ return null;
+}
 export function initialDemoAccounts(){return {items:[{id:crypto.randomUUID(),username:'demo-admin',displayName:'Demo administrator',personId:null,role:'administrator',active:true,version:1,mustChangePassword:false}],receipts:{},receiptSalt:salt()};}
 export function demoUser(accounts){const selected=selectedDemoAccount();const account=accounts.items.find(a=>a.id===selected?.id&&a.active&&a.credentialVersion===selected.credentialVersion);return account?publicAccount(account):null;}
 export async function prepareDemoMigration(accounts){const credentials={};for(const account of accounts.items)if(!account.credential||account.username==='demo-admin'&&account.usesPublicDemoPassword&&account.demoCredentialRevision!==DEMO_CREDENTIAL_REVISION)credentials[account.id]=await verifier(DEMO_PASSWORD);return credentials;}
@@ -25,8 +34,16 @@ export function demoAccountDispatch(accounts,data,path,method,input,prepared={})
  const user=demoUser(accounts),parts=path.split('/');
  const exact=keys=>{if(!input||Object.keys(input).length!==keys.length||keys.some(k=>!Object.hasOwn(input,k)))fail('Supply exactly the requested account fields.');};
  if(path==='auth/demo-entry')fail('Use the demonstration username and password to sign in.',404);
- if(path==='auth/status'){const defaults=accounts.items.find(a=>a.username==='demo-admin'&&a.active&&a.usesPublicDemoPassword);return {configured:true,authenticated:!!user,user,mode:'device-demo',demoDefaults:defaults?{username:defaults.username}:null,demoMigrationHint:accounts.items.some(a=>a.username!=='demo-admin'&&a.usesPublicDemoPassword)?'Previously password-free demo accounts require an administrator password reset.':null};}
- if(path==='auth/login'&&method==='POST'){exact(['username','password']);const proof=prepared.login,target=accounts.items.find(a=>a.id===proof?.id);if(!proof?.valid||!target?.active||target.credentialVersion!==proof.credentialVersion||target.credential.hash!==proof.credentialHash)fail('Username or password is incorrect.',401);return {demoSelection:{id:target.id,credentialVersion:target.credentialVersion},user:publicAccount(target)};}
+ if(path==='auth/status'){const defaults=accounts.items.find(a=>a.username==='demo-admin'&&a.active&&a.usesPublicDemoPassword);return {configured:true,authenticated:!!user,user,...(user?{remainingMs:remainingMs(selectedDemoAccount()||{})}:{}),mode:'device-demo',demoDefaults:defaults?{username:defaults.username}:null,demoMigrationHint:accounts.items.some(a=>a.username!=='demo-admin'&&a.usesPublicDemoPassword)?'Previously password-free demo accounts require an administrator password reset.':null};}
+ if(path==='auth/login'&&method==='POST'){exact(['username','password']);const proof=prepared.login,target=accounts.items.find(a=>a.id===proof?.id);if(!proof?.valid||!target?.active||target.credentialVersion!==proof.credentialVersion||target.credential.hash!==proof.credentialHash)fail('Username or password is incorrect.',401);return {demoSelection:{id:target.id,credentialVersion:target.credentialVersion,lastActivityAt:Date.now(),expiresAt:Date.now()+maximumMs},user:publicAccount(target)};}
+ if(path==='auth/activity'&&method==='POST'){
+  exact(['ageMs']);
+  if(!Number.isSafeInteger(input.ageMs)||input.ageMs<0||input.ageMs>60000)fail('Invalid activity interval.');
+  const selection=selectedDemoAccount();
+  if(!user||!selection)fail('Your session has ended. Sign in again.',401);
+  selection.lastActivityAt=Math.max(selection.lastActivityAt,Date.now()-input.ageMs);
+  return {demoSelection:selection,remainingMs:remainingMs(selection)};
+ }
  if(path==='auth/logout'&&method==='POST'){exact([]);return {demoSelection:null,signedOut:true};}
  if(path.startsWith('auth/'))fail('Demo account action not available.',404);
  if(!user)fail('Sign in to the device demonstration first.',401);if(user.role!=='administrator')fail('Sign in as a demo administrator to manage accounts.',403);

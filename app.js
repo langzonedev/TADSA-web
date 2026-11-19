@@ -392,20 +392,28 @@ async function project(view, id) {
   }
 
   const allNotes=panel('Case-note history');for(const n of projectOperations.notes){allNotes.append(el('p',n.text,'case-note'),el('small',`${n.actor||'Operator'} · ${new Date(n.at||n.createdAt).toLocaleString('en-AU')}`));}if(!projectOperations.notes.length)allNotes.append(el('p','No case notes recorded yet.','muted'));caseNotesPane.append(allNotes);
-  const stages={assessment_review:['Review the assessment','Check engineering quality, safety and estimated costs before preparing the quote.','Record assessment review'],work_request:['Issue the Work Request','Record the request and instructions that authorise the technical team to start the approved work.','Record Work Request'],finance_handoff:['Send the cost summary to finance','Check the technical member’s cost return and receipts, then record the handoff to finance.','Record finance handoff'],enquiry:['Review the enquiry','Decide whether an assessment is needed for this work.','Record assessment decision'],assessment:['Complete the assessment','Arrange the assessment, keep its documents together and record the findings.','Record assessment findings'],quote:['Prepare the project quote','Use the assessment to set out the proposed work and estimated costs.','Prepare quote'],peer_review:['Arrange technical review','A technical member needs to review the solution and its quote.','Record technical review'],client_acceptance:['Confirm the client’s quote decision','Share the reviewed quote and record the confirmation you receive.','Record client decision'],finance_clearance:['Prepare the Finance handoff','Record Finance’s payment confirmation or approved exception before work begins.','Record Finance clearance'],work:['Carry out the agreed work','Keep progress notes and hours up to date, then record completion.','Update technical work'],customer_signoff:['Confirm the customer’s sign-off','Record acceptance of the completed work.','Record customer sign-off'],finance_finalisation:['Finalise the project costs','Record actual costs and Finance’s final confirmation.','Finalise costs'],ready_to_close:['Close the project','The final confirmations are recorded. Add the closure note.','Close project'],closed:['Project closed','Notes, documents and the full project history remain available.','Review completion']};
-  const state=lifecycle.state,stage=lifecycle.effectiveStage??state?.stage,importedHistorical=!lifecycle.managed&&Boolean(p.historicalContext),closedHistorical=!lifecycle.managed&&p.status==='closed',held=!closedHistorical&&!state?.closed&&!state?.cancellation&&(projectOperations.onHold||projectOperations.clientStopped),info=importedHistorical?['Historical project','Read the imported history. Create a new project for new work, or deliberately review continuation of this same job.','Review continuation workflow']:closedHistorical?['Project closed','This historical project retains its records. Review its details and history; guided workflow requires a deliberate reopening.','Review project details']:held?['Review the project hold','Work is paused. Review the hold and record the required consent before resuming.','Review hold or resume']:stages[stage]??['Review the project','This existing project retains its records. Begin the guided workflow when ready.','Review workflow'];
-  const layout=el('div',undefined,'project-overview-grid'),left=el('div',undefined,'project-overview-action'),notes=el('section',undefined,'project-home-notes');overview.append(layout);
+  const state=lifecycle.state,stage=lifecycle.effectiveStage??state?.stage;
+  const layout=el('div',undefined,'project-overview-grid');
+  const notes=el('section',undefined,'project-home-notes');
+  overview.append(layout);
   const historicalPane=renderProjectHistory(overview,p,{openWorkflow:()=>navigate('Task')});
-  if(historicalPane&&importedHistorical)overview.prepend(historicalPane);
-  const next=el('section',undefined,'panel project-next');next.append(el('p','NEXT ACTION','eyebrow'),el('h2',info[0]),el('p',info[1]));
-  const warnings=(lifecycle.workGate?.reasons??[]).filter(r=>/hold|stop/i.test(r));if(stage==='work')warnings.push(...(lifecycle.workGate?.reasons??[]).filter(r=>!/hold|stop/i.test(r)));
+  if(historicalPane&&!lifecycle.managed)overview.prepend(historicalPane);
+
+  const warnings=(lifecycle.workGate?.reasons??[]).filter(reason=>stage==='work'||/hold|stop/i.test(reason));
   if(state?.cancellation)warnings.unshift('Cancelled: '+state.cancellation.reason);
-  if(warnings.length){const warning=el('div',undefined,'message warning');warning.append(...[...new Set(warnings)].map(t=>el('p',t)));left.append(warning);}
+  if(warnings.length){
+    const warning=el('div',undefined,'message warning');
+    warning.append(...[...new Set(warnings)].map(reason=>el('p',reason)));
+    layout.append(warning);
+  }
   const revisionFeedback=state&&!state.closed&&!state.cancellation?(state.revisionRequested?.reason||(state.peerReview?.approved===false?state.peerReview.notes:'')):'';
-  if(revisionFeedback){const feedback=panel('Changes requested');feedback.classList.add('revision-feedback');feedback.append(el('p',revisionFeedback,'workflow-comment'),button('View workflow history',()=>navigate('Workflow history'),'secondary'));left.append(feedback);}
-  const quote=state?.quotes?.at(-1),quoteIssued=quote?state.history?.findLast(e=>e.action==='issueQuote'&&e.data.quoteVersion===quote.version):null;if(quote)next.append(el('p',`Quote revision ${quote.version} · ${new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(quote.totalCents/100)}`,'project-next-evidence'));
-  if(importedHistorical)next.append(link('New project for this client',`new-project/${p.clientId}`,'button primary'));
-  next.append(button(info[2]+' →',()=>navigate(closedHistorical?'Edit details':held?'Hold or resume work':'Task'),importedHistorical?'secondary':'primary'));left.append(next);
+  if(revisionFeedback){
+    const feedback=panel('Changes requested');
+    feedback.classList.add('revision-feedback');
+    feedback.append(el('p',revisionFeedback,'workflow-comment'),button('View workflow history',()=>navigate('Workflow history'),'secondary'));
+    layout.append(feedback);
+  }
+  const quote=state?.quotes?.at(-1),quoteIssued=quote?state.history?.findLast(e=>e.action==='issueQuote'&&e.data.quoteVersion===quote.version):null;
   const brief=panel('The work');brief.append(el('p',p.summary||p.title,'record-summary'));
   const payerNames=new Map([[`client:${p.clientId}`,p.clientName]]);if(projectOperations.fundingContributors.length){const kinds={person:'people',organisation:'organisations',client:'clients'},contributors=projectOperations.fundingContributors.filter(c=>!payerNames.has(c.type+':'+c.id));const selected=await Promise.allSettled(contributors.map(c=>api('selections/'+kinds[c.type]+'/'+encodeURIComponent(c.id))));selected.forEach((result,i)=>{if(result.status==='fulfilled'&&result.value.item?.name)payerNames.set(contributors[i].type+':'+contributors[i].id,result.value.item.name);});}
   const facts=el('div',undefined,'project-facts');const client=el('div');client.append(link('CLIENT',`client/${p.clientId}`,'summary-heading-link'),link(p.clientName,`client/${p.clientId}`));facts.append(client);
@@ -417,20 +425,25 @@ async function project(view, id) {
     for(const member of members)group.append(link(member.name+(label==='CONTACTS'?' · '+member.role:member.id===p.coordination?.technicianId?' · Lead':''),(member.type==='organisation'?'organisation/':'person/')+member.id));facts.append(group);
   }
   brief.append(facts);const context=el('details',undefined,'project-context-details');context.append(el('summary','More project information'),details([['Programme',adminDetails.programme||'Not recorded'],['Coordinator',adminOptions.coordinators.find(a=>a.id===adminDetails.coordinatorAccountId)?.displayName||(adminDetails.coordinatorAccountId?'Previously assigned account':'Not assigned')],['Skills needed',p.coordination?.requiredSkills?.join(', ')||'Not specified'],...(p.status==='closed'?[]:[['Target date',date(p.dueDate)]]),['Work location',[projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded']]));brief.append(context);if(adminDetails.documentFolderUrl){const folder=el('a','Open project document folder','text-button');folder.href=adminDetails.documentFolderUrl;folder.target='_blank';folder.rel='noopener noreferrer';brief.append(folder);}
-  const quickActions=el('div',undefined,'project-overview-links');quickActions.append(button('Edit contacts & referrer',()=>navigate('Contacts'),'primary'),link('Update team','coordination/'+id+'/team','text-button'),link('Update funding','coordination/'+id+'/funding','text-button'),button('Edit project details',()=>{editMode=false;navigate('Edit details');},'text-button'));brief.append(quickActions);brief.classList.add('project-home-brief');
+  const quickActions=el('div',undefined,'project-overview-links');quickActions.append(button('Edit contacts & referrer',()=>navigate('Contacts'),'primary'),link('Edit team','coordination/'+id+'/team','text-button'),link('Edit funding','coordination/'+id+'/funding','text-button'),button('Edit project details',()=>{editMode=false;navigate('Edit details');},'text-button'));brief.append(quickActions);brief.classList.add('project-home-brief');
   const finance=panel('Finance status');finance.classList.add('project-finance-summary');
   const money=value=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(value/100),fullDate=value=>value?new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Adelaide',day:'numeric',month:'short',year:'numeric'}).format(new Date(value.includes('T')?value:value+'T12:00:00Z')):'Not recorded';
   const clearance=state?.financeClearance,lastPayment=[...(workPlan.payments??[])].sort((a,b)=>b.receivedOn.localeCompare(a.receivedOn))[0];
   const financeStateFacts=state?.schema===2?[['Cost summary sent to finance',fullDate(state.financeHandoff?.sentOn)],['Client payment',state.financeFinalisation?.clientPaymentResolved?'Resolved by finance':'Not confirmed'],['Technician reimbursement',state.financeFinalisation?.technicianPaymentResolved?'Resolved by finance':'Not confirmed']]:[['Finance clearance',clearance?.status==='paid'?'Payment confirmed':clearance?.status==='exempt'?'Authorised exemption':'Not recorded'],['Finance confirmation date',fullDate(clearance?.confirmedOn)]];
   const financeFacts=details([['Latest quote',quote?money(quote.totalCents)+' · Revision '+quote.version:'Not recorded'],['Quote saved',fullDate(quote?.at)],['Current quote sent',fullDate(quoteIssued?.data.sentOn)],...financeStateFacts,['Latest recorded receipt',fullDate(lastPayment?.receivedOn)],['Invoice required',p.invoiceRequired?'Yes':'No']]);finance.append(financeFacts);
   finance.append(el('p','The recorded Work Request authorises technical work after assessment review and quote approval. Finance handoff, invoices and receipts are separate records. Earlier workflows retain their recorded clearance requirements.','field-help'),button('View costs & invoices',()=>navigate('Costs & invoices'),'text-button'));
-  // Each column stacks independently so a tall finance summary cannot push notes down.
-  const workColumn=el('div',undefined,'project-overview-column'),financeColumn=el('div',undefined,'project-overview-column');
-  workColumn.append(brief,notes);financeColumn.append(finance,left);layout.append(workColumn,financeColumn);
-  renderNotes(notes,id,projectOperations,true);const notesLink=notes.querySelector('a[href="#operations/'+id+'"]');if(notesLink)notesLink.replaceWith(button('View all case notes',()=>navigate('Case-note history'),'text-button'));
-  const phase=el('ol',undefined,'project-phases'),groups=[['Assessment',['enquiry','assessment','assessment_review']],['Quote & approval',['quote','peer_review','client_acceptance','finance_clearance']],['Technical work',['work_request','work']],['Completion',['customer_signoff','finance_handoff','finance_finalisation','ready_to_close','closed']]],phaseIndex=groups.findIndex(([,keys])=>keys.includes(stage));
-  const milestones=state?.cancellation?[['Cancellation recorded',true,false],['Finance finalisation',Boolean(state.financeFinalisation),!state.financeFinalisation],['Closure',Boolean(state.closed),Boolean(state.financeFinalisation)&&!state.closed]]:groups.map(([name],i)=>[name,stage==='closed'||i<phaseIndex,stage!=='closed'&&i===phaseIndex]);
-  for(const [i,[name,complete,current]] of milestones.entries()){const item=el('li',(complete?'✓ ':`${i+1} · `)+name);if(complete)item.className='complete';else if(current){item.setAttribute('aria-current','step');item.className='current';}phase.append(item);}if(lifecycle.managed)left.prepend(phase);
+  layout.append(notes,brief,finance);
+  let noteSaved=false;
+  function showLatestNote(operations){
+    notes.replaceChildren();
+    renderNotes(notes,id,operations,true,saved=>{
+      noteSaved=true;
+      showLatestNote(saved);
+    });
+    const notesLink=notes.querySelector('a[href="#operations/'+id+'"]');
+    if(notesLink)notesLink.replaceWith(button('View all case notes',()=>navigate('Case-note history'),'text-button'));
+  }
+  showLatestNote(projectOperations);
   const actionPanes=new Map();for(const [i,child] of [...actionSource.children].entries()){const title=child.querySelector(':scope > summary')?.textContent||child.querySelector('button[type=submit]')?.textContent||'Project action';const pane=el('section',undefined,'project-action-task');pane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),el('h2',title),child);flatten(pane);actionPanes.set('Action:'+i,{title,pane});view.append(pane);if(pane.querySelector(':scope > .project-record-section > h2'))pane.querySelector(':scope > h2')?.remove();}
   const embedded=new Map([['Contacts',{route:'contacts'}],['Hold or resume work',{route:'operations',focus:'holds'}],['Record hours',{route:'operations',focus:'hours'}],['Prepare invoices',{route:'operations',focus:'invoices'}],['Print documents',{route:'documents'}],['Feedback',{route:'feedback'}],['Team',{route:'coordination',focus:'team'}],['Funding',{route:'coordination',focus:'funding'}]].map(([name,config])=>{const pane=el('section',undefined,'project-embedded-pane');pane.hidden=true;pane.tabIndex=-1;view.append(pane);return [name,{...config,pane,loaded:false,loading:null}];}));
   function returnNavigation(name){const navigation=el('nav',undefined,'project-task-navigation actions');navigation.setAttribute('aria-label',name+' navigation');navigation.append(button('← Return to current workflow',()=>navigate('Task'),'secondary'),button('Project overview',()=>navigate('Overview'),'text-button'));return navigation;}
@@ -481,10 +494,42 @@ async function project(view, id) {
     sectionLoads.set(name,pending);
     return pending;
   }
-  async function navigate(name){tab=name;menu.hidden=true;more.setAttribute('aria-expanded','false');draw();await loadProjectSection(name);if(tab!==name)return;const destination=embedded.get(name)?.pane??(name==='Task'?task:name==='Overview'?overview:name==='Files'?filesPane:name==='Costs & invoices'?costsPane:name==='Workflow history'?recordPane:name==='Edit details'?editPane:name==='Audit trail'?auditPane:name==='Case-note history'?caseNotesPane:actionPanes.get(name)?.pane);destination?.focus({preventScroll:true});(tabs.getClientRects().length?tabs:header).scrollIntoView({block:'nearest'});}
+  async function navigate(name){
+    // Saving a note advances the project version. Reload the chosen section
+    // before presenting its editors or audit history with that new version.
+    if(noteSaved&&name!=='Overview'){
+      projectTabs.set(id,name);
+      if(location.hash.endsWith('/costs'))history.replaceState(null,'','#project/'+id);
+      await render();
+      const pane=main.querySelector('#project-focused-pane');
+      if(location.hash.split('/')[1]===id&&pane?.dataset.projectSection===name){
+        pane.focus({preventScroll:true});
+        return pane;
+      }
+      return;
+    }
+    tab=name;menu.hidden=true;more.setAttribute('aria-expanded','false');draw();await loadProjectSection(name);if(tab!==name)return;const destination=embedded.get(name)?.pane??(name==='Task'?task:name==='Overview'?overview:name==='Files'?filesPane:name==='Costs & invoices'?costsPane:name==='Workflow history'?recordPane:name==='Edit details'?editPane:name==='Audit trail'?auditPane:name==='Case-note history'?caseNotesPane:actionPanes.get(name)?.pane);destination?.focus({preventScroll:true});(tabs.getClientRects().length?tabs:header).scrollIntoView({block:'nearest'});return destination;}
   function draw(){
     projectTabs.set(id,tab);header.querySelector('h1').textContent=p.title;header.querySelector('.eyebrow').replaceChildren(el('small','Project no.'),el('strong',p.reference,'project-number'));financeFacts.lastElementChild.querySelector('dd').textContent=p.invoiceRequired?'Yes':'No';meta.replaceChildren();
-    for(const [label,value]of [['Project status',el('span',projectLifecycleStatus(state,{projectStatus:p.status,programme:lifecycle.programme}),'workflow-stage')],...(p.status==='closed'||p.cancelled?[]:[['Review date',el('span',fullDate(adminDetails.followUpOn))]]),['Latest quote',el('span',quote?money(quote.totalCents)+' · '+(quoteIssued?'Sent '+fullDate(quoteIssued.data.sentOn):'Not recorded as sent'):'Not recorded')]]){const fact=el('div',undefined,'project-header-fact');const destination=label==='Project status'?(lifecycle.managed?'Task':'Edit details'):label==='Review date'?'Edit details':'Print documents';const jump=button(label,async()=>{await navigate(destination);if(tab!==destination)return;const target=label==='Review date'?editPane.querySelector('[aria-label="Review date"]'):label==='Latest quote'?embedded.get('Print documents')?.pane.querySelector('[data-quote-panel]'):null;if(target){target.scrollIntoView({block:'center'});target.focus({preventScroll:true});}},'summary-heading-link');jump.setAttribute('aria-label',label+' — open '+(destination==='Task'?'workflow':destination.toLowerCase()));fact.append(jump,value);meta.append(fact);}header.append(meta,headerActions);
+    const recordStatus=registerStatus({status:p.status,onHold:projectOperations.onHold||projectOperations.clientStopped,cancelled:Boolean(state?.cancellation||p.cancelled)});
+    const headerFacts=[
+      ['Status',recordStatus,'Edit details'],
+      ['Workflow status',projectLifecycleStatus(state,{projectStatus:p.status,programme:lifecycle.programme}),'Task'],
+      ...(p.status==='closed'||p.cancelled||state?.cancellation?[]:[['Review date',fullDate(adminDetails.followUpOn),'Edit details']]),
+      ['Latest quote',quote?money(quote.totalCents)+' · '+(quoteIssued?'Sent '+fullDate(quoteIssued.data.sentOn):'Not recorded as sent'):'Not recorded','Print documents']
+    ];
+    for(const [label,value,destination] of headerFacts){
+      const fact=el('div',undefined,'project-header-fact');
+      const jump=button(label,async()=>{
+        const pane=await navigate(destination);
+        const target=label==='Review date'?pane?.querySelector('[aria-label="Review date"]'):label==='Latest quote'?pane?.querySelector('[data-quote-panel]'):null;
+        if(target){target.scrollIntoView({block:'center'});target.focus({preventScroll:true});}
+      },'summary-heading-link');
+      jump.setAttribute('aria-label',label+' — open '+(destination==='Task'?'workflow':destination.toLowerCase()));
+      fact.append(jump,el('span',value,label==='Workflow status'?'workflow-stage':undefined));
+      meta.append(fact);
+    }
+    header.append(meta,headerActions);
     const section=sections.find(group=>group.items.some(([key])=>key===tab))??sections[0];
     tabs.replaceChildren();sections.forEach((group,i)=>tabs.append(tabButton(group.label,group===section?tab:group.items[0][0],i,group===section,tabs,'project-tab-')));
     more.textContent='Sections · '+section.label+' ▾';more.setAttribute('aria-label','Project sections: '+section.label);
