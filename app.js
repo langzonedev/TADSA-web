@@ -1,5 +1,5 @@
 import {adelaideToday} from './credential-expiry.js';
-import {registerDraftSource,trackDraftForm,refreshDraftReview,installDraftReview,revealDraftForm} from './draft-review.js';
+import {registerDraftSource,trackDraftForm,refreshDraftReview,installDraftReview,revealDraftForm,pendingDrafts} from './draft-review.js';
 import {renderProjectContacts} from './project-contacts.js';
 import {applyActionStyles,installActionStyles} from './action-styles.js';
 import {renderInvoiceReferences} from './invoice-references.js';
@@ -47,15 +47,49 @@ const el = (tag, text, className) => { const n = document.createElement(tag); if
 const link = (text, hash, className) => { const a = el('a', text, className); a.href = `#${hash}`; return a; };
 const button = (text, action, className = 'secondary') => { const b = el('button', text, className); b.type = 'button'; b.addEventListener('click', action); return b; };
 if(document.documentElement.dataset.hostedStaging==='true'){
+  const loadedVersion=document.documentElement.dataset.uiVersion;
+  const environment=document.querySelector('.environment');
+  const summary=environment.querySelector('summary');
+  const label=summary.querySelector('span:last-child');
+  const info=environment.querySelector('.environment-info');
   const updateStatus=el('p');
   updateStatus.setAttribute('role','status');
-  document.querySelector('.environment-info').append(button('Update app',()=>{
-    if(saving||hasUnsavedWork()){
+  const checkFailed='Could not check the latest version. Try again when connected.';
+  let checking;
+  const updateButton=button('Update ready — reload app',async()=>{
+    if(await checkVersion()!==true)return;
+    if(saving||hasUnsavedWork()||pendingDrafts().length){
       updateStatus.textContent='Finish saving or discard your drafts before updating.';
       return;
     }
     location.reload();
-  }),updateStatus);
+  });
+  summary.setAttribute('aria-label','Staging information');
+  function checkVersion(){
+    if(document.hidden||document.documentElement.dataset.authState!=='ready')return;
+    if(checking)return checking;
+    checking=fetch('./',{method:'HEAD',cache:'no-store',signal:AbortSignal.timeout(8000)})
+      .then(response=>{
+        const version=response.headers.get('X-TADSA-UI-Version');
+        if(!response.ok||!version||!/^[a-f0-9]{64}$/.test(version))throw Error('Version unavailable');
+        if(updateStatus.textContent===checkFailed)updateStatus.textContent='';
+        const available=version!==loadedVersion;
+        label.textContent=available?'Update ready':'Staging';
+        summary.setAttribute('aria-label',available?'Staging information — update ready':'Staging information');
+        if(available&&!updateButton.isConnected)info.append(updateButton,updateStatus);
+        if(!available){
+          updateButton.remove();updateStatus.remove();updateStatus.textContent='';
+        }
+        return available;
+      }).catch(()=>{
+        if(updateButton.isConnected)updateStatus.textContent=checkFailed;
+      }).finally(()=>{checking=undefined;});
+    return checking;
+  }
+  window.addEventListener('focus',checkVersion);
+  document.addEventListener('visibilitychange',checkVersion);
+  environment.addEventListener('toggle',()=>{if(environment.open)checkVersion();});
+  window.setInterval(checkVersion,120000);
 }
 const cap = text => text ? text[0].toUpperCase() + text.slice(1) : 'Not recorded';
 const initials = name => name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('');

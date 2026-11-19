@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "825c1dc451e512654af64e962e624670fdd7ae3c",
+  "sourceRevision": "842e9f9322705eb6f33e249d40c9ae346bb5313f",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "credential-expiry.js": {
@@ -214,7 +214,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "6a57b3afeb34d60063d34eda69c6e32b80feca5af35f56f41a4e541e8f0de65b",
+      "sha256": "917f303a6c164742f793ef2385c9efb3baa95f46ca5a2f4b1f77d4e281a36ba7",
       "transform": null
     },
     "settings.js": {
@@ -305,5 +305,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "084c73892e00a24fe4b85dbb7095b5727017a419ca86ec1f7c1086876f26b6d2"
+  "shellHash": "c8046c115d09040c225259ac235ccf35b81a5a197ced9120771c93f3faddbb60"
 }
