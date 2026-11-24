@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "64ad705e1b7163ec4ade722206da8f228cf36a26",
+  "sourceRevision": "14bd633e5d29efa315c2644452ecd8fdf1f8d876",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "credential-expiry.js": {
@@ -14,7 +14,7 @@
     },
     "customer-feedback.css": {
       "source": "public/customer-feedback.css",
-      "sha256": "e85349c9816b2dc1a252e58fd9ca289b3f5b844a2385b83f7b1317e49ec373d6",
+      "sha256": "6063ec6058aa48d9c8222f5bfa583f8bc1bb0c7de022ead6b449b5a12ab292f2",
       "transform": null
     },
     "availability.css": {
@@ -124,12 +124,17 @@
     },
     "invoice-references.js": {
       "source": "public/invoice-references.js",
-      "sha256": "283afc5bcb7d6b94fb2a478795c7a28e186812e948671bd768af5a230cba007d",
+      "sha256": "f26b00fb7175b17b9844d32c548e1e65890d4d03299c77bf3288a2894c4d3144",
       "transform": null
     },
     "invoice-references-model.js": {
       "source": "public/invoice-references-model.js",
       "sha256": "f5048956f77b0bedff3705ad9fbe91b7238a76e3b23e7f255b1d5f88838dcce0",
+      "transform": null
+    },
+    "finance-status-model.js": {
+      "source": "public/finance-status-model.js",
+      "sha256": "ca77f327a7819f8d8d37b0d6f86fd52d3a0d82cb2114f3c00d6dfbda9a59d9a4",
       "transform": null
     },
     "profile-details.js": {
@@ -164,22 +169,22 @@
     },
     "lifecycle-model.js": {
       "source": "public/lifecycle-model.js",
-      "sha256": "0056fc9d7693a8ce12dc32861202698c7a0654c6f70f3042b5c0c880b51ce904",
+      "sha256": "fe74ea072a48536e1c391247a803c920409e77c4d57b148bcc82f47de9620e41",
       "transform": null
     },
     "lifecycle-validation.js": {
       "source": "public/lifecycle-validation.js",
-      "sha256": "778f5a524f104990547bb2b33c714d969e0f7b35909e0a8f103fcf52c33855bc",
+      "sha256": "cf1303fd6bec65bdfef4de9a3e0c9eb6d78657c90af06889bf89bd2d733330d5",
       "transform": null
     },
     "project-lifecycle.js": {
       "source": "public/project-lifecycle.js",
-      "sha256": "eab2d1909f385ac3159f418a3930e11a52e3bdc2d24673a5d4d6689b6c07a8b2",
+      "sha256": "ccb900073cf707f9631db5da3e69fb839715d77eabdb9fe44162995f96317c1b",
       "transform": null
     },
     "finance-pack.js": {
       "source": "public/finance-pack.js",
-      "sha256": "5d0ed4f9e0b301610bdbc1ab5eefa1206c41a4303cba31babbd0403ef253e863",
+      "sha256": "a24e8587437101cf4c0cbc4f1c58a8ec3eb111ee30e0af04efee30a8ce9f2b75",
       "transform": null
     },
     "technician-credentials.js": {
@@ -214,7 +219,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "f2d3db10e4637a01659e838ab6cc0dddf02dc40cbb5b5b447c8215b41d558325",
+      "sha256": "26e9f4ca6d870d6a4b6039e9d01ec49cfdf89b06349405de2870848265ed709b",
       "transform": null
     },
     "settings.js": {
@@ -239,7 +244,7 @@
     },
     "operations.js": {
       "source": "public/operations.js",
-      "sha256": "99e94c0a4a73ba99faaa7c2d2df053171dda68cde4bb74d303a0d32af03ddd51",
+      "sha256": "c1118f4e45a24a0da731b8e14cd4749a0903d2a01a9e7dd16805f1fa3625469e",
       "transform": null
     },
     "client-details.js": {
@@ -269,12 +274,12 @@
     },
     "project-care.js": {
       "source": "public/project-care.js",
-      "sha256": "38357e74ebba2fcce674e42f3242364d5fbef2df01beac2f0edc524a1b1dbfa6",
+      "sha256": "28ab8fe20de6e5ce07416ca9194aef41e51d3cf9287c4800a70cf1ec2d863a3d",
       "transform": null
     },
     "styles.css": {
       "source": "public/styles.css",
-      "sha256": "20b19b20df8e4d3e8e9d7e54012de579f0a4abd167e17a2638645859cc863985",
+      "sha256": "1a7a094e90351ff99e094ff623cd1e549b37db19823ac525882d03b51619165a",
       "transform": null
     },
     "boot.js": {
@@ -305,5 +310,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "d7b79648aefe7e01d77bf34071647a61af9d137c54a4adb2c0c569ba409abbf7"
+  "shellHash": "46034aa3531fd78ce30379951dcdbdb6b510e62ea2d6e1cc292395d43d96b01e"
 }

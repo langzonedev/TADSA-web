@@ -10,6 +10,17 @@ const editorSaveLabels={location:'Save work location',plan:'Save NDIS reference'
 function rememberSection(section,key){section.open=openSections.get(key)??false;section.addEventListener('toggle',()=>{openSections.set(key,section.open);if(section.open&&matchMedia('(max-width:800px)').matches){for(const other of section.parentElement?.children??[])if(other!==section&&other.tagName==='DETAILS')other.open=false;}});}
 export const configureCare=h=>{host=h;};
 export const careHasDrafts=()=>drafts.size>0;
+export function renderLockedFinanceStatusDraft(parent,id){
+ const key='finance-status/'+id,draft=drafts.get(key);
+ if(!draft)return;
+ const box=node('section',null,'message warning');box.dataset.draftKey='care:'+key;box.tabIndex=-1;
+ box.append(node('h3','Unsaved finance status'),node('p','This record is now read-only. Review your unsaved entries against the saved Finance status above.'));
+ const values=node('dl',null,'detail-pairs');
+ for(const [label,value] of [['Invoice sent date',draft.invoiceSentOn],['Invoice number',draft.invoiceNumber],['Reimbursement date',draft.reimbursedOn],['Payment number',draft.paymentNumber],['Paid in full',draft.paidInFull==='yes'?'Yes':draft.paidInFull==='no'?'No':''],['Payment status date',draft.paidStatusOn]]){
+  const row=node('div');row.append(node('dt',label),node('dd',value||'Not recorded'));values.append(row);
+ }
+ box.append(values,action('Discard unsaved finance status',()=>{drafts.delete(key);baselines.delete(key);host.refresh();}));parent.append(box);
+}
 export function renderRetainedReferenceDraft(parent,key){
  const draft=drafts.get(key);if(!draft)return;
  const box=node('section',null,'message warning');box.dataset.draftKey='care:'+key;box.tabIndex=-1;box.append(node('h4','Unsaved reference changes'),node('p',draft.pending?'An earlier save was not confirmed. Compare these entered values with the saved references above before discarding this draft.':'The entered values below are still unsaved. Financial references are now read-only; compare them with the saved references above.'));
@@ -76,6 +87,12 @@ export function editor(parent,key,initial,title,fields,path,method,payload,optio
  return {form,d,box};
 }
 const dollars=c=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format((c||0)/100);
+export async function downloadProjectFile(projectId,fileId,name){
+ const response=await fetch(`/api/projects/${projectId}/attachments/${fileId}/download`);
+ if(!response.ok)throw Error('Could not download '+name+'.');
+ const url=URL.createObjectURL(await response.blob()),a=node('a');a.href=url;a.download=name;
+ document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
 export async function renderProjectCare(view,id,summaryTarget=view,context={}){
  const [plan,attachments,ops,options,location,approvers,project,lifecycle]=await Promise.all([context.plan??request(`projects/${id}/work-plan`),request(`projects/${id}/attachments`),context.ops??request(`projects/${id}/operations`),request('availability-options'),context.location??request(`projects/${id}/location`),request('approvers'),context.project??request(`projects/${id}`),context.lifecycle??request(`projects/${id}/lifecycle`)]);
  const closed=project.status==='closed'||Boolean(lifecycle.state?.closed),cancelled=Boolean(lifecycle.state?.cancellation)||project.status==='cancelled',finalised=Boolean(lifecycle.state?.financeFinalisation);
@@ -90,6 +107,18 @@ export async function renderProjectCare(view,id,summaryTarget=view,context={}){
  if(!ops.invoices.length&&project.status!=='closed')payments.append(link('Create a draft invoice','operations/'+id+'/invoices'));
  for(const invoice of ops.invoices){const i={...invoice,...invoice.snapshot},received=(plan.payments||[]).filter(p=>p.invoiceId===invoice.id).reduce((n,p)=>n+p.amountCents,0);const box=node('section',null,'panel');box.append(node('h3',i.number),node('p',`Invoice ${dollars(i.totalCents)} · Received ${dollars(received)} · Outstanding ${dollars(i.totalCents-received)}`));payments.append(box);if(received>=i.totalCents||project.status==='closed')continue;editor(box,'payment/'+invoice.id,{version:plan.version,amount:((i.totalCents-received)/100).toFixed(2),receivedOn:new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Adelaide'}).format(new Date()),reference:''},'Record payment',(f,d)=>{field(f,'Payment amount ($ AUD)',d,'amount').inputMode='decimal';field(f,'Payment received on',d,'receivedOn','date').required=true;field(f,'Payment reference',d,'reference').required=true;},`projects/${id}/invoices/${invoice.id}/payments`,'POST',d=>{if(!/^\d+(\.\d{1,2})?$/.test(d.amount))throw Error('Enter a dollar amount with up to two decimal places.');return {requestId:d.requestId,version:d.version,amountCents:Math.round(Number(d.amount)*100),receivedOn:d.receivedOn,reference:d.reference};});}
  const files=node('details',null,'care-details project-files');files.append(node('summary','Project files'),node('p',`Images and documents · ${attachments.items.length} of ${attachments.maxFiles} files · up to ${Math.floor(attachments.maxBytes/1024/1024)} MB per file.`,'field-help'));rememberSection(files,id+'/files');view.append(files);
- for(const file of attachments.items){const row=node('div',null,'file-row');row.append(node('span',`${file.name} · ${Math.ceil(file.size/1024)} KB`));const feedback=node('div');row.append(action('Download',async()=>{try{const response=await fetch(`/api/projects/${id}/attachments/${file.id}/download`);if(!response.ok)throw Error('Could not download file.');const url=URL.createObjectURL(await response.blob()),a=node('a');a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){feedback.replaceChildren(notice(e.message,true));}}));const removal=node('details');removal.append(node('summary','Remove file'));editor(removal,'remove/'+file.id,{version:file.version},null,(f)=>f.append(node('p','Remove '+file.name+' from this project?')),`projects/${id}/attachments/${file.id}/remove`,'POST',d=>({requestId:d.requestId,version:d.version}));row.append(removal,feedback);files.append(row);}
+ for(const file of attachments.items){
+  const row=node('div',null,'file-row'),feedback=node('div');
+  const revisions=(lifecycle.state?.costReturns??[]).filter(item=>item.sourceFileId===file.id).map(item=>item.version);
+  row.append(node('span',file.name+' · '+Math.ceil(file.size/1024)+' KB'));
+  if(revisions.length)row.append(node('span','Original technician return · revision '+revisions.join(', '),'field-help'));
+  row.append(action('Download',async()=>{try{await downloadProjectFile(id,file.id,file.name);}catch(e){feedback.replaceChildren(notice(e.message,true));}}));
+  if(!revisions.length){
+   const removal=node('details');removal.append(node('summary','Remove file'));
+   editor(removal,'remove/'+file.id,{version:file.version},null,(f)=>f.append(node('p','Remove '+file.name+' from this project?')),`projects/${id}/attachments/${file.id}/remove`,'POST',d=>({requestId:d.requestId,version:d.version}));
+   row.append(removal);
+  }
+  row.append(feedback);files.append(row);
+ }
  editor(files,'upload/'+id,{},'Add image or document',(form,d)=>{const f=field(form,'Choose file (PNG, JPEG, PDF or DOCX)',{},'file','file');f.accept='.png,.jpg,.jpeg,.pdf,.docx';f.required=!d.pending&&!d.file;if(d.file)form.append(node('p','Selected file: '+d.file.name));f.onchange=()=>{d.file=f.files[0];};},`projects/${id}/attachments`,'POST',async d=>{if(!d.file)throw Error('Choose a file first.');if(d.file.size>attachments.maxBytes)throw Error('File exceeds the 10 MB limit.');const file=d.file,mime=(file.type==='image/jpg'?'image/jpeg':file.type)||({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}[file.name.split('.').pop().toLowerCase()]);const dataBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('Unable to read file.'));reader.readAsDataURL(file);});return {requestId:d.requestId,name:file.name,mime,dataBase64};});
 }

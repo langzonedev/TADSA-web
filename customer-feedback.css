@@ -132,6 +132,22 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
   text-transform: uppercase;
 }
 .project-finance-summary .detail-pairs :is(dt, dd) { font-size: .875rem; }
+.project-finance-summary .detail-pairs dd { max-width: none; text-align: right; }
+.project-finance-summary > .project-context-details { margin-top: 10px; }
+.project-finance-editor:not([hidden]) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.project-finance-editor > nav { grid-column: 1 / -1; }
+.project-finance-editor > .panel { margin: 0; }
+.project-finance-editor .form-grid > fieldset {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+.project-finance-editor :is(label, fieldset, input, select) { min-width: 0; }
 .project-identity .eyebrow small { font-weight: 700; }
 main:has(> .project-workspace) { padding-top: 4px; }
 .project-workspace > .breadcrumb { margin-block: 0; }

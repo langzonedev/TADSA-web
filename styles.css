@@ -491,4 +491,15 @@ html[data-theme=dark] .availability-workspace .availability-table button.availab
 @media print{.credential-expiry-scroll{overflow:visible;border:0}.credential-expiry-table{min-width:0}.credential-expiry-table th{min-width:0!important}.credential-expiry-table th,.credential-expiry-table td{padding:6px;font-size:10pt}.credential-expiry-scroll-help{display:none}}
 
 main > [hidden], [data-section-loading=true] > :not(.project-section-loading) { display: none !important; }
+.finance-hard-copy { display: none; }
+@media print {
+  body:has(> .finance-hard-copy) > :not(.finance-hard-copy) { display: none !important; }
+  .finance-hard-copy { display: block; margin: 0; padding: 10mm; background: white; color: black; font: 11pt/1.35 Arial, sans-serif; overflow-wrap: anywhere; }
+  .finance-hard-copy header { border-bottom: 2px solid; }
+  .finance-hard-copy h1 { font-size: 19pt; }
+  .finance-hard-copy h2 { font-size: 14pt; break-after: avoid; }
+  .finance-hard-copy table { width: 100%; border-collapse: collapse; }
+  .finance-hard-copy th, .finance-hard-copy td { padding: 3pt 6pt; text-align: left; color: black; border-bottom: 1px solid #aaa; }
+  .finance-hard-copy tr { break-inside: avoid; }
+}
 .session-expiry-notice{position:fixed;z-index:1000;bottom:1rem;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 2rem);padding:.75rem 1rem;border:1px solid var(--line);border-radius:.5rem;background:var(--surface,#fff);color:var(--ink,#172238);box-shadow:0 2px 10px #0002;font-size:.95rem}

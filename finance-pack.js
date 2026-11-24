@@ -1,4 +1,4 @@
-import {node,action,field,notice,request} from './project-care.js';
+import {node,action,field,notice,request,downloadProjectFile} from './project-care.js';
 import {residentialAddressText} from './client-address.js';
 import {lifecycleGate,lifecycleCostLabels} from './lifecycle-model.js';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -115,11 +115,42 @@ export function clientQuoteDocument(project,current,client,business={},plan={},p
  return htmlDocument('Quote — '+project.reference+' / revision '+q.version,
   '<p><strong>DRAFT · Review before sharing. Prepared using the supplied TADSA quotation form; issuer and tax settings require confirmation.</strong></p>'+record('Issuer',business.issuerName)+record('Australian Business Number (ABN)',business.abn)+record('Issuer address',business.address)+record('Issuer contact',business.contact)+record('Project number',project.reference)+record('Quote date',q.at?.slice(0,10))+record('Valid until',quoteValidUntil(q.at))+'<p>This quotation is valid for up to 30 days from the quote date. Acceptance and available funding must be confirmed before work proceeds.</p>'+record('Client',person.name||project.clientName)+record('Client address',residentialAddressText(details))+(plan.ndisApplicable&&plan.ndisNumber?record('National Disability Insurance Scheme (NDIS) number',plan.ndisNumber):'')+record('Description of work',project.summary)+quoteTable(q)+record('Quote notes',q.notes)+'<h2>Funder details</h2>'+blank('Funder name',funder.name)+blank('Funder address',funderAddress)+blank('Funder contact email',funder.email)+blank('Funder contact phone',funder.phone)+'<h2>Authorisation to proceed</h2><p>I accept this quotation. I acknowledge that any modifications made by TADSA to my equipment may affect the product warranty.</p><section class="quote-approval"><h2>Quote approval</h2><p>Client or authorised representative name: __________________________________________</p><p>Signature: __________________________________ Date: _____________________________</p><p>Approval refers to quote revision '+escape(q.version)+'. Changes to scope or cost require a revised quote and renewed approval.</p></section><h2>Invoice instructions</h2>'+blank('Make the invoice out to',funder.name)+blank('Send the invoice to (email address)',funder.email)+blank('Purchase order or agreement / service booking number','')+'<p>Return the completed acceptance to TADSA using the issuer contact details above. Completing this form does not itself record approval, issue an invoice or confirm payment in the application.</p>',{business,logo});
 }
-export function costReturnDocument(project,current){
- const saved=current.state?.costReturns?.at(-1);if(!saved)throw Error('Record an actual cost return first.');
+function savedCostReturn(current,revision){
+ const returns=current.state?.costReturns??[];
+ if(!returns.length)throw Error('Record an actual cost return first.');
+ const saved=revision==null?returns.at(-1):returns.find(item=>item.version===revision);
+ if(!saved)throw Error('This cost return revision is unavailable. Reopen the project and try again.');
+ return saved;
+}
+function costReturnDetails(project,saved){
+ return record('Project',project.title)+record('Client',project.clientName)+record('Cost return revision',saved.version)+
+  record('Cost return received on',saved.receivedOn)+record('Original technician return',saved.sourceFileName)+
+  record('Recorded at',saved.at)+record('Recorded by',saved.actor?.displayName);
+}
+export function costReturnDocument(project,current,revision){
+ const saved=savedCostReturn(current,revision);
  const quote=current.state.quotes?.at(-1);
  return htmlDocument('Actual cost return — '+project.reference+' / revision '+saved.version,
-  '<p><strong>DRAFT · Fictional development data · Saved cost evidence, not an invoice</strong></p>'+record('Project',project.title)+record('Client',project.clientName)+workflowNotice(current)+record('Cost return revision',saved.version)+record('Recorded at',saved.at)+record('Recorded by',saved.actor?.displayName)+quoteTable(saved,'Actual cost total')+record('Cost return notes',saved.notes)+'<p>Parts and material receipts support technical-member expenses and are kept with the project documents. They are not evidence of client invoice payment. Service charge estimates do not determine technician reimbursement; Finance confirms the reimbursement rules.</p>'+record('Latest saved quote revision',quote?.version)+record('Latest saved quote total',quote?money(quote.totalCents):'Not recorded')+record('Difference from latest saved quote',quote?money(saved.totalCents-quote.totalCents):'Not recorded — no quote saved')+'<p>Differences require an explicit customer and Finance decision; they are not automatically billed. This document does not confirm payment or authorise work.</p>');
+  '<p><strong>CRM copy of the technician’s return · Fictional development data · Saved cost evidence, not an invoice</strong></p>'+costReturnDetails(project,saved)+quoteTable(saved,'Actual cost total',false)+record('Cost return notes',saved.notes)+'<h2>Current project context</h2>'+workflowNotice(current)+record('Latest saved quote revision',quote?.version)+record('Latest saved quote total',quote?money(quote.totalCents):'Not recorded')+record('Difference from latest saved quote',quote?money(saved.totalCents-quote.totalCents):'Not recorded — no quote saved'));
+}
+export function costSummaryDocument(project,current,revision){
+ const saved=savedCostReturn(current,revision);
+ const totals=new Map();
+ for(const line of saved.lines)totals.set(line.type,(totals.get(line.type)??0)+line.amountCents);
+ const rows=[...totals].map(([type,cents])=>'<tr><td>'+escape(lifecycleCostLabels[type]??type)+'</td><td>'+money(cents)+'</td></tr>').join('');
+ return htmlDocument('Cost summary for Finance — '+project.reference+' / revision '+saved.version,
+  '<p>Fictional development data · Actual costs in AUD</p>'+costReturnDetails(project,saved)+
+  '<h2>Cost summary</h2><table><thead><tr><th>Cost category</th><th>Amount</th></tr></thead><tbody>'+rows+
+  '</tbody><tfoot><tr><th>Total actual cost</th><td>'+money(saved.totalCents)+'</td></tr></tfoot></table>'+
+  '<h2>Supporting cost return</h2>'+quoteTable(saved,'Actual cost total',false)+record('Cost return notes',saved.notes));
+}
+function printCostDocument(html){
+ const page=new DOMParser().parseFromString(html,'text/html');
+ const sheet=node('article',null,'finance-hard-copy');
+ sheet.append(...page.body.childNodes);
+ document.querySelector('.finance-hard-copy')?.remove();
+ document.body.append(sheet);
+ try{window.print();}finally{sheet.remove();}
 }
 export function projectCoverDocument(project,current,client,details={}){
  const intake=client.details??{},person=client.person??{},residential=residentialAddressText(intake),representative=client.contacts?.find(c=>c.personId===intake.representativePersonId),preferred=intake.preferredContact==='representative'?representative:person;
@@ -188,18 +219,34 @@ export function renderWorkflowRequestDownloads(parent,project,{assessment=true,t
  if(assessment)buttons.append(action('Download Assessment Request',()=>prepare('assessment')));
  if(task)buttons.append(action('Download Work Request',()=>prepare('task')));
 }
-export function renderSavedDocumentDownloads(parent,project,{cover=true,costReturn=true}={}){
+export function renderSavedDocumentDownloads(parent,project,{cover=true,costReturn=true,returns=[]}={}){
  const feedback=node('div',null,'report-toolbar'),buttons=node('div',null,'actions report-toolbar');parent.append(buttons,feedback);
- const prepare=async(kind)=>{try{
+ const selection={revision:returns.at(-1)?.version};
+ const revisionPicker=costReturn&&returns.length>1?field(buttons,'Cost return revision',selection,'revision','text',returns.slice().reverse().map(r=>[r.version,'Revision '+r.version+(r.receivedOn?' · '+r.receivedOn:'')])):null;
+ const prepare=async(kind,print=false)=>{try{
+  const revision=selection.revision==null?null:Number(selection.revision);
   const read=async()=>{const p=await request('projects/'+project.id);return Promise.all([Promise.resolve(p),request(`projects/${p.id}/lifecycle`),...(kind==='cover'?[request('clients/'+p.clientId),request(`projects/${p.id}/admin-details`)]:[])]);};
   const before=await read(),[p,current,client,details]=before;
-  const html=kind==='cover'?projectCoverDocument(p,current,client,details):costReturnDocument(p,current);
+  const renderer=kind==='summary'?costSummaryDocument:costReturnDocument;
+  const html=kind==='cover'?projectCoverDocument(p,current,client,details):renderer(p,current,revision);
   assertStableDocumentSnapshot(before,await read());
-  download(new Blob([html],{type:'text/html'}),safeName(p.reference)+(kind==='cover'?'-cover-sheet':'-cost-return-'+current.state.costReturns.at(-1).version)+'.html');
-  feedback.replaceChildren(notice('Saved document downloaded. Open it to review and print / save as PDF. Nothing was sent or marked approved.'));
+  if(print){printCostDocument(html);return;}
+  const suffix=kind==='cover'?'cover-sheet':(kind==='summary'?'cost-summary-':'cost-return-')+savedCostReturn(current,revision).version;
+  download(new Blob([html],{type:'text/html'}),safeName(p.reference)+'-'+suffix+'.html');
+  feedback.replaceChildren(notice('Saved document downloaded. Open it to review, print or save as PDF.'));
  }catch(e){feedback.replaceChildren(notice(e.message,true));}};
  if(cover)buttons.append(action('Download enquiry / project cover sheet',()=>prepare('cover')));
- if(costReturn)buttons.append(action('Download saved cost return',()=>prepare('cost')));
+ if(costReturn)buttons.append(action('Print cost return',()=>prepare('cost',true)),action('Print cost summary',()=>prepare('summary',true)),
+  action('Download saved cost return',()=>prepare('cost')),action('Download cost summary for Finance',()=>prepare('summary')));
+ if(costReturn&&returns.some(item=>item.sourceFileId)){
+  const selectedReturn=()=>returns.find(item=>item.version===Number(selection.revision));
+  const original=action('Download technician’s original',async()=>{try{
+   const saved=selectedReturn();await downloadProjectFile(project.id,saved.sourceFileId,saved.sourceFileName);
+   feedback.replaceChildren(notice('Original downloaded. Open the file to print the copy supplied by the technician.'));
+  }catch(error){feedback.replaceChildren(notice(error.message,true));}});
+  const showOriginal=()=>{original.hidden=!selectedReturn()?.sourceFileId;};
+  revisionPicker?.addEventListener('change',showOriginal);showOriginal();buttons.append(original);
+ }
 }
 // Use the very same guards as document generation. Availability is guidance;
 // each download still reads a fresh stable snapshot before preparing a file.
@@ -232,7 +279,7 @@ export function renderFinancePack(parent,project,lifecycle,options={}){
   assertStableDocumentSnapshot(before,await read());
   const a=node('a');a.href=draft.href;a.click();feedback.replaceChildren(notice('Email draft prepared. Review the recipient and quote revision, choose your sending mailbox, and attach the quote manually. Nothing was sent or recorded as sent.'));
  }catch(e){feedback.replaceChildren(notice(e.message,true));}}));
- if(!options.quoteOnly)renderSavedDocumentDownloads(section,project,{costReturn:!availability?.cost});
+ if(!options.quoteOnly)renderSavedDocumentDownloads(section,project,{costReturn:Boolean(lifecycle.state?.costReturns?.length),returns:lifecycle.state?.costReturns});
  if(!options.quoteOnly)renderWorkflowRequestDownloads(section,project,{assessment:!availability?.assessment,task:!availability?.task});
  if(!options.quoteOnly)buttons.append(action('Download Finance pack',async()=>{try{
   feedback.replaceChildren(notice('Preparing saved project details…'));
@@ -241,6 +288,11 @@ export function renderFinancePack(parent,project,lifecycle,options={}){
   const state=current.state,quote=state?.quotes?.at(-1),rows=[workflowNotice(current),record('Project number',p.reference),record('Client',p.clientName),record('Work',p.summary),record('Purpose',d.purpose==='before_work'?'Approval and payment before work':'Final costs and reconciliation'),record('Prepared',new Date().toLocaleString('en-AU')),record('NDIS reference',plan.ndisNumber),record('Issuer',business.issuerName),record('ABN',business.abn),record('Office',business.address),'<h2>Current estimate</h2>',quoteTable(quote),'<h2>Recorded decisions</h2>',decisionSummary(state,people.items),'<h2>Actual cost return and summary</h2><p>Distinguish technical-member expenses and travel/work time from the reviewed service charge. Check the quantities and rates before sending to Finance; no reimbursement or fee is calculated from an assumed rate.</p>',(state?.costReturns?.length?quoteTable(state.costReturns.at(-1),'Actual cost total'):'<p>No actual cost return recorded yet.</p>'),record('Cost return notes',state?.costReturns?.at(-1)?.notes),record('Difference from quote',state?.costReturns?.length&&quote?money(state.costReturns.at(-1).totalCents-quote.totalCents):'Not recorded'),'<p>Differences require an explicit decision by the customer and Finance; they are not automatically billed.</p>','<h2>Hours and invoices</h2>',record('Recorded hours',String(ops.actualMinutes/60)),invoiceSummary(ops.invoices,plan.payments),'<h2>Files in this pack</h2>',`<ul>${files.items.map(f=>`<li>${escape(f.name)}</li>`).join('')}</ul>`,'<p>External Finance records remain authoritative for invoicing and payment. Recorded confirmations are operator-entered evidence, not a bank verification. Review this pack before sending.</p>'];
   if(files.items.reduce((n,f)=>n+f.size,0)>50*1024*1024)throw Error('Project files exceed the 50 MB email-pack limit. Download required files individually from Project files instead.');
   const entries=[{name:'Finance-summary.html',data:htmlDocument('Finance handoff — '+p.reference,rows.join(''))},{name:'Project-record.json',data:JSON.stringify({purpose:d.purpose,preparedAt:new Date().toISOString(),project:p,lifecycle:current,operations:ops,ndisReference:plan.ndisNumber,attachments:files.items},null,2)}];
+  if(d.purpose==='completion'&&state?.costReturns?.length){
+   const revision=state.costReturns.at(-1).version;
+   entries.push({name:'Cost-return-'+revision+'.html',data:costReturnDocument(p,current,revision)},
+    {name:'Cost-summary-'+revision+'.html',data:costSummaryDocument(p,current,revision)});
+  }
   for(const file of files.items){const r=await fetch(`/api/projects/${p.id}/attachments/${file.id}/download`);if(!r.ok)throw Error('Unable to include '+file.name+'. Pack was not downloaded.');entries.push({name:'Documents/'+safeName(file.id)+'-'+safeName(file.name),data:new Uint8Array(await r.arrayBuffer())});}
   assertStableFinanceSnapshot(snapshot,await readSnapshot());
   download(storedZip(entries),safeName(p.reference)+'-finance-'+d.purpose+'.zip');feedback.replaceChildren(notice('Pack downloaded with project records and documents. Review it before sharing; attach it manually to your email.'));

@@ -2,7 +2,7 @@ import {adelaideToday} from './credential-expiry.js';
 import {registerDraftSource,trackDraftForm,refreshDraftReview,installDraftReview,revealDraftForm,pendingDrafts} from './draft-review.js';
 import {renderProjectContacts} from './project-contacts.js';
 import {applyActionStyles,installActionStyles} from './action-styles.js';
-import {renderInvoiceReferences} from './invoice-references.js';
+import {financeStatusRows,renderFinanceStatusForm,renderInvoiceReferences} from './invoice-references.js';
 import {residentialAddressText} from './client-address.js';
 import {auditReferenceIds,auditAction,auditChanges,formatValue as displayValue} from './record-values.js';
 import {renderProfileDetails} from './profile-details.js';
@@ -13,10 +13,10 @@ import {renderReports} from './reports.js';
 import {renderSettings,configureSettings} from './settings.js';
 import {requireLocalSession,sessionEnded,showAuthFailure} from './local-login.js';
 import {configureOperations,renderOperations,operationsHaveDrafts,renderNotes} from './operations.js';
-import {configureCare,careHasDrafts,renderProjectCare} from './project-care.js';
-import {renderLifecycle} from './project-lifecycle.js';
+import {configureCare,careHasDrafts,renderLockedFinanceStatusDraft,renderProjectCare} from './project-care.js';
+import {financeRecordingAccess,renderLifecycle} from './project-lifecycle.js';
 import {projectLifecycleStatus} from './lifecycle-model.js';
-import {renderFinancePack} from './finance-pack.js';
+import {renderFinancePack,renderSavedDocumentDownloads} from './finance-pack.js';
 import {renderAssessmentTemplateDownloads} from './assessment-templates.js';
 import {renderProjectHistory} from './project-history.js';
 import {renderCredentials} from './technician-credentials.js';
@@ -360,25 +360,25 @@ function auditPanel(p,operationsPromise,managed=false) {
 async function project(view, id) {
   let tab = location.hash.split('/')[2]==='costs'?'Costs & invoices':projectTabs.get(id)??'Overview'; let editMode = drafts.has(id); let success = '';
   const operationsPromise=api(`projects/${id}/operations`);
-  const [projectRecord,projectOperations,projectLocation,adminDetails,adminOptions,workPlan,currentLifecycle]=await Promise.all([
+  const [projectRecord,projectOperations,projectLocation,adminDetails,adminOptions,workPlan,currentLifecycle,financeStatus]=await Promise.all([
     api(`projects/${id}`),operationsPromise,api(`projects/${id}/location`),api(`projects/${id}/admin-details`),
-    api('project-admin-options'),api(`projects/${id}/work-plan`),api(`projects/${id}/lifecycle`)
+    api('project-admin-options'),api(`projects/${id}/work-plan`),api(`projects/${id}/lifecycle`),api(`projects/${id}/finance-status`)
   ]);
   let p=projectRecord;
-  const destinations=['Overview','Files','Costs & invoices','Workflow history'];
+  const destinations=['Overview','Files','Costs & invoices','Finance status','Workflow history'];
   if(!destinations.includes(tab)&&!['Task','Edit details','Audit trail','Case-note history','Hold or resume work','Record hours','Prepare invoices','Print documents','Contacts','Team','Funding','Feedback'].includes(tab)&&!tab.startsWith('Action:'))tab='Overview';
   view.classList.add('project-workspace');view.dataset.recordContext=p.reference+' · '+p.title;
   view.append(link('← All projects','projects','breadcrumb'));
   const meta=el('div',undefined,'record-meta'),header=recordHeader(view,p.reference,p.title,meta),headerActions=el('div',undefined,'project-more-wrap');header.firstElementChild.classList.add('project-identity');header.append(headerActions);
   const tabs=el('div',undefined,'record-tabs project-nav');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Project detail');view.append(tabs);
   const subnav=el('div',undefined,'project-subnav');subnav.setAttribute('role','tablist');subnav.setAttribute('aria-label','Project section');view.append(subnav);view.insertBefore(tabs,header);view.insertBefore(subnav,header);
-  const overview=el('section',undefined,'project-overview'),task=el('section',undefined,'project-task'),filesPane=el('section'),costsPane=el('section'),recordPane=el('section'),editPane=el('section');
+  const overview=el('section',undefined,'project-overview'),task=el('section',undefined,'project-task'),filesPane=el('section'),costsPane=el('section'),financePane=el('section',undefined,'project-finance-editor'),recordPane=el('section'),editPane=el('section');
   const content=el('div'),auditPane=el('section'),caseNotesPane=el('section');editPane.append(content);auditPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),el('p','Loading history…'));caseNotesPane.append(button('← Project overview',()=>navigate('Overview'),'secondary'));
   const taskForm=el('div',undefined,'project-task-form'),taskContext=el('aside',undefined,'project-task-context'),taskGrid=el('div',undefined,'project-task-grid');taskGrid.append(taskContext,taskForm);
   const taskNavigation=el('nav',undefined,'project-task-navigation actions');taskNavigation.setAttribute('aria-label','Workflow navigation');
   taskNavigation.append(button('← Project overview',()=>navigate('Overview'),'secondary'));
   task.append(taskNavigation,taskGrid);
-  view.append(overview,task,filesPane,costsPane,recordPane,editPane,auditPane,caseNotesPane);
+  view.append(overview,task,filesPane,costsPane,financePane,recordPane,editPane,auditPane,caseNotesPane);
   const actionSource=el('div'),fundingReference=el('div');
   const careContext={project:p,ops:projectOperations,plan:workPlan,location:projectLocation,lifecycle:currentLifecycle};
   const [lifecycle]=await Promise.all([
@@ -394,6 +394,23 @@ async function project(view, id) {
   if(!recordPane.children.length){const empty=panel('Workflow history');empty.append(el('p','No workflow decisions have been recorded for this project yet. Operator notes are in Case notes; technical changes are in Audit trail.'));recordPane.append(empty);}
   filesPane.prepend(returnNavigation('Files'));costsPane.prepend(returnNavigation('Costs'));editPane.prepend(returnNavigation('Details'));
   costsPane.prepend(el('h2','Costs & invoices'));
+  const costReturns=lifecycle.state?.costReturns??[];
+  const costStage=lifecycle.effectiveStage??lifecycle.state?.stage;
+  if(costReturns.length||['customer_signoff','finance_handoff','finance_finalisation'].includes(costStage)){
+    const returnsPanel=panel('Technician cost return and summary');
+    if(['customer_signoff','finance_handoff','finance_finalisation'].includes(costStage)){
+      returnsPanel.append(button('Open cost return entry',async()=>{
+        const correction=[...actionPanes].find(([,entry])=>entry.title.startsWith('Correct actual cost return'));
+        const destination=correction?.[0]??'Task';
+        await navigate(destination);
+        const input=panes.get(destination)?.querySelector('[aria-label="Cost return received on"]');
+        for(let parent=input?.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+        input?.focus();
+      },'secondary'));
+    }
+    if(costReturns.length)renderSavedDocumentDownloads(returnsPanel,p,{cover:false,returns:costReturns});
+    costsPane.append(returnsPanel);
+  }
   const financeRelevant=!lifecycle.managed||['finance_clearance','work','customer_signoff','finance_finalisation','ready_to_close','closed'].includes(lifecycle.effectiveStage??lifecycle.state?.stage);
   if(financeRelevant)costsPane.append(link('Prepare or review invoices','operations/'+id+'/invoices','button secondary'));else costsPane.append(el('p','Assessment is free. Invoice preparation becomes available after the client accepts the quote.','field-help'));
   let careLoading,invoiceReferencesLoading;
@@ -463,9 +480,26 @@ async function project(view, id) {
   const finance=panel('Finance status');finance.classList.add('project-finance-summary');
   const money=value=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(value/100),fullDate=value=>value?new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Adelaide',day:'numeric',month:'short',year:'numeric'}).format(new Date(value.includes('T')?value:value+'T12:00:00Z')):'Not recorded';
   const clearance=state?.financeClearance,lastPayment=[...(workPlan.payments??[])].sort((a,b)=>b.receivedOn.localeCompare(a.receivedOn))[0];
-  const financeStateFacts=state?.schema===2?[['Cost summary sent to finance',fullDate(state.financeHandoff?.sentOn)],['Client payment',state.financeFinalisation?.clientPaymentResolved?'Resolved by finance':'Not confirmed'],['Technician reimbursement',state.financeFinalisation?.technicianPaymentResolved?'Resolved by finance':'Not confirmed']]:[['Finance clearance',clearance?.status==='paid'?'Payment confirmed':clearance?.status==='exempt'?'Authorised exemption':'Not recorded'],['Finance confirmation date',fullDate(clearance?.confirmedOn)]];
-  const financeFacts=details([['Latest quote',quote?money(quote.totalCents)+' · Revision '+quote.version:'Not recorded'],['Quote saved',fullDate(quote?.at)],['Current quote sent',fullDate(quoteIssued?.data.sentOn)],...financeStateFacts,['Latest recorded receipt',fullDate(lastPayment?.receivedOn)],['Invoice required',p.invoiceRequired?'Yes':'No']]);finance.append(financeFacts);
-  finance.append(el('p','The recorded Work Request authorises technical work after assessment review and quote approval. Finance handoff, invoices and receipts are separate records. Earlier workflows retain their recorded clearance requirements.','field-help'),button('View costs & invoices',()=>navigate('Costs & invoices'),'text-button'));
+  const statusFacts=financeStatusRows(lifecycle,financeStatus);
+  finance.append(details(statusFacts),button('Review finance status',()=>navigate('Finance status'),'primary'));
+  const otherFinance=el('details',undefined,'project-context-details');otherFinance.append(el('summary','Other finance records'));
+  const financeStateFacts=state?.schema===2?[['Client payment resolution',state.financeFinalisation?.clientPaymentResolved?'Resolved by finance':'Not confirmed'],['Technician payment resolution',state.financeFinalisation?.technicianPaymentResolved?'Resolved by finance':'Not confirmed']]:[['Finance clearance',clearance?.status==='paid'?'Payment confirmed':clearance?.status==='exempt'?'Authorised exemption':'Not recorded'],['Finance confirmation date',fullDate(clearance?.confirmedOn)]];
+  const invoiceRequiredValue=el('span',p.invoiceRequired?'Yes':'No');
+  otherFinance.append(details([['Quote saved',fullDate(quote?.at)],...financeStateFacts,['Latest recorded receipt',fullDate(lastPayment?.receivedOn)],['Invoice required',invoiceRequiredValue]]));
+  finance.append(otherFinance,button('View costs & invoices',()=>navigate('Costs & invoices'),'text-button'));
+  const financeReadback=panel('Finance status');
+  financeReadback.append(details(statusFacts),el('p','Record the quote, approval, cost return and handoff in the project workflow.','field-help'),button('Open project workflow',()=>navigate('Task'),'secondary'));
+  financePane.append(returnNavigation('Finance status'),financeReadback);
+  let financeEditorLoading;
+  function loadFinanceEditor(){
+    if(!financeEditorLoading)financeEditorLoading=(async()=>{
+      const locked=p.status==='closed'||state?.closed||state?.financeFinalisation;
+      const access=locked?{allowed:false,message:'Finance records are read-only after finalisation or project closure.'}:await financeRecordingAccess('finance_status');
+      if(access.allowed)renderFinanceStatusForm(financePane,id,financeStatus);
+      else {financePane.append(el('p',access.message,'field-help'));renderLockedFinanceStatusDraft(financePane,id);}
+    })();
+    return financeEditorLoading;
+  }
   layout.append(notes,brief,finance);
   let noteSaved=false;
   function showLatestNote(operations){
@@ -489,7 +523,7 @@ async function project(view, id) {
     {label:'Team',items:[['Team','Team']]},
     {label:'Funding',items:[['Funding','Funding']]},
     {label:'Files',items:[['Files','Project files'],['Print documents','Print documents']]},
-    {label:'Costs',items:[['Costs & invoices','Cost summary'],...(financeRelevant?[['Prepare invoices','Invoices']]:[])]},
+    {label:'Costs',items:[['Costs & invoices','Cost summary'],['Finance status','Finance status'],...(financeRelevant?[['Prepare invoices','Invoices']]:[])]},
     {label:'Hours',items:[['Record hours','Hours']]},
     {label:'Workflow',items:[['Task','Current step'],['Workflow history','Workflow history'],['Hold or resume work','Hold or resume work'],...[...actionPanes].map(([key,value])=>[key,value.title])]},
     {label:'Feedback',items:[['Feedback','Customer feedback']]},
@@ -499,7 +533,7 @@ async function project(view, id) {
   const more=button('Project sections',()=>{menu.hidden=!menu.hidden;more.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('[aria-current=page],button')?.focus();},'secondary project-sections-toggle'),menu=el('div',undefined,'project-more-menu');menu.hidden=true;more.setAttribute('aria-expanded','false');more.setAttribute('aria-controls','project-more-menu');menu.id='project-more-menu';
   for(const section of sections)menu.append(button(section.label,()=>navigate(section.items[0][0]),''));
   headerActions.append(more,menu);headerActions.addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;more.setAttribute('aria-expanded','false');more.focus();}});
-  const panes=new Map([['Overview',overview],['Task',task],['Files',filesPane],['Costs & invoices',costsPane],['Workflow history',recordPane],['Edit details',editPane],['Audit trail',auditPane],['Case-note history',caseNotesPane],...[...embedded].map(([key,value])=>[key,value.pane]),...[...actionPanes].map(([key,value])=>[key,value.pane])]);
+  const panes=new Map([['Overview',overview],['Task',task],['Files',filesPane],['Costs & invoices',costsPane],['Finance status',financePane],['Workflow history',recordPane],['Edit details',editPane],['Audit trail',auditPane],['Case-note history',caseNotesPane],...[...embedded].map(([key,value])=>[key,value.pane]),...[...actionPanes].map(([key,value])=>[key,value.pane])]);
   function tabButton(label,key,index,active,container,prefix){
     const b=button(label,()=>navigate(key),'');b.id=prefix+index;b.dataset.destination=key;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;b.setAttribute('aria-controls','project-focused-pane');
     b.addEventListener('keydown',async event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...container.querySelectorAll('[role=tab]')];const target=event.key==='Home'?buttons[0]:event.key==='End'?buttons.at(-1):buttons[(index+(event.key==='ArrowRight'?1:buttons.length-1))%buttons.length];const targetId=target.id;await navigate(target.dataset.destination);if(tab===target.dataset.destination&&view.isConnected)document.getElementById(targetId)?.focus();});return b;
@@ -508,6 +542,7 @@ async function project(view, id) {
   const sectionLoads=new Map();
   const carePanes=new Map([['Files',filesPane],['Costs & invoices',costsPane],['Edit details',editPane],['Funding',embedded.get('Funding').pane]]);
   function loadProjectSection(name){
+    if(name==='Finance status')return loadFinanceEditor();
     const carePane=carePanes.get(name);
     if(!carePane)return loadEmbedded(name);
     if(sectionLoads.has(name))return sectionLoads.get(name);
@@ -542,9 +577,9 @@ async function project(view, id) {
       }
       return;
     }
-    tab=name;menu.hidden=true;more.setAttribute('aria-expanded','false');draw();await loadProjectSection(name);if(tab!==name)return;const destination=embedded.get(name)?.pane??(name==='Task'?task:name==='Overview'?overview:name==='Files'?filesPane:name==='Costs & invoices'?costsPane:name==='Workflow history'?recordPane:name==='Edit details'?editPane:name==='Audit trail'?auditPane:name==='Case-note history'?caseNotesPane:actionPanes.get(name)?.pane);destination?.focus({preventScroll:true});(tabs.getClientRects().length?tabs:header).scrollIntoView({block:'nearest'});return destination;}
+    tab=name;menu.hidden=true;more.setAttribute('aria-expanded','false');draw();await loadProjectSection(name);if(tab!==name)return;const destination=panes.get(name);destination?.focus({preventScroll:true});(tabs.getClientRects().length?tabs:header).scrollIntoView({block:'nearest'});return destination;}
   function draw(){
-    projectTabs.set(id,tab);header.querySelector('h1').textContent=p.title;header.querySelector('.eyebrow').replaceChildren(el('small','Project no.'),el('strong',p.reference,'project-number'));financeFacts.lastElementChild.querySelector('dd').textContent=p.invoiceRequired?'Yes':'No';meta.replaceChildren();
+    projectTabs.set(id,tab);header.querySelector('h1').textContent=p.title;header.querySelector('.eyebrow').replaceChildren(el('small','Project no.'),el('strong',p.reference,'project-number'));invoiceRequiredValue.textContent=p.invoiceRequired?'Yes':'No';meta.replaceChildren();
     const recordStatus=registerStatus({status:p.status,onHold:projectOperations.onHold||projectOperations.clientStopped,cancelled:Boolean(state?.cancellation||p.cancelled)});
     const headerFacts=[
       ['Status',recordStatus,'Edit details'],
