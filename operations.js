@@ -111,7 +111,14 @@ export function renderNotes(view,id,ops,compact=false,onConfirmed){
   if(compact)entry.append(node('h3','Latest case note'));
   entry.append(node('p',n.text,'case-note'),node('small',`${n.actor||'Development operator'} · ${new Date(n.at||n.createdAt).toLocaleString('en-AU')}`));box.append(entry);
  }
- if(compact){if(ops.notes.length)box.append(link('View all case notes','operations/'+id));else box.append(node('p','No case notes recorded yet.','muted'));}
+ if(compact){
+  if(ops.notes.length)box.append(link('View all case notes','operations/'+id));
+  else{
+   const empty=node('article',null,'case-note-entry');
+   empty.append(node('h3','Latest case note'),node('p','No case notes recorded yet.','case-note muted'));
+   box.append(empty);
+  }
+ }
  const key='note/'+id,d=drafts.get(key)??{requestId:crypto.randomUUID(),text:'',baseVersion:ops.version};
  baselineDraft(d);const form=node('form',null,'form-grid case-note-form');trackDraftForm(form,'operations',key,{label:'Case note'});input(form,'New case note',d,'text','textarea').required=true;form.oninput=()=>{if(draftChanged(d))drafts.set(key,d);else drafts.delete(key);refreshDraftReview();};
  const feedback=node('div',null,'case-note-feedback'),submit=node('button','Add case note','primary');submit.type='submit';submit.dataset.label='Add case note';const discard=button('Discard unsaved case note',()=>{if(d.pending||host.isSaving?.())return;drafts.delete(key);d.text='';form.querySelector('textarea').value='';feedback.replaceChildren();refreshDraftReview();form.querySelector('textarea').focus();});discard.disabled=Boolean(d.pending);const actions=node('div',null,'actions');actions.append(submit,discard);form.append(feedback,actions);

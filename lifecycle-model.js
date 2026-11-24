@@ -26,6 +26,7 @@ export function canCancelEnquiryWithoutFinance(state,{actualMinutes,hasInvoice,i
 }
 export function projectLifecycleStatus(state,{projectStatus,programme}={}){
  if(state?.cancellation){
+  if(state.cancellation.closedWithoutFinance===true)return 'Enquiry';
   if(state.closed||projectStatus==='closed')return 'Cancelled';
   return state.financeFinalisation?'Cancelled · Finance finalised':'Cancelled · Finance pending';
  }

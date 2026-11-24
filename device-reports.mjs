@@ -1,3 +1,5 @@
+import {projectLifecycleStatus} from './lifecycle-model.js';
+import {reviewDay} from './project-details-model.js';
 import {installModelExtensions,fail} from './device-model.mjs';
 import {validateReportQuery,applyReportQuery} from './report-model.js';
 // Deliberately project only the reporting allowlist; never include case notes,
@@ -19,7 +21,12 @@ export function deviceReportRows(d,dataset){
   const address=addresses.get(p.clientId)??{},operations=d.operations[p.id],quote=d.lifecycles[p.id]?.quotes?.at(-1),invoices=operations?.invoices;
   invoiceCount+=invoices?.length??0;
   if(invoiceCount>100000)fail('This device report contains too many invoice records. Use the database application for larger reports.');
-  return {id:p.id,reference:p.reference,title:p.title,status:p.status,clientName:people.get(clients.get(p.clientId))??'',
+  const life=d.lifecycles[p.id],cancelled=life?.cancellation;
+  const recordStatus=cancelled?'Cancelled':p.status==='closed'?'Closed':operations?.onHold||operations?.clientStopped?'On hold':p.status==='review'?'Review':'Open';
+  return {id:p.id,reference:p.reference,title:p.title,status:p.status,recordStatus,
+   workflowStatus:projectLifecycleStatus(life,{projectStatus:p.status,programme:d.projectAdminDetails?.[p.id]?.programme}),
+   cancelledOn:cancelled?.at?reviewDay(cancelled.at):null,cancellationReason:cancelled?.reason??null,
+   cancelledBy:typeof cancelled?.actor==='string'?cancelled.actor:cancelled?.actor?.displayName??null,clientName:people.get(clients.get(p.clientId))??'',
    clientSuburb:address.residentialSuburb??'',clientState:address.residentialState??'',clientPostcode:address.residentialPostcode??'',hoursWorked:typeof operations?.actualMinutes==='number'?operations.actualMinutes/60:null,
    hoursRemaining:operations?.workEstimateRecorded!==false&&typeof operations?.remainingMinutes==='number'?operations.remainingMinutes/60:null,
    quoteTotal:typeof quote?.totalCents==='number'?quote.totalCents/100:null,

@@ -16,7 +16,7 @@ export function renderProjectDraftReturn(view,route){
   const d=drafts.get('new-project');
   if(route==='new-project'||!d||(!d.dirty&&!d.pending&&d.step===1))return;
   const banner=el('aside',null,'project-draft-return');banner.setAttribute('aria-label','Project in progress');
-  const context=el('div');context.append(el('strong',d.title.trim()||'New project in progress'),el('span',`Step ${d.step} of 4 · Unsaved draft kept in this tab.`));
+  const context=el('div');context.append(el('strong',d.title.trim()||'New enquiry in progress'),el('span',`Step ${d.step} of 4 · Unsaved draft kept in this tab.`));
   banner.append(context,link('← Return to project draft','new-project','button secondary'));view.prepend(banner);
 }
 const el = (tag, text, cls) => { const n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; };
@@ -79,7 +79,7 @@ async function newClient(view, arg) {
   const key = 'new-client'; const d = getDraft(key, { name: '', email: '', phone: '', language: 'English', allowDuplicate: false, forProject: arg === 'project' });
   if (arg === 'project') d.forProject = true;
   title(view, 'New client', 'Start with the details you know. A client can be saved before there is a project.');
-  const box = panel('Client details'); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New project':key==='new-client'?'New client':'Person details'});
+  const box = panel('Client details'); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New enquiry':key==='new-client'?'New client':'Person details'});
   field(form, 'Full name', d, 'name', { required: true, help: 'Use the name the client wants us to use. Required.' });
   field(form, 'Phone number', d, 'phone', { type: 'tel', max: 40, help: 'Optional. Helpful when checking whether this person already has a record.' });
   field(form, 'Email address', d, 'email', { type: 'email', max: 200, help: 'Optional. Do not invent an address if it is unknown.' });
@@ -232,12 +232,12 @@ async function newProject(view, clientId) {
   const dirs = await directories();
   if (clientId && !d.clientId) { d.clientId = clientId; d.step = 2; }
   let selected = d.clientId ? await request('clients/'+d.clientId) : null;
-  title(view, 'New project', 'Record an email enquiry or phone call. A project number is assigned automatically; assessment and technical work stay in this project.');
+  title(view, 'New enquiry', 'Record the request for review. If TADSA accepts it, the assessment and project keep this reference.');
   const steps = el('ol', null, 'workflow-steps'); for (const [i,label] of ['Client','Project details','Funding & technical team','Review'].entries()) { const n = el('li', `${i+1}. ${label}`); if (i+1 === d.step) n.setAttribute('aria-current','step'); steps.append(n); } view.append(steps);
   const slot = el('div'); view.append(slot);
   function draw() {
     slot.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.destroy());slot.replaceChildren(); steps.querySelectorAll('li').forEach((n,i) => i+1 === d.step ? n.setAttribute('aria-current','step') : n.removeAttribute('aria-current'));
-    const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technical team','Review'][d.step-1]}`); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New project':key==='new-client'?'New client':'Person details'}); const notice = el('div');
+    const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technical team','Review'][d.step-1]}`); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New enquiry':key==='new-client'?'New client':'Person details'}); const notice = el('div');
     if (d.step === 1) {
       const picker=createRecordPicker({label:'Existing client',kind:'clients',selectedId:d.clientId,required:true,onChange:async(id,item)=>{d.clientId=id;selected=item?{person:{name:item.name},details:{residentialAddress:item.address}}:null;touch(d);if(id){try{const client=await request('clients/'+id);if(d.clientId===id){selected=client;if(d.step===3&&slot.isConnected)draw();}}catch{}}}});picker.element.recordPicker=picker;form.append(picker.element,link('Create new client','new-client/project','button secondary'),el('p','Search by name, reference, phone, email or address. Confirm the person’s details before choosing.','field-help'));
     } else if (d.step === 2) {
@@ -255,12 +255,12 @@ async function newProject(view, clientId) {
       form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technical team',dirs.technicians.filter(t=>(d.technicianIds??[]).includes(t.id)).map(t=>t.name+(t.id===d.technicianId?' (lead)':'')).join(', ')||'Not assigned yet']]));
       form.append(note('Check the client and project details before saving. No emails, work instructions or invoices will be sent.'));
     }
-    const actions=el('div',null,'actions');const next=saveButton(d.step===4?'Create project':'Continue');
+    const actions=el('div',null,'actions');const next=saveButton(d.step===4?'Save enquiry':'Continue');
     if(d.step>1)actions.append(button('Back',()=>{d.step--;draw();slot.querySelector('h2').tabIndex=-1;slot.querySelector('h2').focus({preventScroll:true});window.scrollTo(0,0);}));
-    actions.append(next,cancel(form,d,key,d.clientId?'client/'+d.clientId:'projects','Cancel new project'));form.append(notice,actions);box.append(form);slot.append(box);
+    actions.append(next,cancel(form,d,key,d.clientId?'client/'+d.clientId:'projects','Cancel new enquiry'));form.append(notice,actions);box.append(form);slot.append(box);
     form.addEventListener('submit',e=>{e.preventDefault();if(d.step===1&&!d.clientId){notice.replaceChildren(note('Choose the existing client or create a new client to continue.',true));return;}if(!allocationValid(form,d,notice))return;
       if(d.step<4){d.step++;draw();slot.querySelector('h2').tabIndex=-1;slot.querySelector('h2').focus({preventScroll:true});window.scrollTo(0,0);return;}
-      save(form,d,notice,next,'projects','POST',{requestId:d.requestId,clientId:d.clientId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,followUpOn:d.followUpOn??reviewDay(),...coordinationValues(d)},result=>{drafts.delete(key);host.announce('Project created.');location.hash='project/'+result.id;});
+      save(form,d,notice,next,'projects','POST',{requestId:d.requestId,clientId:d.clientId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,followUpOn:d.followUpOn??reviewDay(),...coordinationValues(d)},result=>{drafts.delete(key);host.announce('Enquiry saved.');location.hash='project/'+result.id;});
     });
     if(d.pending){notice.append(note('A previous save was not confirmed. Retry the same request safely.'));lock(form,true,next);next.textContent='Retry save safely';}
   }

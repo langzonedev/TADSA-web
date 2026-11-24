@@ -1,4 +1,4 @@
-import {REPORT_DATASETS,REPORT_OPERATORS,validateReportQuery} from './report-model.js';
+import {REPORT_DATASETS,REPORT_OPERATORS,validateReportQuery,cancelledEnquiriesQuery} from './report-model.js';
 import {node,action,notice} from './project-care.js';
 const clone=v=>JSON.parse(JSON.stringify(v));
 const storageKey='tadsa-report-definitions-v1';
@@ -24,7 +24,12 @@ export function renderReportBuilder(view){
  const builder=node('form',null,'panel report-builder');const fields=node('div',null,'report-controls'),filterBox=node('div'),columnBox=node('fieldset',null,'report-columns'),output=node('section',null,'report-output');output.setAttribute('aria-live','polite');
  const feedback=node('div'),run=node('button','Run report','primary');run.type='submit';const cancel=action('Cancel report',()=>{sequence++;requestController?.abort();run.disabled=false;cancel.hidden=true;output.removeAttribute('aria-busy');output.replaceChildren(notice('Report cancelled. Adjust the filters or run it again.'));});cancel.hidden=true;
  const savedBox=node('div',null,'report-saved'),savedState=node('p',null,'field-help');let selectedName='',modified=false;
- view.append(heading,builder,output);builder.append(savedBox,fields,filterBox,columnBox,feedback);const controls=node('div',null,'actions');controls.append(run,cancel);builder.append(controls);
+ const enquiries=action('Cancelled enquiries',()=>{
+   query=cancelledEnquiriesQuery();selectedName='';modified=false;
+   invalidate(false);drawSaved();draw();
+   filterBox.querySelector('input[type=date]')?.focus();
+ });
+ view.append(heading,builder,output);builder.append(enquiries,savedBox,fields,filterBox,columnBox,feedback);const controls=node('div',null,'actions');controls.append(run,cancel);builder.append(controls);
  function datasets(){return Object.entries(REPORT_DATASETS);}
  function config(){return REPORT_DATASETS[query.dataset];}
  function fieldList(){return config().fields;}
@@ -40,6 +45,7 @@ export function renderReportBuilder(view){
   select(fields,'Order',[['asc','A to Z / lowest first'],['desc','Z to A / highest first']],query.sort?.direction??'asc',value=>{query.sort={field:query.sort?.field??fieldList()[0].key,direction:value};invalidate();});
   select(fields,'Rows per page',[['25','25'],['50','50'],['100','100']],String(query.limit),value=>{query.limit=Number(value);invalidate();});
   filterBox.replaceChildren(node('h2','Only include records where…'),node('p','All conditions must match. Leave conditions empty to include every record. Missing numbers do not count as zero.','field-help'));
+  if(query.filters.some(f=>f.field==='cancelledOn'))filterBox.append(node('p','Use the cancellation date recorded in Adelaide. The start and end dates are included.','field-help'));
   query.filters.forEach((filter,index)=>{
    const row=node('div',null,'report-filter');const f=fieldList().find(f=>f.key===filter.field)??fieldList()[0];
    select(row,'Field '+(index+1),fieldList().map(f=>[f.key,f.label]),f.key,value=>{const field=fieldList().find(f=>f.key===value);query.filters[index]={field:value,operator:operators(field)[0].value,value:''};invalidate();draw();});

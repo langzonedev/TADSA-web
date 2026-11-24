@@ -96,13 +96,47 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
 }
 .project-home-notes .case-note-entry {
   min-width: 0;
+  margin: 0;
 }
 .project-home-notes .case-note-entry .case-note {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: none;
   overflow: visible;
-  margin: 4px 0;
+  box-sizing: border-box;
+  margin: 0 0 4px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  min-height: 5.5rem;
+}
+.project-home-notes .case-note-form textarea {
+  box-sizing: border-box;
+  height: 5.5rem;
+  min-height: 5.5rem;
+}
+.project-home-notes .case-note-entry h3,
+.project-home-notes .case-note-form .field-label {
+  display: block;
+  margin: 0 0 4px;
+  font-size: .875rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.project-home-notes .case-notes-panel > .text-button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.project-home-notes h2, .project-home-brief > h2, .project-finance-summary > h2 {
+  text-transform: uppercase;
+}
+.project-finance-summary .detail-pairs :is(dt, dd) { font-size: .875rem; }
+.project-identity .eyebrow small { font-weight: 700; }
+main:has(> .project-workspace) { padding-top: 4px; }
+.project-workspace > .breadcrumb { margin-block: 0; }
+@media (pointer: fine) {
+  .project-workspace > .breadcrumb { min-height: 30px; padding-block: 2px; }
 }
 .project-overview-grid .project-facts {
   align-items: start;
@@ -150,11 +184,13 @@ html:not([data-auth-state=ready]) .draft-review{display:none}
   }
   .project-home-notes > .case-notes-panel > :not(form) {
     grid-column: 1;
-    justify-self: start;
+    justify-self: stretch;
   }
+  .project-home-notes > .case-notes-panel > h2 { grid-column: 1 / -1; }
+  .project-home-notes > .case-notes-panel > .text-button { justify-self: start; }
   .project-home-notes > .case-notes-panel > form {
     grid-column: 2;
-    grid-row: 1 / 4;
+    grid-row: 2 / 4;
     min-width: 0;
     margin: 0;
   }
