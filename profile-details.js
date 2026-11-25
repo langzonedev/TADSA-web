@@ -148,14 +148,15 @@ export async function renderProfileDetails(parent,person,{client=null}={}){
  for(const entries of [values.contact,values.personal]){
   const dl=node('dl',null,'contact-overview-values');
   for(const [label,value]of entries){
-   const dd=node('dd',value);
+   const dt=node('dt',label),dd=node('dd',value);
    if(entries===values.contact&&/^Phone/.test(label)&&alternatePhones.length){
+    dt.textContent='Phone numbers';
     dd.replaceChildren();dd.className='contact-phone-values';
     for(const [kind,number] of [[label,value],...alternatePhones]){
      const item=node('span');item.append(node('strong',kind==='Phone'?'Primary':kind),node('span',number));dd.append(item);
     }
    }
-   dl.append(node('dt',label),dd);
+   dl.append(dt,dd);
   }
   overview.append(dl);
  }
