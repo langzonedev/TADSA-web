@@ -98,9 +98,16 @@ function recipientFields(parent,label,choices,preferred=''){
  }};
 }
 
-function showMail(parent,address,subject,body){
+function showMail(parent,address,subject,body,validate,isCurrent){
  const message=node('div',null,'assessment-mail-draft');message.append(node('h4','Review email draft'),node('p','To: '+address),node('strong',subject),node('p',body));
  const open=node('a','Open in email app','button secondary');open.href='mailto:'+encodeURIComponent(address)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+ let checking=false;
+ open.addEventListener('click',async event=>{
+  event.preventDefault();if(checking||!isCurrent())return;checking=true;
+  try{await validate();if(isCurrent()&&open.isConnected)window.location.assign(open.href);}
+  catch(error){if(isCurrent())parent.replaceChildren(notice(error.message,true));}
+  finally{checking=false;}
+ });
  message.append(open);parent.replaceChildren(message);
 }
 
@@ -123,7 +130,7 @@ function renderDispatch(parent,project,current,client,files,options){
  let techDraft=0,contactDraft=0;
  const mail=node('div');box.append(action('Prepare technician email',async()=>{const ticket=++techDraft;try{
   const person=tech.read();await checkCurrent(person);if(ticket!==techDraft)return;
-  showMail(mail,person.email,'Assessment request · TADSA '+project.reference,'Hi '+person.name+',\n\nPlease see the attached assessment request and report form for project '+project.reference+'. Please complete the report after the visit and return it to the project manager.\n\nThanks');
+  showMail(mail,person.email,'Assessment request · TADSA '+project.reference,'Hi '+person.name+',\n\nPlease see the attached assessment request and report form for project '+project.reference+'. Please complete the report after the visit and return it to the project manager.\n\nThanks',()=>checkCurrent(person),()=>ticket===techDraft);
  }catch(e){if(ticket===techDraft)mail.replaceChildren(notice(e.message,true));}}),mail);
  const alreadySent=state.assessmentDispatch?.requestFileId===pack.requestFileId;
  let confirmation;
@@ -136,7 +143,8 @@ function renderDispatch(parent,project,current,client,files,options){
   return {requestId:d.requestId,version:d.version,action:'assessmentRequestSent',data:{sentOn:d.sentOn,technicianId:p.id,technicianName:p.name,technicianEmail:p.email,requestFileId:pack.requestFileId,reportFileId:pack.reportFileId}};
  },{saveLabel:'Record assessment request sent'});
  const visitDraft=node('div');
- const resetRecipient=()=>{techDraft++;contactDraft++;mail.replaceChildren();visitDraft.replaceChildren();if(confirmation?.checked){confirmation.checked=false;confirmation.dispatchEvent(new Event('change',{bubbles:true}));}};
+ const clearPreviews=()=>{mail.replaceChildren();visitDraft.replaceChildren();if(confirmation?.checked){confirmation.checked=false;confirmation.dispatchEvent(new Event('change',{bubbles:true}));}};
+ const resetRecipient=()=>{techDraft++;contactDraft++;clearPreviews();};
  tech.choose.addEventListener('change',resetRecipient);tech.email.addEventListener('input',resetRecipient);
  const arrange=node('section',null,'panel workflow-panel');parent.append(arrange);arrange.append(node('h3','Ask a contact to arrange the visit'));
  const contacts=arrangingContacts(project,client);
@@ -146,16 +154,22 @@ function renderDispatch(parent,project,current,client,files,options){
  ref.choose.addEventListener('change',resetContact);ref.email.addEventListener('input',resetContact);
  arrange.append(action('Prepare visit arrangement email',async()=>{const ticket=++contactDraft;try{
   const person=tech.read(),recipient=ref.read();await checkCurrent(person,recipient);if(ticket!==contactDraft)return;
-  showMail(visitDraft,recipient.email,'Arrange an assessment visit · TADSA '+project.reference,'Hi '+recipient.name+',\n\nCould you please contact '+person.name+' ('+person.email+') to arrange a mutually suitable time with the client for the assessment visit for TADSA project '+project.reference+'?\n\nThanks');
+  showMail(visitDraft,recipient.email,'Arrange an assessment visit · TADSA '+project.reference,'Hi '+recipient.name+',\n\nCould you please contact '+person.name+' ('+person.email+') to arrange a mutually suitable time with the client for the assessment visit for TADSA project '+project.reference+'?\n\nThanks',()=>checkCurrent(person,recipient),()=>ticket===contactDraft);
  }catch(e){if(ticket===contactDraft)visitDraft.replaceChildren(notice(e.message,true));}}),visitDraft);
  async function checkCurrent(person,recipient){
+  const originalTech=techDraft,originalContact=contactDraft;
   const verifyAddress=async target=>{
    const entry=await request((target.type==='organisation'?'organisations/':'people/')+target.id);
    if(entry.name!==target.name||(entry.email||'')!==target.directoryEmail)throw Error('Directory contact details changed. Select the recipient again and review their name and email address.');
   };
-  const [fresh,workflow,freshClient]=await Promise.all([request('projects/'+project.id),request('projects/'+project.id+'/lifecycle'),request('clients/'+project.clientId),verifyAddress(person),...(recipient?[verifyAddress(recipient)]:[])]);
-  if(fresh.version!==current.version||workflow.state?.assessmentPack?.requestFileId!==pack.requestFileId||workflow.state?.stage!=='assessment'||held(workflow)||
-   !fresh.relationships.some(r=>r.role==='Technician'&&r.id===person.id)||recipient&&!arrangingContacts(fresh,freshClient).some(c=>c.id===recipient.id&&c.type===recipient.type))throw Error('The project or its contacts have changed. Reopen the assessment before preparing an email.');
+  try{
+   const [fresh,workflow,freshClient]=await Promise.all([request('projects/'+project.id),request('projects/'+project.id+'/lifecycle'),request('clients/'+project.clientId),verifyAddress(person),...(recipient?[verifyAddress(recipient)]:[])]);
+   if(fresh.version!==current.version||workflow.state?.assessmentPack?.requestFileId!==pack.requestFileId||workflow.state?.stage!=='assessment'||held(workflow)||
+    !fresh.relationships.some(r=>r.role==='Technician'&&r.id===person.id)||recipient&&!arrangingContacts(fresh,freshClient).some(c=>c.id===recipient.id&&c.type===recipient.type))throw Error('The project or its contacts have changed. Reopen the assessment before preparing an email.');
+  }catch(error){
+   if(originalTech===techDraft&&(!recipient||originalContact===contactDraft))clearPreviews();
+   throw error;
+  }
  }
 }
 

@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "e41d56d1916d157bdda7b4de8b7eaa0ad7491ff1",
+  "sourceRevision": "83662cdf25921047dd32c6ee95bf86417303da15",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "assessment-pack-model.js": {
@@ -9,7 +9,7 @@
     },
     "assessment-workspace.js": {
       "source": "public/assessment-workspace.js",
-      "sha256": "64552b0217c8dcf9bb94c42d0f59dd3f228f757d2da504c7712866940c71826e",
+      "sha256": "80f415b43dcbe75e6abbdfb500abd9356e1dba51434d6863d297d5ef4ea55e13",
       "transform": null
     },
     "assessment-word.js": {
@@ -325,5 +325,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "2df6cc9f35fb7c2b4e4e17abf02a3bcc35527fffca052b4917bf29e2978e113c"
+  "shellHash": "9ecd2b7b1155d85e834d54e182638ba7226c993cfe0052a1dcf5e70fe540ecf0"
 }
