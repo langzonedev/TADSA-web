@@ -1,5 +1,5 @@
 import {rankTechnicians,clientMatchLocation,workRegion,technicianMatchesFilters} from './technician-location-model.js';
-import {MEMBERSHIP_STATUSES,MAILING_COHORTS} from './profile-details-model.js';
+import {MEMBERSHIP_STATUSES,MAILING_COHORTS,matchingPersonRoles} from './profile-details-model.js';
 import {registerDraftSource,trackDraftForm,refreshDraftReview,baselineDraft,draftChanged} from './draft-review.js';
 import {organisationRoleSuggestions} from './organisation-model.js';
 import {reconcileContactDraft} from './contact-draft.js';
@@ -338,7 +338,7 @@ async function linkContact(view,id,initialRole='Occupational therapist') {
   field(form,'Relationship description (optional)',d,'relationshipLabel',{max:120});form.append(el('p','For example: parent, guardian or support coordinator. Multiple contacts can be linked; the preferred contact is selected separately in Client details.','field-help'));
   const mode=el('div',null,'actions');const slot=el('div');
   mode.append(button('Choose existing person',()=>{d.mode='existing';drawPerson();}),button('Create new contact',()=>{d.mode='new';d.personId='';drawPerson();}));form.append(mode,slot);
-  const matchesRelationship=p=>p.active!==false&&p.directoryStatus!=='inactive'&&p.id!==client.person.id&&(p.roles??[p.role]).includes(d.role);
+  const matchesRelationship=p=>p.active!==false&&p.directoryStatus!=='inactive'&&p.id!==client.person.id&&matchingPersonRoles(p.roles??[p.role],p.alliedHealthProfession).includes(d.role);
   function drawPerson(){
     slot.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.destroy());slot.replaceChildren();
     if(d.mode==='new'&&!d.personId){field(slot,'Full name',d,'name',{required:true});field(slot,'Phone number',d,'phone',{type:'tel',max:40});field(slot,'Email address',d,'email',{type:'email',max:200});field(slot,'Language',d,'language',{max:120});slot.append(el('p',`A ${d.role.toLowerCase()} profile will be created and linked to this client. This does not create a sign-in account.`,'field-help'));}
@@ -398,7 +398,12 @@ async function personProfile(view, id) {
   for (const skill of catalogue.skills) check(skills,skill,d.skills.includes(skill),on=>{d.skills=on?[...d.skills,skill]:d.skills.filter(s=>s!==skill);touch(d);});
   tech.append(el('span','Skills','field-label'),skills);
   selectField(tech,'General allocation status',d,'availability',catalogue.availability.map(v=>[v,v==='unknown'?'Not recorded':v==='unavailable'?'Unavailable':v==='limited'?'Limited availability':'Available']));
-  for(const role of catalogue.roles){const input=check(roles,role,d.roles.includes(role),on=>{d.roles=on?[...d.roles,role]:d.roles.filter(r=>r!==role);tech.hidden=!d.roles.includes('Technician');touch(d);});if(role==='Client'&&person?.clientId){input.disabled=true;input.dataset.keepDisabled='true';}}
+  for(const role of catalogue.roles){
+    if(role==='Occupational therapist'&&!person?.roles?.includes(role))continue;
+    const label=role==='Allied-health contact'?'Allied health':role==='Occupational therapist'?'Occupational therapist (existing role)':role;
+    const input=check(roles,label,d.roles.includes(role),on=>{d.roles=on?[...d.roles,role]:d.roles.filter(r=>r!==role);tech.hidden=!d.roles.includes('Technician');touch(d);});
+    if(role==='Client'&&person?.clientId){input.disabled=true;input.dataset.keepDisabled='true';}
+  }
   if(person?.clientId)roles.append(el('p','The linked client role is retained. Other roles can be recorded on this same person.','field-help'));
   const followUp=el('p',null,'field-help');
   function showRoleDetails(){

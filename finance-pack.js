@@ -1,6 +1,6 @@
 import {node,action,field,notice,request,downloadProjectFile} from './project-care.js';
 import {residentialAddressText} from './client-address.js';
-import {lifecycleGate,lifecycleCostLabels} from './lifecycle-model.js';
+import {awaitingAssessmentReport,lifecycleGate,lifecycleCostLabels} from './lifecycle-model.js';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=c=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format((c??0)/100);
 export function storedZip(files){
@@ -35,7 +35,7 @@ function printableDocumentBrand(business={},logo=''){
  return image+'<strong>TADSA · Technology for Ageing &amp; Disability SA</strong>'+
   (issuer.length?`<div class="issuer">${issuer.map(value=>`<div>${escape(value)}</div>`).join('')}</div>`:'');
 }
-function readDocumentLogo(){
+export function readDocumentLogo(){
  documentLogo??=fetch(new URL('./assets/tadsa-logo.png',import.meta.url))
   .then(async response=>{
    if(!response.ok)throw Error('Logo unavailable');
@@ -164,7 +164,7 @@ function requestContext(project,client,details){
  const team=(project.relationships??[]).filter(relation=>relation.role==='Technician').map(relation=>relation.name).join(', ');
  return '<h2>Project and visit</h2>'+facts([
   ['Project number',project.reference],['Project',project.title],['Assigned technical team',team],
-  ['TADSA work address',intake.sameAsResidential?address:intake.workAddress],['Next follow-up',details.followUpOn]
+  ['TADSA work address',details.assessmentVisitAddress||(intake.sameAsResidential?address:intake.workAddress)],['Next follow-up',details.followUpOn]
  ])+'<h2>Client and contacts</h2>'+facts([
   ['Client',person.name||project.clientName],['Client phone',person.phone],['Client email',person.email],
   ['Preferred contact',intake.preferredContact==='representative'?(representative?.name||'Representative no longer linked — review required'):'Client'],
@@ -175,7 +175,7 @@ function requestContext(project,client,details){
 export function assessmentRequestDocument(project,current,client,details={},brand){
  const s=current.state;
  if(current.workGate?.reasons?.some(reason=>/hold|stop/i.test(reason)))throw Error('Resolve the project hold or client stop before preparing an assessment request.');
- if(project.status==='closed'||!s||s.closed||s.cancellation||s.revisionRequested||s.stage!=='assessment'||s.assessmentDecision?.required!==true||s.assessment)throw Error('An assessment request is available only while a required assessment is awaiting findings.');
+ if(project.status==='closed'||!awaitingAssessmentReport(s))throw Error('An assessment request is available only while a required assessment is awaiting findings.');
  return htmlDocument('Assessment Request — '+project.reference,'<p><strong>DRAFT · Fictional development data · Review before sharing</strong></p>'+requestContext(project,client,details)+record('Assessment decision reason',s.assessmentDecision.reason)+record('Instructions to the technical member',details.assessmentInstructions||'Confirm the visit arrangements with the office and client. Return the assessment findings to the office; do not purchase or build from this assessment request.')+'<h2>Report to return</h2><p>Send the office a separate assessment report covering feasibility, safety and engineering needs, with estimated hours and costs for parts, travel, consumables and other items. Keep that report in Project files and record the findings before preparing a quote.</p><p>This request is for assessment only. It does not authorise fabrication, purchasing, building or other technical work. Confirm client consent and arrangements before any visit; recheck the live project for a later hold or client stop. Preparing this document does not send it or record acceptance.</p>',brand);
 }
 function workRequestApproval(state,prepared){
@@ -280,7 +280,10 @@ export function renderFinancePack(parent,project,lifecycle,options={}){
   const a=node('a');a.href=draft.href;a.click();feedback.replaceChildren(notice('Email draft prepared. Review the recipient and quote revision, choose your sending mailbox, and attach the quote manually. Nothing was sent or recorded as sent.'));
  }catch(e){feedback.replaceChildren(notice(e.message,true));}}));
  if(!options.quoteOnly)renderSavedDocumentDownloads(section,project,{costReturn:Boolean(lifecycle.state?.costReturns?.length),returns:lifecycle.state?.costReturns});
- if(!options.quoteOnly)renderWorkflowRequestDownloads(section,project,{assessment:!availability?.assessment,task:!availability?.task});
+ if(!options.quoteOnly){
+  if(options.openAssessment&&!availability?.assessment)section.append(action('Prepare assessment documents and emails',options.openAssessment));
+  renderWorkflowRequestDownloads(section,project,{assessment:!options.openAssessment&&!availability?.assessment,task:!availability?.task});
+ }
  if(!options.quoteOnly)buttons.append(action('Download Finance pack',async()=>{try{
   feedback.replaceChildren(notice('Preparing saved project details…'));
   const readSnapshot=()=>readFinanceSnapshot(project.id);

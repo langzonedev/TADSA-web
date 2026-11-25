@@ -4,6 +4,19 @@ import {addressPostalSuffix,residentialGeocodeValues} from './client-address.js'
 import {postcodePoint} from './postcode-locations.js';
 import {addressKey,preserveGeocode,proximityKm} from './location-geocode.js';
 
+export const sameServiceAreas=(a,b)=>a.length===b.length&&a.every(area=>b.includes(area));
+export const validServiceAreas=areas=>Array.isArray(areas)&&areas.length<=30&&
+ areas.every(id=>typeof id==='string')&&new Set(areas).size===areas.length;
+
+// Older clients only supplied a calendar version. The profile editor also
+// sends the areas it displayed, so unrelated calendar changes can be retained.
+export function canSaveServiceAreas(calendar,input){
+ if(!Object.hasOwn(input,'previousServiceAreas'))return input.version===calendar.version;
+ return input.version<=calendar.version&&(sameServiceAreas(calendar.serviceAreas,input.previousServiceAreas)||
+   sameServiceAreas(calendar.serviceAreas,input.serviceAreas));
+}
+export const areaConflictMessage='The saved service areas have changed. Review the current regions before saving your selection.';
+
 // Contact addresses are useful for postcode matching, but are not assumed to be
 // workshops, service coverage, or permission to travel. An explicit base takes priority.
 export function technicianLocation(settings,contact={}) {

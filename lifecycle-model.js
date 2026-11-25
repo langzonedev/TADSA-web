@@ -10,6 +10,12 @@ export const lifecycleCostLabels=Object.freeze({labour:'Labour / time',materials
 export const lifecycleCostTypes=Object.freeze(Object.keys(lifecycleCostLabels));
 const currentQuote=s=>s.quotes.at(-1);
 const readyAssessment=s=>s.assessmentDecision&&(!s.assessmentDecision.required||s.assessment);
+export function awaitingAssessmentReport(state){
+ if(!state||state.stage!=='assessment'||state.assessmentDecision?.required!==true||state.assessment||state.closed||state.cancellation)return false;
+ if(!state.revisionRequested)return true;
+ // Returning to assessment deliberately pauses the old quote while a new report is obtained.
+ return Boolean(state.history?.some(e=>e.action==='returnTo'&&e.at===state.revisionRequested.at&&['enquiry','assessment'].includes(e.data.target)));
+}
 export function createLifecycle(schema=2){return {...(schema===2?{assessmentReview:null,workRequest:null,financeHandoff:null}:{}),schema,stage:'enquiry',revisionRequested:null,costReturns:[],cancellation:null,assessmentDecision:null,assessment:null,quotes:[],peerReview:null,acceptance:null,financeClearance:null,work:null,signoff:null,financeFinalisation:null,closed:null,history:[]};}
 export function requiresFreedomWheelsPayment(s,context={}){return context.enforceFreedomWheelsPayment!==false&&(context.programme==='FW'||s?.freedomWheelsPaymentRequired===true);}
 export function requiresBuildPayment(s,context={}){return requiresFreedomWheelsPayment(s,context)||s?.invoiceBeforeBuildRequired===true||s?.quotes?.at(-1)?.pricing?.invoiceBeforeBuild===true;}
@@ -54,6 +60,7 @@ export function projectLifecycleStatus(state,{projectStatus,programme}={}){
  if(state.assessmentReview?.approved)return state.assessment?'Assessment approved':'Assessment review approved';
  if(state.assessmentReview?.approved===false)return 'Assessment changes requested';
  if(state.assessment)return 'Assessment findings recorded';
+ if(stage==='assessment'&&state.assessmentDispatch)return 'Assessment request sent';
  return 'Project open';
 }
 export function lifecycleEffectiveStage(s,context={}){if(!s)return null;const q=currentQuote(s);return requiresBuildPayment(s,context)&&s.acceptance?.quoteVersion===q?.version&&q&&!s.closed&&!s.cancellation&&!s.signoff&&!s.revisionRequested&&s.work?.status!=='complete'&&(s.financeClearance?.status!=='paid'||s.financeClearance.quoteVersion!==q.version)?'finance_clearance':s.stage;}
@@ -70,7 +77,30 @@ export function applyLifecycle(previous,action,data,context){
  if(s.cancellation&&!['costReturn','financeHandoff','financeFinalise','close','reopen'].includes(action))fail('Cancellation requires finance finalisation and closure before reopening.');
  if(s.closed&&action!=='reopen')fail('Reopen the project before changing its lifecycle.');
  let value;
+ if(action==='assessmentDecision'||action==='returnTo'&&['enquiry','assessment'].includes(data?.target)){
+  delete s.assessmentPack;delete s.assessmentDispatch;
+ }
  switch(action){
+  case 'assessmentPackPrepared':
+  case 'assessmentRequestSent':{
+   if(context.projectStatus==='closed'||!awaitingAssessmentReport(s)||context.onHold||context.clientStopped)fail('An active assessment awaiting findings is required. Resolve any hold before preparing or sending its documents.');
+   const preparing=action==='assessmentPackPrepared';
+   exact(data,preparing?['instructions','reportTemplateRevision','requestFileId','reportFileId']:['sentOn','technicianId','technicianName','technicianEmail','requestFileId','reportFileId']);
+   for(const id of [data.requestFileId,data.reportFileId])if(typeof id!=='string'||!id||id.length>100||!/^[a-zA-Z0-9-]+$/.test(id))fail('Choose the two saved assessment documents.');
+   if(data.requestFileId===data.reportFileId)fail('The request and report must be separate files.');
+   if(preparing){
+    if(!Number.isSafeInteger(data.reportTemplateRevision)||data.reportTemplateRevision<0)fail('Choose a valid assessment report template.');
+    value={...data,instructions:text(data.instructions,2000)};s.assessmentPack=value;delete s.assessmentDispatch;
+   }else{
+    if(!s.assessmentPack||s.assessmentPack.requestFileId!==data.requestFileId||s.assessmentPack.reportFileId!==data.reportFileId)fail('Review the latest saved assessment documents before recording dispatch.');
+    if(s.assessmentDispatch?.requestFileId===data.requestFileId&&s.assessmentDispatch?.reportFileId===data.reportFileId)fail('Sending these assessment documents has already been recorded.');
+    if(!/^person-[a-z\d-]+$/i.test(data.technicianId)||data.technicianId.length>100)fail('Choose an assigned technician.');
+    const technicianEmail=text(data.technicianEmail,254);
+    if(!/^[^\s@<>,;?&#]+@[^\s@<>,;?&#]+\.[^\s@<>,;?&#]+$/.test(technicianEmail))fail('Enter one valid technician email address.');
+    value={...data,sentOn:occurredOn(data.sentOn),technicianName:text(data.technicianName,120),technicianEmail};s.assessmentDispatch=value;
+   }
+   break;
+  }
   case 'assessmentDecision':exact(data,['required','reason']);if(typeof data.required!=='boolean')fail('Choose whether an assessment is required.');if(s.quotes.length&&stage(s)!=='enquiry')fail('Return to the assessment decision before changing it.');value={required:data.required,reason:text(data.reason)};s.assessmentDecision=value;s.assessment=null;if(s.schema===2)s.assessmentReview=null;break;
   case 'assessmentComplete':optionalExact(data,['notes'],['estimate']);if(!s.assessmentDecision?.required)fail('An assessment must be selected first.');if(s.quotes.length&&stage(s)!=='assessment')fail('Return to assessment before changing it.');value={notes:text(data.notes)};if(Object.hasOwn(data,'estimate')){const e=data.estimate,limits={materialCostCents:1000000000,workMinutes:6000000,travelMinutes:6000000,travelDistanceMilliKm:1000000000};if(!e||typeof e!=='object'||Array.isArray(e)||!Object.keys(e).length||Object.keys(e).some(k=>!Object.hasOwn(limits,k)||!Number.isSafeInteger(e[k])||e[k]<0||e[k]>limits[k]))fail('Enter valid assessment material, time and travel estimates.');value.estimate={...e};}s.assessment=value;if(s.schema===2)s.assessmentReview=null;break;
   case 'assessmentReview':{if(s.schema!==2)fail('This workflow uses the earlier review sequence.');exact(data,['approved','qualityReviewed','safetyReviewed','costsReviewed','reference','reviewedOn','notes']);if(!readyAssessment(s))fail('Record the assessment decision and any required findings first.');if(s.quotes.length&&stage(s)!=='assessment_review')fail('Return to assessment review before changing it.');if(typeof data.approved!=='boolean'||data.qualityReviewed!==true||data.safetyReviewed!==true||data.costsReviewed!==true)fail('Confirm engineering quality, safety and cost review.');value={...data,reference:text(data.reference,300),reviewedOn:occurredOn(data.reviewedOn),notes:text(data.notes),at,actor};s.assessmentReview=value;break;}

@@ -1,6 +1,6 @@
 // Pure reads over fictional device records. No graph hydration or storage writes.
 import {lifecycleEffectiveStage,projectLifecycleStatus} from './lifecycle-model.js';
-import {profileContactPhone} from './profile-details-model.js';
+import {profileContactPhone,matchingPersonRoles} from './profile-details-model.js';
 const kinds={clients:['client','client'],people:['person','person'],organisations:['org','organisation']};
 const knownRoles=['Client','Technician','Occupational therapist','Administrator','Carer','Referrer','Allied-health contact','Funder','General contact'];
 const fail=(message,status=422)=>{throw Object.assign(Error(message),{status});};
@@ -8,11 +8,11 @@ const validText=(s,max)=>typeof s==='string'&&s.length<=max&&!/[\u0000-\u001f\u0
 const idOf=(kind,id)=>{if(!Object.hasOwn(kinds,kind)||typeof id!=='string'||!new RegExp('^'+kinds[kind][0]+'-[0-9]{1,20}$').test(id))fail('Choose a valid selection identity.');return id;};
 const compare=(a,b)=>{const x=Array.from(a),y=Array.from(b);for(let i=0;i<Math.min(x.length,y.length);i++){const delta=x[i].codePointAt(0)-y[i].codePointAt(0);if(delta)return Math.sign(delta);}return Math.sign(x.length-y.length);};
 const statusMatch=(r,status)=>status==='all'||r.directoryStatus===status||status==='active'&&['current','review'].includes(r.directoryStatus);
-const publicSelection=({technicianEligible,workSearch,description,category,nameKey,projectCount,...row})=>row;
-const publicRegister=({technicianEligible,workSearch,nameKey,type,...row})=>row;
+const publicSelection=({technicianEligible,filterRoles,workSearch,description,category,nameKey,projectCount,...row})=>row;
+const publicRegister=({technicianEligible,filterRoles,workSearch,nameKey,type,...row})=>row;
 function rows(d,kind,register=false){
  const clients=new Map(d.clients.map(c=>[c.personId,c])),people=new Map(d.people.map(p=>[p.id,p]));
- const person=(p,c)=>{const roles=[...new Set(p.roles??[p.role])].sort(compare),owner=clients.get(p.id),details=(c??(register?owner:null))?.details??{};return {id:c?.id??p.id,name:p.name,type:c?'client':'person',personId:p.id,clientId:owner?.id??null,reference:c||register&&owner?'CL-'+(c??owner).id.slice(7):register?'':null,roles,directoryStatus:d.profileDetails?.[p.id]?.contact?.directoryStatus??'current',email:p.email??'',phone:p.phone??'',address:details.residentialAddress??'',suburb:details.residentialSuburb??'',state:details.residentialState??'',postcode:details.residentialPostcode??'',workSearch:register?details.workAddress??'':'',description:'',category:'',technicianEligible:Boolean(p.technician)&&roles.every(r=>knownRoles.includes(r))};};
+ const person=(p,c)=>{const roles=[...new Set(p.roles??[p.role])].sort(compare),owner=clients.get(p.id),details=(c??(register?owner:null))?.details??{};return {id:c?.id??p.id,name:p.name,type:c?'client':'person',personId:p.id,clientId:owner?.id??null,reference:c||register&&owner?'CL-'+(c??owner).id.slice(7):register?'':null,roles,filterRoles:matchingPersonRoles(roles,d.profileDetails?.[p.id]?.contact?.alliedHealthProfession),directoryStatus:d.profileDetails?.[p.id]?.contact?.directoryStatus??'current',email:p.email??'',phone:p.phone??'',address:details.residentialAddress??'',suburb:details.residentialSuburb??'',state:details.residentialState??'',postcode:details.residentialPostcode??'',workSearch:register?details.workAddress??'':'',description:'',category:'',technicianEligible:Boolean(p.technician)&&roles.every(r=>knownRoles.includes(r))};};
  if(kind==='clients')return d.clients.map(c=>person(people.get(c.personId),c));
  if(kind==='people'){
   const organisations=new Map(d.organisations.map(o=>[o.id,o.name]));
@@ -21,7 +21,7 @@ function rows(d,kind,register=false){
    return register?row:{...row,organisationName:organisations.get(d.profileDetails?.[p.id]?.contact?.organisationId)??null};
   });
  }
- return d.organisations.map(o=>({id:o.id,name:o.name,type:'organisation',personId:null,clientId:null,reference:register?'':null,roles:o.roles?.length?[...o.roles]:[o.role],directoryStatus:o.directoryStatus??'current',email:o.email??'',phone:o.phone??'',address:'',suburb:'',state:'',postcode:'',workSearch:'',description:o.description??'',category:o.category??'',technicianEligible:false}));
+ return d.organisations.map(o=>({id:o.id,name:o.name,type:'organisation',personId:null,clientId:null,reference:register?'':null,roles:o.roles?.length?[...o.roles]:[o.role],filterRoles:o.roles?.length?o.roles:[o.role],directoryStatus:o.directoryStatus??'current',email:o.email??'',phone:o.phone??'',address:'',suburb:'',state:'',postcode:'',workSearch:'',description:o.description??'',category:o.category??'',technicianEligible:false}));
 }
 function fields(params,register){
  const allowed=register?['kind','q','status','role','direction','limit','after']:['kind','q','role','status','limit','after'];
@@ -37,9 +37,9 @@ const decode=value=>JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Uint
 async function registers(d,params){
  const value=fields(params,true),scope=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({kind:value.kind,q:value.q,status:value.status,role:value.role,direction:value.direction})))),b=>b.toString(16).padStart(2,'0')).join('');let cursor=null;
  if(value.after){try{if(value.after.length>2048||! /^[A-Za-z0-9_-]+$/.test(value.after))throw Error();cursor=decode(value.after);if(Object.keys(cursor).sort().join(',')!=='id,nameKey,scope,v'||cursor.v!==1||cursor.scope!==scope||!validText(cursor.nameKey,400))throw Error();idOf(value.kind,cursor.id);}catch{fail('The register page does not match these filters. Start at the first page.');}}
- const matching=rows(d,value.kind,true).filter(r=>!value.q||[r.name,r.id,r.clientId,r.reference,r.email,r.phone,r.address,r.suburb,r.state,r.postcode,r.workSearch,r.description,r.category,'['+r.roles.map(role=>JSON.stringify(role)).join(', ')+']'].join(' ').toLowerCase().includes(value.q));
- const statuses=Object.fromEntries(['all','active','current','inactive','review'].map(s=>[s,matching.filter(r=>statusMatch(r,s)).length])),roles=[...new Set(matching.flatMap(r=>r.roles))].sort(compare).map(role=>({role,total:matching.filter(r=>r.roles.includes(role)).length}));
- let filtered=matching.filter(r=>statusMatch(r,value.status)&&(!value.role||r.roles.includes(value.role))).map(r=>({...r,nameKey:r.name.toLowerCase()}));const total=filtered.length,sign=value.direction==='asc'?1:-1,order=(a,b)=>sign*(compare(a.nameKey,b.nameKey)||compare(a.id,b.id));filtered.sort(order);if(cursor)filtered=filtered.filter(r=>order(r,cursor)>0);
+ const matching=rows(d,value.kind,true).filter(r=>!value.q||[r.name,r.id,r.clientId,r.reference,r.email,r.phone,r.address,r.suburb,r.state,r.postcode,r.workSearch,r.description,r.category,'['+r.filterRoles.map(role=>JSON.stringify(role)).join(', ')+']'].join(' ').toLowerCase().includes(value.q));
+ const statuses=Object.fromEntries(['all','active','current','inactive','review'].map(s=>[s,matching.filter(r=>statusMatch(r,s)).length])),roles=[...new Set(matching.flatMap(r=>r.filterRoles))].sort(compare).map(role=>({role,total:matching.filter(r=>r.filterRoles.includes(role)).length}));
+ let filtered=matching.filter(r=>statusMatch(r,value.status)&&(!value.role||r.filterRoles.includes(value.role))).map(r=>({...r,nameKey:r.name.toLowerCase()}));const total=filtered.length,sign=value.direction==='asc'?1:-1,order=(a,b)=>sign*(compare(a.nameKey,b.nameKey)||compare(a.id,b.id));filtered.sort(order);if(cursor)filtered=filtered.filter(r=>order(r,cursor)>0);
  const page=filtered.slice(0,value.limit),last=page.at(-1),projectIds=new Map();
  for(const rel of d.relationships){if(rel.active===false)continue;const key=rel.type+':'+rel.id;if(!projectIds.has(key))projectIds.set(key,new Set());projectIds.get(key).add(rel.projectId);}
  for(const row of page){const related=new Set(projectIds.get((value.kind==='people'?'person':'organisation')+':'+row.id));if(value.kind==='people'&&row.clientId)for(const p of d.projects)if(p.clientId===row.clientId)related.add(p.id);row.projectCount=related.size;}
@@ -73,10 +73,12 @@ export function deviceDirectoryQuery(d,path,method,params,actor){
   const row=rows(d,kind).find(r=>r.id===id);
   if(!row)fail('Selection record not found.',404);
   const item=publicSelection(row);
+  const profession=d.profileDetails?.[row.personId]?.contact?.alliedHealthProfession;
+  if(kind!=='organisations'&&profession)item.alliedHealthProfession=profession;
   if(kind!=='organisations')item.displayPhone=profileContactPhone(row.phone,d.profileDetails?.[row.personId]?.contact).number;
   return {item};
  }
  if(parts.length!==1)fail('Record not found.',404);
- const value=fields(params,false),matching=rows(d,value.kind).filter(r=>(!value.q||[r.name,r.reference,r.id,r.email,r.phone,r.address,r.suburb,r.state,r.postcode].join(' ').toLowerCase().includes(value.q))&&(!value.role||r.roles.includes(value.role))&&(value.role!=='Technician'||r.technicianEligible)&&statusMatch(r,value.status)&&(!value.after||compare(r.id,value.after)>0)).sort((a,b)=>compare(a.id,b.id));
+ const value=fields(params,false),matching=rows(d,value.kind).filter(r=>(!value.q||[r.name,r.reference,r.id,r.email,r.phone,r.address,r.suburb,r.state,r.postcode].join(' ').toLowerCase().includes(value.q))&&(!value.role||r.filterRoles.includes(value.role))&&(value.role!=='Technician'||r.technicianEligible)&&statusMatch(r,value.status)&&(!value.after||compare(r.id,value.after)>0)).sort((a,b)=>compare(a.id,b.id));
  const page=matching.slice(0,value.limit);return {items:page.map(publicSelection),limit:value.limit,nextAfter:matching.length>value.limit?page.at(-1).id:null};
 }

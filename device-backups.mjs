@@ -1,3 +1,4 @@
+import {assessmentDocx} from './assessment-pack-model.js';
 import {mailingDetails} from './profile-details-model.js';
 import {organisationRoles,organisationContactDetails} from './organisation-model.js';
 import {residentialFields,clientGeocodes} from './client-address.js';
@@ -101,6 +102,17 @@ export async function validateBackup(input){
  }
  for(const [id,n]of Object.entries(raw.clientNdis??{})){ref('clients',id,'NDIS record');if(!object(n))invalid('invalid NDIS record.');amount(n.version,'NDIS version',0,2147483647);if(typeof n.number!=='string'||(n.number&&!/^[0-9 ]{3,30}$/.test(n.number)))invalid('invalid NDIS number.');}
  for(const [id,state]of Object.entries(raw.lifecycles??{})){ref('projects',id,'Lifecycle');validateLifecycleBackup(state);
+  for(const {action,data} of state.history){
+   if(action==='assessmentRequestSent')ref('people',data.technicianId,'Assessment dispatch recipient');
+   if(action!=='assessmentPackPrepared')continue;
+   const files=raw.attachments?.[id]??[],request=files.find(f=>f.id===data.requestFileId&&!f.removed),report=files.find(f=>f.id===data.reportFileId&&!f.removed);
+   if(request?.mime!==assessmentDocx||!report)invalid('a saved assessment document is missing or has an incorrect type.');
+   if(data.reportTemplateRevision===0){if(report.mime!==assessmentDocx)invalid('the generated assessment report must be a Word document.');}
+   else{
+    const original=raw.assessmentTemplates?.find(f=>f.revision===data.reportTemplateRevision);
+    if(!original||original.name!==report.name||original.mime!==report.mime||original.dataBase64!==report.dataBase64)invalid('the assessment report does not match its saved office template revision.');
+   }
+  }
   for(const cost of state.costReturns??[]){
    if(cost.sourceFileId&&!raw.attachments?.[id]?.some(file=>!file.removed&&file.id===cost.sourceFileId&&file.name===cost.sourceFileName))invalid('original cost return file is missing or does not match the project.');
   }

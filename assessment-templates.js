@@ -2,9 +2,10 @@ import {node,request,action,notice,editor,field} from './project-care.js';
 function downloadButton(file,feedback){return action(`Download assessment template · revision ${file.revision}`,async()=>{
  try{const response=await fetch(`/api/assessment-templates/${file.revision}/download`);if(!response.ok)throw Error('Could not download this template. Please try again.');const url=URL.createObjectURL(await response.blob()),a=node('a');a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);feedback.replaceChildren(notice('Template downloaded. Complete a copy and upload the completed assessment to this project’s Files.'));}catch(e){feedback.replaceChildren(notice(e.message,true));}
 });}
-export async function renderAssessmentTemplateDownloads(parent,{manage=false}={}){
+export async function renderAssessmentTemplateDownloads(parent,{manage=false,onlyWhenAvailable=false}={}){
  const section=node('section',null,'panel workflow-panel');section.append(node('h2','Assessment report template'));parent.append(section);
  let state;try{state=await request('assessment-templates');}catch(e){section.append(notice('Assessment templates could not be loaded. Reload this page to try again.',true));return;}
+ if(onlyWhenAvailable&&!state.items.length){section.remove();return;}
  section.append(node('p','This is the blank report form the technical member completes after receiving an Assessment Request. Download it here, then upload the returned report to the project’s Files. Replacing the blank form keeps earlier revisions and completed reports.','field-help'));
  const feedback=node('div');section.append(feedback);
  if(state.items.length){const current=state.items[0];section.append(node('p',`${current.name} · revision ${current.revision} · ${new Date(current.createdAt).toLocaleDateString('en-AU')}`),downloadButton(current,feedback));

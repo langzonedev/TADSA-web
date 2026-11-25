@@ -211,3 +211,7 @@ main:has(> .project-workspace) { padding-top: 4px; }
     margin: 0;
   }
 }
+.assessment-workspace .assessment-preview[hidden]{display:none}
+.assessment-workspace .assessment-preview{grid-column:1/-1;min-width:0}
+.assessment-workspace .assessment-preview p,.assessment-workspace .assessment-mail-draft p{white-space:pre-line;overflow-wrap:anywhere}
+.assessment-workspace .assessment-mail-draft{margin-block:12px}

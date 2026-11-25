@@ -1,4 +1,4 @@
-import {mailingDetails,initialLanguageDetails} from './profile-details-model.js';
+import {mailingDetails,initialLanguageDetails,matchingPersonRoles} from './profile-details-model.js';
 import {technicianLocation} from './technician-location-model.js';
 import {organisationRoles,organisationContactDetails,ORGANISATION_CONTACT_FIELDS} from './organisation-model.js';
 import {RESIDENTIAL_FIELDS,CLIENT_GEOCODE_FIELDS,residentialFields,clientGeocodes,initialPersonAddress,initialContactAddress,initialClientResidence} from './client-address.js';
@@ -57,7 +57,13 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
  const replayProjection=value=>{if(Array.isArray(value))return value.filter(item=>actorContext?.role==='administrator'||actorContext?.manageSensitiveDetails||!['Technician credentials updated','Technician qualifications updated'].includes(item?.action)).map(replayProjection);if(!value||typeof value!=='object')return value;const result={};for(const [key,item]of Object.entries(value)){if(['primaryRecords','primaryRecordId','primaryReference','legacyPrimaryRecordId'].includes(key))continue;result[key]=replayProjection(item);}if(value.primaryRecordId&&!result.clientId)result.clientId=d.primaryRecords.find(r=>r.id===value.primaryRecordId)?.clientId;return result;};
  const mutating=method!=='GET';let replayKey;
  if(mutating&&kind==='projects'&&sub==='finance-status'&&actorContext&&actorContext.role!=='administrator')fail('An administrator must record Finance confirmations.',403);
- if(mutating&&Object.hasOwn(input,'requestId')){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId))fail('Supply a valid request identifier.');replayKey=canonical({path,method,input});const saved=d.replays[input.requestId];if(saved){if(saved.key!==replayKey)fail('This request identifier was already used for different changes.',409,{code:'IDEMPOTENCY_MISMATCH'});return replayProjection(saved.result);}}
+ if(mutating&&Object.hasOwn(input,'requestId')){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId))fail('Supply a valid request identifier.');let receipt=input;
+  if(kind==='projects'&&sub==='assessment-pack'){
+   const hashes=actorContext?.assessmentHashes;if(!hashes)fail('Validate the assessment documents before saving.');
+   const identity=(file,sha256)=>file&&({name:file.name,mime:file.mime,sha256});
+   receipt={...input,requestFile:identity(input.requestFile,hashes.request),reportFile:identity(input.reportFile,hashes.report)};
+  }
+  replayKey=canonical({path,method,input:receipt});const saved=d.replays[input.requestId];if(saved){if(saved.key!==replayKey)fail('This request identifier was already used for different changes.',409,{code:'IDEMPOTENCY_MISMATCH'});return replayProjection(saved.result);}}
  function saveClientFields(c,input,allowIncomplete){
   const p=find('people',c.personId);version(p,input.version);
   const before=client(c).details;
@@ -114,7 +120,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   if(sub==='work-plan')keys=['requestId','version','clientNdisVersion','location','serviceArea','ndisApplicable','ndisNumber','ndisApproved','ndisApprovedBy','ndisApprovedOn'];
   if(action==='payments')keys=['requestId','version','amountCents','receivedOn','reference'];
   if(sub==='attachments')keys=subid?['requestId','version']:['requestId','name','mime','dataBase64'];
-  if(kind==='availability')keys=sub==='location'?['requestId','version','baseAddress','suburb','postcode',...(Object.hasOwn(input,'geocode')?['geocode']:[])]:sub==='areas'?['requestId','version','serviceAreas']:action==='remove'?['requestId','version']:['requestId','id','version','startDate','endDate','status','note'];
+  if(kind==='availability')keys=sub==='location'?['requestId','version','baseAddress','suburb','postcode',...(Object.hasOwn(input,'geocode')?['geocode']:[])]:sub==='areas'?['requestId','version','serviceAreas',...(Object.hasOwn(input,'previousServiceAreas')?['previousServiceAreas']:[])]:action==='remove'?['requestId','version']:['requestId','id','version','startDate','endDate','status','note'];
   if(kind==='availability'&&sub==='entries'&&Object.hasOwn(input,'calendarVersion'))keys.push('calendarVersion');
   if(keys&&!id&&['clients','people'].includes(kind))keys.push(...['language','initialAddress'].filter(k=>Object.hasOwn(input,k)));
   if(keys&&kind==='people'&&keys.includes('roles'))keys.push(...['membershipStatus','cohorts'].filter(k=>Object.hasOwn(input,k)));
@@ -180,7 +186,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   const c=find('clients',id),p=find('people',input.personId),remove=subid==='remove';
   if(!['Occupational therapist','Carer','Referrer'].includes(input.role))fail('Choose a supported contact role.');
   const label=Object.hasOwn(input,'relationshipLabel')?str(input.relationshipLabel,120):undefined;if(label!==undefined&&/[\u0000-\u001f\u007f]/.test(label))fail('Relationship description contains invalid characters.');
-  if(!remove){if(c.personId===p.id)fail('Choose another person as the client contact.');if(p.active===false||directoryStatus(p)==='inactive')fail('Choose a current person or update their directory status before linking.');if(!p.roles.includes(input.role))fail('Choose a person with the selected contact role.');}
+  if(!remove){if(c.personId===p.id)fail('Choose another person as the client contact.');if(p.active===false||directoryStatus(p)==='inactive')fail('Choose a current person or update their directory status before linking.');if(!matchingPersonRoles(p.roles,d.profileDetails?.[p.id]?.contact?.alliedHealthProfession).includes(input.role))fail('Choose a person with the selected contact role.');}
   const old=d.contacts.find(x=>x.clientId===id&&x.personId===p.id&&x.role===input.role),relationshipLabel=remove?old?.relationshipLabel??'':label??old?.relationshipLabel??'';
   const wasActive=!!old&&old.active!==false;
   if(wasActive===!remove&&(remove||(old.relationshipLabel??'')===relationshipLabel))return client(c);

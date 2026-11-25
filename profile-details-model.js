@@ -22,7 +22,15 @@ export function mailingDetails(input) {
  }
  return result;
 }
-export const ALLIED_HEALTH_PROFESSIONS=[['','Not recorded'],['occupational-therapist','Occupational therapist (OT)'],['physiotherapist','Physiotherapist'],['psychologist','Psychologist'],['other','Other']];
+export const ALLIED_HEALTH_PROFESSIONS=[['','Not recorded'],['occupational-therapist','Occupational therapist (OT)'],['physiotherapist','Physiotherapist'],['psychologist','Psychologist'],['speech-pathologist','Speech pathologist'],['other','Other']];
+// Search and relationship eligibility include both generations of directory records.
+// Stored roles and the separate mailing groups continue to describe actual selections.
+export function matchingPersonRoles(roles,profession){
+ const allied='Allied-health contact',ot='Occupational therapist';
+ if(roles.includes(ot)&&!roles.includes(allied))return [...roles,allied];
+ if(roles.includes(allied)&&!roles.includes(ot)&&profession==='occupational-therapist')return [...roles,ot];
+ return roles;
+}
 const overviewDefaults={disability:'',dateOfBirth:'',additionalComments:''};
 const professionDefaults={alliedHealthProfession:'',alliedHealthProfessionOther:''};
 const capabilityDefaults={visitClients:'unknown',drives:'unknown',vehicle:'',interests:'',equipment:[],equipmentNotes:''};

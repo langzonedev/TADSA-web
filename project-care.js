@@ -116,7 +116,10 @@ export async function renderProjectCare(view,id,summaryTarget=view,context={}){
   row.append(node('span',file.name+' · '+Math.ceil(file.size/1024)+' KB'));
   if(revisions.length)row.append(node('span','Original technician return · revision '+revisions.join(', '),'field-help'));
   row.append(action('Download',async()=>{try{await downloadProjectFile(id,file.id,file.name);}catch(e){feedback.replaceChildren(notice(e.message,true));}}));
-  if(!revisions.length){
+  const assessmentPacks=lifecycle.state?.history?.filter(e=>e.action==='assessmentPackPrepared')??[];
+  const packIndex=assessmentPacks.findIndex(e=>e.data.requestFileId===file.id||e.data.reportFileId===file.id);
+  if(packIndex>=0)row.append(node('span','Assessment documents · set '+(packIndex+1),'field-help'));
+  if(!revisions.length&&packIndex<0){
    const removal=node('details');removal.append(node('summary','Remove file'));
    editor(removal,'remove/'+file.id,{version:file.version},null,(f)=>f.append(node('p','Remove '+file.name+' from this project?')),`projects/${id}/attachments/${file.id}/remove`,'POST',d=>({requestId:d.requestId,version:d.version}));
    row.append(removal);
