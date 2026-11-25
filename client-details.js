@@ -1,3 +1,4 @@
+import {addressKey} from './location-geocode.js';
 import {registerDraftSource,trackDraftForm,refreshDraftReview,baselineDraft,draftChanged} from './draft-review.js';
 import {RESIDENTIAL_FIELDS,AUSTRALIAN_STATES,residentialAddressText} from './client-address.js';
 import {attachAddressLookup} from './address-lookup.js';
@@ -29,6 +30,30 @@ export function clientDetailsSummary(client) {
   if(d.contactNeeds)box.append(el('p',d.contactNeeds));
   const link=el('a','Edit contact preferences');link.className='button secondary';link.href='#client-details/'+client.id;box.append(link,clientHistory(client));return box;
 }
+export function savedContactAddressOption(parent,d,controls,contact){
+  if(!contact?.addressLine1||d.residentialAddress)return;
+  const street=[contact.addressLine1,contact.addressLine2].filter(Boolean).join(', ');
+  const values={residentialAddress:street,residentialSuburb:contact.suburb||'',residentialState:contact.state||'',residentialPostcode:contact.postcode||''};
+  const source=el('p','Saved contact address: '+Object.values(values).filter(Boolean).join(', '));
+  source.className='field-help';parent.append(source);
+  if((values.residentialState&&!AUSTRALIAN_STATES.includes(values.residentialState))||
+     (values.residentialPostcode&&!/^\d{4}$/.test(values.residentialPostcode))||values.residentialSuburb.length>100||street.length>500){
+    source.append(' Review this address and enter the residential details manually.');return;
+  }
+  const copy=el('button','Use saved contact address');copy.type='button';parent.append(copy);
+  const keys=Object.keys(values),eventFor=control=>control.tagName==='SELECT'?'change':'input';
+  const available=()=>{copy.disabled=Boolean(d.pending||keys.some(key=>d[key]));};
+  copy.onclick=()=>{
+    available();if(copy.disabled)return;
+    for(const [key,value] of Object.entries(values)){
+      controls[key].value=value;controls[key].dispatchEvent(new Event(eventFor(controls[key]),{bubbles:true}));
+    }
+    d.residentialGeocode=contact.geocode?.addressKey===addressKey(keys.map(key=>d[key]))?contact.geocode:null;
+    available();controls.residentialAddress.focus();
+  };
+  for(const key of keys)controls[key].addEventListener(eventFor(controls[key]),available);
+  available();
+}
 export async function renderClientDetails(view,id,host) {
   const client=await host.request('clients/'+id);const current=client.details;
   let profile=null,contactUnavailable=false;
@@ -50,16 +75,10 @@ export async function renderClientDetails(view,id,host) {
   field('residentialPostcode','Residential postcode',4);controls.residentialPostcode.inputMode='numeric';controls.residentialPostcode.pattern='[0-9]{4}';
   const contact=profile?.contact;
   if(contactUnavailable)form.append(el('p','The separate contact address could not be loaded. You can still enter and save the residential address manually.'));
-  if(contact?.addressLine1&&!current.residentialAddress){
-    const copy=el('button','Use saved contact address');copy.type='button';const text=[contact.addressLine1,contact.addressLine2].filter(Boolean).join(', '),source=el('p','Already recorded contact address: '+[text,contact.suburb,contact.state,contact.postcode].filter(Boolean).join(', '));source.className='field-help';
-    const unsupported=Boolean(contact.state&&!AUSTRALIAN_STATES.includes(contact.state)||contact.postcode&&!/^\d{4}$/.test(contact.postcode)||contact.suburb?.length>100||text.length>500);
-    if(unsupported)source.append(' This address needs review before reuse; enter the residential details below without changing the original.');
-    const canCopy=()=>{copy.disabled=Boolean(d.pending||d.residentialAddress||d.residentialSuburb||d.residentialState||d.residentialPostcode||unsupported);};
-    copy.onclick=()=>{canCopy();if(copy.disabled)return;const values={residentialAddress:text,residentialSuburb:contact.suburb||'',residentialState:AUSTRALIAN_STATES.includes(contact.state)?contact.state:'',residentialPostcode:/^\d{4}$/.test(contact.postcode)?contact.postcode:''};if(values.residentialSuburb.length>100){source.textContent='Review the saved contact suburb before copying it; it is longer than the client suburb field allows.';return;}for(const [key,value]of Object.entries(values)){controls[key].value=value;controls[key].dispatchEvent(new Event(controls[key].tagName==='SELECT'?'change':'input',{bubbles:true}));}d.residentialGeocode=null;d.dirty=draftChanged(d);refreshDraftReview();canCopy();controls.residentialAddress.focus();};
-    for(const key of ['residentialAddress',...RESIDENTIAL_FIELDS])controls[key].addEventListener(controls[key].tagName==='SELECT'?'change':'input',canCopy);canCopy();form.append(source,copy,el('p','Copy only if this is also the residential address, then check and save. The original contact address stays unchanged.'));
-  }
-  const same=el('label');const checkbox=el('input');checkbox.type='checkbox';checkbox.checked=d.sameAsResidential;same.append(checkbox,el('span','Work address is the same as residential'));form.append(same);
-  field('workAddress','Work address',500,'textarea');
+  savedContactAddressOption(form,d,controls,contact);
+  const same=el('label');const checkbox=el('input');checkbox.type='checkbox';checkbox.checked=d.sameAsResidential;same.append(checkbox,el('span','TADSA work address is the same as residential'));form.append(same);
+  const workHelp=el('p','This is where TADSA will carry out the work. Enter a different address if another location is needed.');workHelp.className='field-help';form.append(workHelp);
+  field('workAddress','TADSA work address',500,'textarea');
   attachAddressLookup(controls.residentialAddress,{draft:d,geoField:'residentialGeocode',fields:{street:'residentialAddress',suburb:'residentialSuburb',state:'residentialState',postcode:'residentialPostcode',keys:['residentialAddress','residentialSuburb','residentialState','residentialPostcode'],elements:controls}});
   attachAddressLookup(controls.workAddress,{draft:d,geoField:'workGeocode',fields:{street:'workAddress',keys:['workAddress'],elements:controls}});
   const toggle=()=>{controls.workAddress.disabled=d.sameAsResidential;controls.workAddress.required=!d.sameAsResidential;};toggle();

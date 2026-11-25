@@ -35,6 +35,11 @@ html body main#content .project-overview-links{display:flex;flex-wrap:wrap;gap:8
 html body main#content .project-overview-links .app-action{margin:0}
 
 /* Grid-based editors use the same compact actions as the main record forms. */
+@media (min-width: 801px) and (pointer: fine) {
+ html body main#content :is(button,a,summary).app-action:is(.app-action-edit,.app-action-primary) {
+  min-height:36px;padding-block:6px;
+ }
+}
 html body main#content form > button.app-action,
 html body main#content form .actions > .app-action{
  width:auto;justify-self:start;flex:0 1 auto;

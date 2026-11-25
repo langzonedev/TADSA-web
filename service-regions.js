@@ -1,6 +1,7 @@
 // Approximate Australian service-area inference. Explicit technician coverage is
 // stored separately; this module only describes a recorded geographic location.
 import {polygons,postalLocalities,namesOutsideSA,postcodesOutsideSA} from './service-region-data.js';
+import {addressPostalSuffix} from './client-address.js';
 
 const metroDistricts = new Set(['eastern','western','southern','northern']);
 const regionIds = new Set([...metroDistricts,'metro','regional','adelaide-hills']);
@@ -72,8 +73,8 @@ export function locationRegion(location={}) {
   const state = String(location.state || '').trim().toUpperCase();
   if (state && state !== 'SA' && state !== 'SOUTH AUSTRALIA') return '';
   const address = String(location.address || location.baseAddress || '');
-  const suffix = address.match(/\b(SA|VIC|NSW|QLD|NT|ACT|TAS|WA)\s+([0-9]{4})(?:,?\s+Australia)?[.,\s]*$/i);
-  if (suffix && (suffix[1].toUpperCase() !== 'SA' || location.postcode && String(location.postcode).trim() !== suffix[2])) return '';
+  const suffix = addressPostalSuffix(address);
+  if (suffix && (suffix.state !== 'SA' || location.postcode && String(location.postcode).trim() !== suffix.postcode)) return '';
   const {latitude,longitude} = location.geocode || {};
   if (Number.isFinite(latitude) && Number.isFinite(longitude)) return pinRegion(latitude,longitude);
 

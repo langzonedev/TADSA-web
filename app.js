@@ -3,6 +3,7 @@ import {registerDraftSource,trackDraftForm,refreshDraftReview,installDraftReview
 import {renderProjectContacts} from './project-contacts.js';
 import {applyActionStyles,installActionStyles} from './action-styles.js';
 import {financeStatusRows,renderFinanceStatusForm,renderInvoiceReferences} from './invoice-references.js';
+import {awaitingInvoicePayment,outstandingInvoiceMessage} from './finance-status-model.js';
 import {residentialAddressText} from './client-address.js';
 import {auditReferenceIds,auditAction,auditChanges,formatValue as displayValue} from './record-values.js';
 import {renderProfileDetails} from './profile-details.js';
@@ -122,7 +123,7 @@ function relationships(rows) {
 function projectLinks(projects) {
   const box = panel('Linked projects'); if (!projects.length) box.append(el('p', 'No linked projects recorded.', 'muted'));
   const list = el('div', undefined, 'project-links');
-  for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); text.append(el('strong', p.title), el('small', `${p.reference}`));const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, projectStatus(p)); list.append(a); }
+  for (const p of [...projects].sort((a,b)=>Number(a.status==='closed')-Number(b.status==='closed')||String(b.reference).localeCompare(String(a.reference),'en-AU',{numeric:true}))) { const a = link('', `project/${p.id}`, 'project-link'); const text = el('span'); const heading=el('span',undefined,'linked-project-heading');heading.append(el('small',String(p.reference)),el('strong',p.title));text.append(heading);const description=String(p.summary||'').replace(/\s+/g,' ').trim();if(description)text.append(el('span',description.length>200?description.slice(0,197)+'…':description,'project-link-description'));a.append(text, projectStatus(p)); list.append(a); }
   box.append(list); return box;
 }
 const registerStatus = item => item.cancelled ? 'Cancelled' : item.status==='closed' ? 'Closed' : item.onHold ? 'On hold' : cap(item.status);
@@ -328,7 +329,7 @@ async function contactRecord(view,person,c=null){
   const grid=el('div',undefined,'detail-layout contact-detail-layout'),left=el('div'),right=el('div');
   const {profile}=await renderProfileDetails(left,person,{client:c});
   const header=el('div',undefined,'record-header contact-header'),identity=el('div'),roles=el('div',undefined,'contact-header-roles'),state=el('div',undefined,'contact-header-status');
-  identity.append(el('div','Person record','eyebrow'),el('h1',person.name));roles.append(el('strong',(person.roles?.length??1)>1?'Roles':'Role'),contactRoles(person));
+  identity.append(el('div','Person record','eyebrow'),el('h1',person.name));roles.append(el('strong',(person.roles?.length??1)>1?'Roles':'Role'),contactRoles(person),link('Edit roles & membership','edit-person/'+person.id+'/roles','text-button'));
   state.append(el('strong','Status'),el('span',DIRECTORY_STATUSES.find(([key])=>key===profile.contact.directoryStatus)?.[1]||'Not recorded','contact-status-value'));
   header.append(identity,roles,state);if(c)header.append(link('New enquiry','new-project/'+c.id,'button primary'));view.append(header);
   if(c){const contacts=panel('Referrers, carers & other contacts');contacts.append(el('p','People linked to this client across their work. Project-specific contacts are recorded separately on each project.','field-help'));addClientContactActions(contacts,c);left.append(contacts);}
@@ -365,7 +366,7 @@ async function project(view, id) {
     api('project-admin-options'),api(`projects/${id}/work-plan`),api(`projects/${id}/lifecycle`),api(`projects/${id}/finance-status`)
   ]);
   let p=projectRecord;
-  const destinations=['Overview','Files','Costs & invoices','Finance status','Workflow history'];
+  const destinations=['Overview','Project status','Files','Costs & invoices','Finance status','Workflow history'];
   if(!destinations.includes(tab)&&!['Task','Edit details','Audit trail','Case-note history','Hold or resume work','Record hours','Prepare invoices','Print documents','Contacts','Team','Funding','Feedback'].includes(tab)&&!tab.startsWith('Action:'))tab='Overview';
   view.classList.add('project-workspace');view.dataset.recordContext=p.reference+' · '+p.title;
   view.append(link('← All projects','projects','breadcrumb'));
@@ -381,8 +382,9 @@ async function project(view, id) {
   view.append(overview,task,filesPane,costsPane,financePane,recordPane,editPane,auditPane,caseNotesPane);
   const actionSource=el('div'),fundingReference=el('div');
   const careContext={project:p,ops:projectOperations,plan:workPlan,location:projectLocation,lifecycle:currentLifecycle};
+  const paymentPending=awaitingInvoicePayment(financeStatus);
   const [lifecycle]=await Promise.all([
-    renderLifecycle(taskForm,p,{current:currentLifecycle,operations:projectOperations,adminDetails,workPlan,recordTarget:recordPane,actionsTarget:actionSource,contextTarget:taskContext,onSaved:()=>projectTabs.set(id,'Task'),openHold:()=>navigate('Hold or resume work'),openAction:name=>{const entry=[...actionPanes].find(([,value])=>value.title.toLowerCase().includes(name.toLowerCase()));if(entry)navigate(entry[0]);},openFollowUp:async()=>{await navigate('Edit details');if(tab==='Edit details'&&view.isConnected)editPane.querySelector('input[type=date]')?.focus();},openFiles:async()=>{await navigate('Files');if(tab==='Files'&&view.isConnected)filesPane.querySelector('input[type=file]')?.focus();}}),
+    renderLifecycle(taskForm,p,{current:currentLifecycle,paymentPending,openFinance:()=>navigate('Finance status'),operations:projectOperations,adminDetails,workPlan,recordTarget:recordPane,actionsTarget:actionSource,contextTarget:taskContext,onSaved:action=>projectTabs.set(id,['cancel','reopen','close'].includes(action)?'Project status':'Task'),openHold:()=>navigate('Hold or resume work'),openAction:name=>{const entry=[...actionPanes].find(([,value])=>value.title.toLowerCase().includes(name.toLowerCase()));if(entry)navigate(entry[0]);},openFollowUp:async()=>{await navigate('Edit details');if(tab==='Edit details'&&view.isConnected)editPane.querySelector('input[type=date]')?.focus();},openFiles:async()=>{await navigate('Files');if(tab==='Files'&&view.isConnected)filesPane.querySelector('input[type=file]')?.focus();}}),
     renderProjectDetails(editPane,id,{details:adminDetails})
   ]);
   const earlierStep=taskForm.querySelector('.workflow-return-action');if(earlierStep)taskNavigation.append(earlierStep);
@@ -488,14 +490,15 @@ async function project(view, id) {
   otherFinance.append(details([['Quote saved',fullDate(quote?.at)],...financeStateFacts,['Latest recorded receipt',fullDate(lastPayment?.receivedOn)],['Invoice required',invoiceRequiredValue]]));
   finance.append(otherFinance,button('View costs & invoices',()=>navigate('Costs & invoices'),'text-button'));
   const financeReadback=panel('Finance status');
-  financeReadback.append(details(statusFacts),el('p','Record the quote, approval, cost return and handoff in the project workflow.','field-help'),button('Open project workflow',()=>navigate('Task'),'secondary'));
+  financeReadback.append(details(statusFacts),el('p','Choose Invoice Before Build when preparing the quote in Workflow. Record client approval, the cost return and the Finance handoff there as well.','field-help'),button('Open project workflow',()=>navigate('Task'),'secondary'));
   financePane.append(returnNavigation('Finance status'),financeReadback);
   let financeEditorLoading;
   function loadFinanceEditor(){
     if(!financeEditorLoading)financeEditorLoading=(async()=>{
-      const locked=p.status==='closed'||state?.closed||state?.financeFinalisation;
+      const paymentOnly=Boolean(state?.financeFinalisation&&paymentPending);
+      const locked=p.status==='closed'||state?.closed||(state?.financeFinalisation&&!paymentOnly);
       const access=locked?{allowed:false,message:'Finance records are read-only after finalisation or project closure.'}:await financeRecordingAccess('finance_status');
-      if(access.allowed)renderFinanceStatusForm(financePane,id,financeStatus);
+      if(access.allowed)renderFinanceStatusForm(financePane,id,financeStatus,paymentOnly);
       else {financePane.append(el('p',access.message,'field-help'));renderLockedFinanceStatusDraft(financePane,id);}
     })();
     return financeEditorLoading;
@@ -516,8 +519,30 @@ async function project(view, id) {
   const embedded=new Map([['Contacts',{route:'contacts'}],['Hold or resume work',{route:'operations',focus:'holds'}],['Record hours',{route:'operations',focus:'hours'}],['Prepare invoices',{route:'operations',focus:'invoices'}],['Print documents',{route:'documents'}],['Feedback',{route:'feedback'}],['Team',{route:'coordination',focus:'team'}],['Funding',{route:'coordination',focus:'funding'}]].map(([name,config])=>{const pane=el('section',undefined,'project-embedded-pane');pane.hidden=true;pane.tabIndex=-1;view.append(pane);return [name,{...config,pane,loaded:false,loading:null}];}));
   function returnNavigation(name){const navigation=el('nav',undefined,'project-task-navigation actions');navigation.setAttribute('aria-label',name+' navigation');navigation.append(button('← Return to current workflow',()=>navigate('Task'),'secondary'),button('Project overview',()=>navigate('Overview'),'text-button'));return navigation;}
   async function loadEmbedded(name){const entry=embedded.get(name);if(!entry||entry.loaded)return;if(entry.loading)return entry.loading;if(!entry.pane.dataset.sectionLoading)entry.pane.replaceChildren(el('p','Opening '+name.toLowerCase()+'…','loading'));entry.loading=(async()=>{const body=el('div');try{if(entry.route==='coordination')await renderWorkflow(body,'coordination',id,{embedded:true,focus:entry.focus,onCancel:()=>{entry.loaded=false;navigate('Overview');}});else if(entry.route==='contacts')await renderProjectContacts(body,id);else if(entry.route==='feedback')await renderProjectFeedback(body,id);else await renderOperations(body,entry.route,id,{embedded:true,focus:entry.focus,openWorkflow:()=>navigate('Task')});if(name==='Team')await renderProjectCoordinator(body,id);entry.pane.replaceChildren(returnNavigation(name),el('h2',name),body);body.querySelectorAll('form').forEach(form=>form.startTechnicianCalendars?.());if(name==='Funding')entry.pane.append(fundingReference);entry.loaded=true;}catch(error){entry.pane.replaceChildren(message(error.status?error.message:'This section could not load. Your project is still open.',true),button('Try again',()=>loadEmbedded(name),'secondary'));}finally{entry.loading=null;}})();return entry.loading;}
+  const statusPane=panel('Project status');
+  view.append(statusPane);
+  const statusActions=[...actionPanes].filter(([,entry])=>['Cancel this enquiry','Cancel this project','Reopen for review'].includes(entry.title));
+  const availableHold=p.status!=='closed'&&!state?.cancellation&&!state?.closed;
+  const statusText=registerStatus({status:p.status,onHold:projectOperations.onHold||projectOperations.clientStopped,cancelled:Boolean(state?.cancellation||p.cancelled)});
+  statusPane.append(details([['Current status',statusText]]));
+  const controls=el('div',undefined,'actions');
+  if(availableHold)controls.append(button('Hold or resume work',()=>navigate('Hold or resume work'),'secondary'));
+  for(const [key,entry] of statusActions)controls.append(button(entry.title,()=>navigate(key),'secondary'));
+  if(!lifecycle.managed){
+    controls.append(button('Edit historical status',async()=>{editMode=true;await navigate('Edit details');content.querySelector('[name=status]')?.focus();},'secondary'));
+    if(availableHold)controls.append(button('Start workflow to record a cancellation',()=>navigate('Task'),'secondary'));
+  }else if(stage==='ready_to_close'&&!paymentPending){
+    controls.append(button('Close project',async()=>{const pane=await navigate('Task');const note=pane?.querySelector('[aria-label="Closure note"]');if(note){for(let n=note.parentElement;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true;note.focus();}},'secondary'));
+  }else if(!state.closed&&p.status!=='closed'){
+    const guidance=state.cancellation?'Complete the outstanding Finance steps to close this cancelled project.':'Project closure becomes available after work, sign-off and Finance are complete.';
+    statusPane.append(el('p',paymentPending?outstandingInvoiceMessage:guidance,'field-help'));
+    if(paymentPending)controls.append(button('Review finance status',()=>navigate('Finance status'),'secondary'));
+  }
+  if(state?.cancellation)statusPane.append(details([['Cancellation reason',state.cancellation.reason]]));
+  statusPane.append(controls);
   const sections=[
     {label:'Overview',items:[['Overview','Overview']]},
+    {label:'Status',items:[['Project status','Current status'],...(availableHold?[['Hold or resume work','Hold or resume work']]:[]),...statusActions.map(([key,value])=>[key,value.title])]},
     {label:'Case notes',items:[['Case-note history','Case notes']]},
     {label:'Contacts',items:[['Contacts','Contacts & referrer']]},
     {label:'Team',items:[['Team','Team']]},
@@ -525,7 +550,7 @@ async function project(view, id) {
     {label:'Files',items:[['Files','Project files'],['Print documents','Print documents']]},
     {label:'Costs',items:[['Costs & invoices','Cost summary'],['Finance status','Finance status'],...(financeRelevant?[['Prepare invoices','Invoices']]:[])]},
     {label:'Hours',items:[['Record hours','Hours']]},
-    {label:'Workflow',items:[['Task','Current step'],['Workflow history','Workflow history'],['Hold or resume work','Hold or resume work'],...[...actionPanes].map(([key,value])=>[key,value.title])]},
+    {label:'Workflow',items:[['Task','Current step'],['Workflow history','Workflow history'],...[...actionPanes].filter(([key])=>!statusActions.some(([statusKey])=>statusKey===key)).map(([key,value])=>[key,value.title])]},
     {label:'Feedback',items:[['Feedback','Customer feedback']]},
     {label:'Details',items:[['Edit details','Project details']]},
     {label:'Audit trail',items:[['Audit trail','Audit trail']]}
@@ -533,7 +558,7 @@ async function project(view, id) {
   const more=button('Project sections',()=>{menu.hidden=!menu.hidden;more.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('[aria-current=page],button')?.focus();},'secondary project-sections-toggle'),menu=el('div',undefined,'project-more-menu');menu.hidden=true;more.setAttribute('aria-expanded','false');more.setAttribute('aria-controls','project-more-menu');menu.id='project-more-menu';
   for(const section of sections)menu.append(button(section.label,()=>navigate(section.items[0][0]),''));
   headerActions.append(more,menu);headerActions.addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;more.setAttribute('aria-expanded','false');more.focus();}});
-  const panes=new Map([['Overview',overview],['Task',task],['Files',filesPane],['Costs & invoices',costsPane],['Finance status',financePane],['Workflow history',recordPane],['Edit details',editPane],['Audit trail',auditPane],['Case-note history',caseNotesPane],...[...embedded].map(([key,value])=>[key,value.pane]),...[...actionPanes].map(([key,value])=>[key,value.pane])]);
+  const panes=new Map([['Overview',overview],['Project status',statusPane],['Task',task],['Files',filesPane],['Costs & invoices',costsPane],['Finance status',financePane],['Workflow history',recordPane],['Edit details',editPane],['Audit trail',auditPane],['Case-note history',caseNotesPane],...[...embedded].map(([key,value])=>[key,value.pane]),...[...actionPanes].map(([key,value])=>[key,value.pane])]);
   function tabButton(label,key,index,active,container,prefix){
     const b=button(label,()=>navigate(key),'');b.id=prefix+index;b.dataset.destination=key;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;b.setAttribute('aria-controls','project-focused-pane');
     b.addEventListener('keydown',async event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...container.querySelectorAll('[role=tab]')];const target=event.key==='Home'?buttons[0]:event.key==='End'?buttons.at(-1):buttons[(index+(event.key==='ArrowRight'?1:buttons.length-1))%buttons.length];const targetId=target.id;await navigate(target.dataset.destination);if(tab===target.dataset.destination&&view.isConnected)document.getElementById(targetId)?.focus();});return b;
@@ -582,7 +607,7 @@ async function project(view, id) {
     projectTabs.set(id,tab);header.querySelector('h1').textContent=p.title;header.querySelector('.eyebrow').replaceChildren(el('small','Project no.'),el('strong',p.reference,'project-number'));invoiceRequiredValue.textContent=p.invoiceRequired?'Yes':'No';meta.replaceChildren();
     const recordStatus=registerStatus({status:p.status,onHold:projectOperations.onHold||projectOperations.clientStopped,cancelled:Boolean(state?.cancellation||p.cancelled)});
     const headerFacts=[
-      ['Status',recordStatus,'Edit details'],
+      ['Status',recordStatus,'Project status'],
       ['Workflow status',projectLifecycleStatus(state,{projectStatus:p.status,programme:lifecycle.programme}),'Task'],
       ...(p.status==='closed'||p.cancelled||state?.cancellation?[]:[['Review date',fullDate(adminDetails.followUpOn),'Edit details']]),
       ['Latest quote',quote?money(quote.totalCents)+' · '+(quoteIssued?'Sent '+fullDate(quoteIssued.data.sentOn):'Not recorded as sent'):'Not recorded','Print documents']
@@ -612,11 +637,12 @@ async function project(view, id) {
     const draft = drafts.get(id) ?? { version: p.version, title: p.title, status: p.status, feedbackRequired: p.feedbackRequired, invoiceRequired: p.invoiceRequired };
     const form = el('form', undefined, 'form-grid');trackDraftForm(form,'project',id,{label:'Project details',section:'Edit details'});
     const titleLabel = el('label'); titleLabel.append(el('span', 'Project title', 'field-label')); const input = el('input'); input.name = 'title'; input.required = true; input.maxLength = 120; input.value = draft.title; titleLabel.append(input);
-    const stateLabel = el('label'); stateLabel.append(el('span', 'Status', 'field-label')); const select = el('select'); select.name = 'status'; for (const s of ['open', 'review', 'closed']) { const o = el('option', cap(s)); o.value = s; select.append(o); } select.value = draft.status; select.disabled=Boolean(lifecycle.managed); stateLabel.append(select); form.append(titleLabel, stateLabel);
+    const stateLabel = el('label'); stateLabel.append(el('span', 'Status', 'field-label')); const select = el('select'); select.name = 'status'; for (const s of ['open', 'review', 'closed']) { const o = el('option', cap(s)); o.value = s; o.disabled=s==='closed'&&p.status!=='closed'&&paymentPending; select.append(o); } select.value = draft.status; select.disabled=Boolean(lifecycle.managed); stateLabel.append(select); form.append(titleLabel, stateLabel);
+    if(!lifecycle.managed&&p.status!=='closed'&&paymentPending)form.append(el('p',outstandingInvoiceMessage,'field-help'),button('Review finance status',()=>navigate('Finance status'),'secondary'));
     const checks = {}; for (const [key, label] of [['feedbackRequired', 'Feedback required'], ['invoiceRequired', 'Invoice required']]) { const l = el('label', undefined, 'checkbox'); const check = el('input'); check.type = 'checkbox'; check.name = key; check.checked = draft[key]; checks[key] = check; l.append(check, el('span', label)); form.append(l); }
     const read = () => ({ version: draft.version, title: input.value, status: select.value, feedbackRequired: checks.feedbackRequired.checked, invoiceRequired: checks.invoiceRequired.checked });
     const saved=()=>({version:draft.version,title:p.title,status:p.status,feedbackRequired:p.feedbackRequired,invoiceRequired:p.invoiceRequired});form.addEventListener('input', () => {const value=read();if(!protectedProjectDrafts.has(id)&&JSON.stringify(value)===JSON.stringify(saved()))drafts.delete(id);else drafts.set(id,value);success='';refreshDraftReview();});
-    form.append(el('p', lifecycle.managed?'Use the project workflow to close or reopen this project. Its number and history are retained.':p.status==='closed'?'Reopen this historical project only after reviewing whether continuing the same job is appropriate. Guided workflow then records fresh stage approvals.':'Use the guided workflow to record stage approvals before changing status.', 'muted'));
+    form.append(el('p', lifecycle.managed?'Open Status for hold, cancellation, closure and reopening actions. Its number and history are retained.':p.status==='closed'?'Reopen this historical project only after reviewing whether continuing the same job is appropriate. Guided workflow then records fresh stage approvals.':'Use the guided workflow to record stage approvals before changing status.', 'muted'));
     const notice = el('div'); const actions = el('div', undefined, 'actions'); const save = el('button', 'Save changes', 'primary'); save.type = 'submit'; const cancel = button('Cancel edit', () => { drafts.delete(id);protectedProjectDrafts.delete(id); editMode = false; success = ''; draw(); header.querySelector('button')?.focus(); }, 'secondary'); actions.append(save, cancel); form.append(notice, actions); box.append(form);
     form.addEventListener('submit', async event => {
       event.preventDefault(); if (saving) return;

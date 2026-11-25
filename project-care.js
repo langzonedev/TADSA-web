@@ -46,7 +46,7 @@ export const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!=
 export const action=(text,fn)=>{const b=node('button',text,'secondary');b.type='button';b.onclick=fn;return b;};
 export const link=(text,hash)=>{const a=node('a',text,'button secondary');a.href='#'+hash;return a;};
 export const notice=(text,error=false)=>{const p=node('p',text,error?'message error':'message');p.setAttribute('role',error?'alert':'status');return p;};
-export async function request(path,method='GET',body){const r=await fetch('/api/'+path,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{}),...(method==='GET'?{signal:AbortSignal.timeout(12000)}:{})});const data=await r.json();if(!r.ok){const e=Error(data.error);e.status=r.status;throw e;}return data;}
+export async function request(path,method='GET',body){const r=await fetch('/api/'+path,{method,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{}),...(method==='GET'?{signal:AbortSignal.timeout(12000)}:{})});const data=await r.json();if(!r.ok){const e=Error(data.error);e.status=r.status;e.code=data.code;e.candidates=data.candidates;throw e;}return data;}
 export function field(parent,label,d,key,type='text',options){const l=node('label',null,'workflow-field');l.append(node('span',label,'field-label'));const n=node(options?'select':type==='textarea'?'textarea':'input');n.setAttribute('aria-label',label);if(options){for(const[value,text]of options){const o=node('option',text);o.value=value;n.append(o);}}else if(type!=='textarea')n.type=type;if(type==='checkbox'){n.checked=Boolean(d[key]);l.className='checkbox';}else n.value=d[key]??'';if(type==='text')n.maxLength=200;if(type==='textarea'){n.rows=3;n.maxLength=500;}n.addEventListener(options||type==='checkbox'?'change':'input',()=>d[key]=type==='checkbox'?n.checked:n.value);l.append(n);parent.append(l);return n;}
 export function editor(parent,key,initial,title,fields,path,method,payload,options={}){
  const d=drafts.get(key)??{...initial,requestId:crypto.randomUUID()},box=node('section',null,'panel workflow-panel'),form=node('form',null,'form-grid');if(title)box.append(node('h2',title));box.append(form);parent.append(box);fields(form,d);trackDraftForm(form,'care',key,{label:title||options.saveLabel||editorSaveLabels[key.split('/')[0]],...options.draftReview});if(!drafts.has(key))baselines.set(key,draftValue(d));const feedback=node('div'),buttons=node('div',null,'actions'),save=node('button','Save','primary');save.type='submit';const discard=action('Discard unsaved changes',()=>{drafts.delete(key);baselines.delete(key);host.refresh();});buttons.append(save,discard);form.append(feedback,buttons);const remember=()=>{if(d.pending||draftValue(d)!==baselines.get(key))drafts.set(key,d);else drafts.delete(key);refreshDraftReview();};form.addEventListener('input',remember);form.addEventListener('change',remember);
@@ -66,7 +66,10 @@ export function editor(parent,key,initial,title,fields,path,method,payload,optio
    if(error.status){d.pending=null;d.requestId=crypto.randomUUID();}
    feedback.replaceChildren(notice(error.message||'Save not confirmed. Retry safely.',true));
    if(error.status===401)feedback.append(action('Sign in and keep draft',()=>host.refresh()));
-   if(error.status===409){
+   if(error.code==='DUPLICATE_CANDIDATE'&&options.onDuplicate){
+    for(const match of error.candidates??[])feedback.append(node('p',[match.name,match.email,match.phone].filter(Boolean).join(' · ')));
+    feedback.append(action('Confirm these details belong to this person',()=>{options.onDuplicate(d);form.requestSubmit();}));
+   }else if(error.status===409){
     let review;try{review=await options.reviewConflict?.(d);}catch{/* Keep the draft if the latest record cannot be read. */}
     if(review){
      feedback.append(notice(review.message));

@@ -1,6 +1,6 @@
 import {installModelExtensions,fail} from './device-model.mjs';
 import {validateInvoiceReferences} from './invoice-references-model.js';
-import {emptyFinanceStatus,financeStatusCommand} from './finance-status-model.js';
+import {emptyFinanceStatus,financeStatusCommand,resolvesFinalisedInvoice} from './finance-status-model.js';
 installModelExtensions(ctx => {
  const {d,parts,method,input,find,version,bump,actorContext,phase} = ctx;
  const [kind,projectId,section] = parts;
@@ -13,7 +13,7 @@ installModelExtensions(ctx => {
  const after=financeStatusCommand(input);
  version(project,input.version);
  const state=d.lifecycles?.[projectId];
- if(project.status==='closed'||state?.closed||state?.financeFinalisation)fail('Reopen or revise the project before changing Finance confirmations.');
+ if(project.status==='closed'||state?.closed||(state?.financeFinalisation&&!resolvesFinalisedInvoice(before,after)))fail('Reopen or revise the project before changing Finance confirmations.');
  if(Object.keys(after).every(key=>before[key]===after[key]))return read();
  d.financeStatuses??={};
  d.financeStatuses[projectId]=after;

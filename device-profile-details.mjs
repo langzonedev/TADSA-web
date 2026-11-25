@@ -16,10 +16,17 @@ installModelExtensions(ctx=>{
  const person=find('people',id),before=d.profileDetails?.[id]??{personId:id,version:0,...createProfileDetails()};
  if(method==='GET')return structuredClone({...before,...normaliseProfileDetails(before)});
  if(method!=='PUT')fail('Profile action unavailable.',404);
- let value;try{value=validateProfileDetails(input,before.contact);}catch(error){fail(error.message);}
+ const unified=input.section==='contact'&&Object.hasOwn(input,'identity');
+ let fields=input;
+ if(unified){const {identity,client,...section}=input;fields=section;if(!Object.hasOwn(input,'client'))fail('Supply client address details or null.');}
+ let value;try{value=validateProfileDetails(fields,before.contact);}catch(error){fail(error.message);}
  if(input.version!==before.version)fail('Profile details changed. Reload and compare before saving.',409,{code:'VERSION_CONFLICT'});
  if(value.section==='capabilities'&&(person.active===false||!(person.roles??[person.role]).includes('Technician')))fail('Choose a person with an active Technician role.');
  if(value.section==='contact'&&value.details.organisationId&&!d.organisations.some(o=>o.id===value.details.organisationId))fail('Choose an existing organisation.');
+ if(unified){
+  ctx.saveContactIdentity(id,input.identity,input.client);
+  if(Object.entries(value.details).every(([key,v])=>JSON.stringify(v)===JSON.stringify(before.contact[key]??null)))return structuredClone(before);
+ }
  const next={...structuredClone(before),version:before.version+1,[value.section]:value.details};d.profileDetails??={};d.profileDetails[id]=next;
  event('people',id,value.section==='contact'?'Additional contact details updated':'Technician capabilities updated',{section:value.section,before:before[value.section],after:value.details});
  return structuredClone(next);

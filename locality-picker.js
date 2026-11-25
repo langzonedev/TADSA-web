@@ -18,14 +18,21 @@ export function attachLocalityPicker(fields) {
 
   let revision = 0;
   let active;
+  let outsidePointer;
+  let dismissAfterClick = false;
   const results = document.createElement('div');
   results.className = 'locality-options';
   results.setAttribute('role', 'group');
   results.setAttribute('aria-label', 'Matching Australian localities');
   function close() {
     revision++;
+    outsidePointer?.abort();
+    dismissAfterClick = false;
     results.hidden = true;
     results.replaceChildren();
+  }
+  function dismissOnBlur(event) {
+    if (!results.contains(event.relatedTarget) && !dismissAfterClick) close();
   }
   function choose(place) {
     if (active.disabled || active.closest('[inert]')) return;
@@ -70,10 +77,28 @@ export function attachLocalityPicker(fields) {
     credit.className = 'field-help';
     results.append(credit);
     results.hidden = false;
+    // Removing in-flow options on pointerdown can move the target between press and release.
+    outsidePointer = new AbortController();
+    const events = {capture:true, signal:outsidePointer.signal};
+    document.addEventListener('pointerdown', event => {
+      if (!results.isConnected) { close(); return; }
+      dismissAfterClick = event.target !== input && !results.contains(event.target);
+    }, events);
+    document.addEventListener('click', () => {
+      if (dismissAfterClick) setTimeout(() => { if (ticket === revision) close(); }, 0);
+    }, events);
+    document.addEventListener('pointercancel', () => {
+      dismissAfterClick = false;
+      if (document.activeElement !== input && !results.contains(document.activeElement)) close();
+    }, events);
+    document.addEventListener('keydown', () => {
+      dismissAfterClick = false;
+      if (document.activeElement !== input && !results.contains(document.activeElement)) close();
+    }, events);
   }
   for (const input of [suburb, postcode]) {
     input.addEventListener('input', () => void suggest(input));
-    input.addEventListener('blur', event => { if (!results.contains(event.relatedTarget)) close(); });
+    input.addEventListener('blur', dismissOnBlur);
     input.addEventListener('keydown', event => {
       if (event.key === 'ArrowDown' && !results.hidden && results.firstChild) {
         event.preventDefault();
@@ -81,6 +106,6 @@ export function attachLocalityPicker(fields) {
       } else if (event.key === 'Escape') close();
     });
   }
-  results.addEventListener('focusout', event => { if (!results.contains(event.relatedTarget)) close(); });
+  results.addEventListener('focusout', dismissOnBlur);
   results.addEventListener('keydown', event => { if (event.key === 'Escape') { active.focus(); close(); } });
 }

@@ -1,6 +1,6 @@
 import {areaIncludes,locationRegion} from './service-regions.js';
 import {contactGeocodeValues} from './profile-details-model.js';
-import {residentialGeocodeValues} from './client-address.js';
+import {addressPostalSuffix,residentialGeocodeValues} from './client-address.js';
 import {postcodePoint} from './postcode-locations.js';
 import {addressKey,preserveGeocode,proximityKm} from './location-geocode.js';
 
@@ -17,16 +17,12 @@ export function technicianLocation(settings,contact={}) {
  return {baseAddress,suburb,postcode,geocode,...(contact.state?{state:contact.state}:{}),locationSource:baseAddress||suburb||postcode?'person-contact':'unrecorded'};
 }
 
-function trailingPostcode(address='') {
- const match=(address||'').match(/\b(?:SA|VIC|NSW|QLD|NT|ACT|TAS|WA)\s+(\d{4})(?:,?\s+Australia)?\s*$/i);
- return match?.[1]??'';
-}
-
 export function clientMatchLocation(client={}) {
  if(client.sameAsResidential===false || (!client.sameAsResidential && client.workAddress && client.workAddress!==client.residentialAddress)){
-  return {source:'client-work',address:client.workAddress||'',suburb:'',postcode:trailingPostcode(client.workAddress),geocode:preserveGeocode(undefined,client.workGeocode,[client.workAddress])};
+  const suffix=addressPostalSuffix(client.workAddress);
+  return {source:'client-work',address:client.workAddress||'',suburb:'',state:suffix?.state??'',postcode:suffix?.postcode??'',geocode:preserveGeocode(undefined,client.workGeocode,[client.workAddress])};
  }
- return {source:'client-residential',state:client.residentialState||'',address:client.residentialAddress||client.workAddress||'',suburb:client.residentialSuburb||'',postcode:client.residentialPostcode||trailingPostcode(client.residentialAddress),geocode:preserveGeocode(undefined,client.residentialGeocode,residentialGeocodeValues(client))};
+ return {source:'client-residential',state:client.residentialState||'',address:client.residentialAddress||client.workAddress||'',suburb:client.residentialSuburb||'',postcode:client.residentialPostcode||addressPostalSuffix(client.residentialAddress)?.postcode||'',geocode:preserveGeocode(undefined,client.residentialGeocode,residentialGeocodeValues(client))};
 }
 
 export function projectMatchLocation(stored={},client={}) {
@@ -34,7 +30,7 @@ export function projectMatchLocation(stored={},client={}) {
  // Older work plans may save the displayed client street when only funding fields change.
  const copiedStreet=stored.location&&addressKey([stored.location])===addressKey([inherited.address]);
  if(!stored.suburb&&!stored.postcode&&!stored.geocode&&(!stored.location||copiedStreet))return {...inherited,serviceArea:area};
- return {source:'project',address:stored.location||'',suburb:stored.suburb||'',postcode:stored.postcode||trailingPostcode(stored.location),serviceArea:area,
+ return {source:'project',address:stored.location||'',suburb:stored.suburb||'',postcode:stored.postcode||addressPostalSuffix(stored.location)?.postcode||'',serviceArea:area,
   geocode:preserveGeocode(undefined,stored.geocode,[stored.location,stored.suburb,stored.postcode])};
 }
 

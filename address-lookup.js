@@ -111,6 +111,20 @@ export async function lookupAddress(text,signal,locality={}){
  if(cache.size>=50)cache.delete(cache.keys().next().value);cache.set(cacheKey,result);return result;
 }
 export function attachAddressLookup(input,{draft,fields,geoField}={}){
+ // Normalise operator edits before the form records its draft or binds coordinates.
+ // Reading an old address or editing unrelated fields does not rewrite saved text.
+ if(geoField)for(const key of fields.keys){
+  const control=fields.elements?.[key]??(key===fields.street?input:null);
+  if(!control||control.tagName==='SELECT')continue;
+  control.addEventListener('input',event=>{
+   if(event.isComposing)return;
+   const value=control.value,upper=value.toUpperCase();
+   if(upper===value)return;
+   const start=control.selectionStart,end=control.selectionEnd;
+   control.value=upper;
+   if(start!==null&&end!==null)control.setSelectionRange(value.slice(0,start).toUpperCase().length,value.slice(0,end).toUpperCase().length);
+  },true);
+ }
  attachLocalityPicker(fields);
  // fields maps provider parts to the form's saved keys. Unmapped locality is
  // included in address text, never silently dropped from a selected address.

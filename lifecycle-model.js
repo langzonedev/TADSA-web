@@ -25,17 +25,20 @@ export function canCancelEnquiryWithoutFinance(state,{actualMinutes,hasInvoice,i
   !actualMinutes && !hasInvoice && !invoiceRequired && !assessmentComplete && !workApproved);
 }
 export function projectLifecycleStatus(state,{projectStatus,programme}={}){
+ const handoff=state?.financeHandoff;
+ const sentToFinance=Boolean(handoff?.sentOn && handoff.costReturnVersion===state?.costReturns?.at(-1)?.version);
  if(state?.cancellation){
   if(state.cancellation.closedWithoutFinance===true)return 'Enquiry';
   if(state.closed||projectStatus==='closed')return 'Cancelled';
-  return state.financeFinalisation?'Cancelled · Finance finalised':'Cancelled · Finance pending';
+  if(state.financeFinalisation)return 'Cancelled · Finance finalised';
+  return sentToFinance?'To finance for invoicing':'Cancelled · Finance pending';
  }
  if(state?.closed||projectStatus==='closed')return 'Closed';
  if(!state)return projectStatus==='review'?'Review':projectStatus==='open'?'Project open':'Status not recorded';
  const stage=lifecycleEffectiveStage(state,{programme}),quote=state.quotes?.at(-1);
  if(stage==='enquiry')return 'Enquiry';
  if(state.financeFinalisation)return 'Finance finalised';
- if(state.financeHandoff&&state.financeHandoff.costReturnVersion===state.costReturns?.at(-1)?.version)return 'Cost summary sent to Finance';
+ if(sentToFinance)return 'To finance for invoicing';
  if(state.costReturns?.length&&['finance_handoff','finance_finalisation','ready_to_close'].includes(stage))return 'Cost return received';
  if(stage==='finance_handoff'||stage==='finance_finalisation')return 'Customer sign-off recorded';
  if(stage==='customer_signoff')return 'Technical work completed';

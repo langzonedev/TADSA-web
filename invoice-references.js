@@ -26,7 +26,7 @@ export function financeStatusRows(lifecycle,finance){
  ];
 }
 
-export function renderFinanceStatusForm(parent,projectId,saved){
+export function renderFinanceStatusForm(parent,projectId,saved,paymentOnly=false){
  const initial={...saved,paidInFull:saved.paidInFull==null?'':saved.paidInFull?'yes':'no'};
  return editor(parent,'finance-status/'+projectId,initial,'Invoice and payment details',(form,draft)=>{
   const today=adelaideToday();
@@ -35,6 +35,7 @@ export function renderFinanceStatusForm(parent,projectId,saved){
    const day=field(group,dateLabel,draft,dateKey,'date');day.min='1900-01-01';day.max=today;
    const other=field(group,otherLabel,draft,otherKey,'text',options);
    if(!options)other.maxLength=120;
+   if(paymentOnly&&otherKey!=='paidInFull')group.disabled=true;
    function requirePair(){day.required=Boolean(other.value.trim());other.required=Boolean(day.value);}
    group.addEventListener('input',requirePair);group.addEventListener('change',requirePair);requirePair();
   }

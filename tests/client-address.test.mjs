@@ -6,6 +6,21 @@ import '../device-extensions.mjs';
 import {validateBackup} from '../device-backups.mjs';
 import {invoiceDetails} from '../device-business.mjs';
 import {residentialAddressText} from '../client-address.js';
+test('new client and person capture their home or contact address with the initial save',async()=>{
+ const d=normalise(seed({enriched:false})),call=(path,method='GET',data={})=>dispatch(d,path,method,data);
+ const initialAddress={street:'1 Fictional street',suburb:'darwin',state:'nt',postcode:'0800'};
+ const input={requestId:crypto.randomUUID(),name:'Fictional intake client',email:'',phone:'',allowDuplicate:false,initialAddress};
+ const client=call('clients','POST',input);
+ assert.equal(client.details.workAddress,'1 FICTIONAL STREET');assert.equal(client.details.residentialPostcode,'0800');assert.equal(client.details.sameAsResidential,true);
+ assert.equal(call('clients','POST',input).id,client.id);
+ const generic=call('people','POST',{...input,requestId:crypto.randomUUID(),name:'Fictional intake contact',roles:['Carer'],technician:null});
+ assert.equal(d.profileDetails[generic.id].contact.suburb,'DARWIN');
+ const both=call('people','POST',{...input,requestId:crypto.randomUUID(),name:'Fictional intake client and carer',roles:['Carer','Client'],technician:null});
+ assert.equal(call('clients/'+both.clientId).details.residentialAddress,'1 FICTIONAL STREET');
+ const count=d.people.length;
+ assert.throws(()=>call('clients','POST',{...input,name:'Invalid intake',requestId:crypto.randomUUID(),initialAddress:{...initialAddress,postcode:'123'}}),e=>e.status===422);
+ assert.equal(d.people.length,count);assert.equal((await validateBackup(d)).clients.find(c=>c.id===client.id).details.residentialPostcode,'0800');
+});
 test('structured client address retains leading zero, supports reports/search and round-trips backups',async()=>{
  const d=normalise(seed({enriched:false})),call=(path,method='GET',input={})=>dispatch(d,path,method,input);
  const c=call('clients/client-1'),body={version:c.details.version,name:c.person.name,email:'address.test@example.invalid',phone:'',residentialAddress:'Legacy full address, Fictional SA 5000',workAddress:'',sameAsResidential:true,preferredContact:'client',representativePersonId:null,contactNeeds:''};

@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "14bd633e5d29efa315c2644452ecd8fdf1f8d876",
+  "sourceRevision": "a47349e3a9fe7dc9fa66d08e30322873fa7940d2",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "credential-expiry.js": {
@@ -39,12 +39,12 @@
     },
     "action-styles.css": {
       "source": "public/action-styles.css",
-      "sha256": "0c144ca2f31b482222bfc7787fb498bfc8459108a38c9b87e90afa88280d5159",
+      "sha256": "99e275b3c24ffc550ef865d184e42edb006b15c8771d7662a63e2883d4dc23f8",
       "transform": null
     },
     "contact-overview.css": {
       "source": "public/contact-overview.css",
-      "sha256": "52e745d985d0fc9bf056578eb00bc3d98dab8ae06cb640135b83fc5d76566ea4",
+      "sha256": "00d1f38034c19094829610fd458abe58e2b0d00bb3f20341974e34fd937c48b4",
       "transform": null
     },
     "inline-confirmation.js": {
@@ -64,12 +64,12 @@
     },
     "address-lookup.js": {
       "source": "public/address-lookup.js",
-      "sha256": "b754dc98e43281894b42612bd39f9d5652d8ddd56d68afdb25f7d80be233e5d5",
+      "sha256": "3c69854a815096aafcd97530c81bf84b2006c8bcea7ab182ed67722fd47a2691",
       "transform": null
     },
     "service-regions.js": {
       "source": "public/service-regions.js",
-      "sha256": "f3ab2be2ad33d1e1b66d54c0b423fe8abf701ad8d64cc3b944f29e62e1e32c85",
+      "sha256": "8dd34ddd39380cf4800489b4e6a79b2cdf2091f6e7191c2ef3a50d71880ce608",
       "transform": null
     },
     "service-region-data.js": {
@@ -84,7 +84,7 @@
     },
     "locality-picker.js": {
       "source": "public/locality-picker.js",
-      "sha256": "c3676ec41127056306f2e52bdc484dd75df2fd2795eee4be434d3f3a266def0d",
+      "sha256": "361bae9baf701cb71a720a363a106a159b8d5e69db133eeb398001be4741ef3d",
       "transform": null
     },
     "postal-localities.js": {
@@ -104,7 +104,7 @@
     },
     "client-address.js": {
       "source": "public/client-address.js",
-      "sha256": "4962f637ab67d9f93262b0421ce7b1e00eeec8c95818481e925acb3db81f152d",
+      "sha256": "268a9cdb3f1eadb96addad054cde138e3aa428130865a104fe072a22255d3ddb",
       "transform": null
     },
     "contact-draft.js": {
@@ -124,7 +124,7 @@
     },
     "invoice-references.js": {
       "source": "public/invoice-references.js",
-      "sha256": "f26b00fb7175b17b9844d32c548e1e65890d4d03299c77bf3288a2894c4d3144",
+      "sha256": "646e4daf18f3117e6677ee563c0f31f789e18e1820a1fca0d82db37e229456f1",
       "transform": null
     },
     "invoice-references-model.js": {
@@ -134,12 +134,12 @@
     },
     "finance-status-model.js": {
       "source": "public/finance-status-model.js",
-      "sha256": "ca77f327a7819f8d8d37b0d6f86fd52d3a0d82cb2114f3c00d6dfbda9a59d9a4",
+      "sha256": "61ad59ff0f30f8f247da22c926bec5300acc45bd211288245d63ff5ae879b985",
       "transform": null
     },
     "profile-details.js": {
       "source": "public/profile-details.js",
-      "sha256": "c0b308a13149c27f6b31d3c1e8921ecf5bc786a8b887fc60238799c48cd93d60",
+      "sha256": "6d3555f29480fbf25cb376ccd5b5d96d2ac6c9fd2ec59ab28edacf5af7bf6c00",
       "transform": null
     },
     "profile-details-model.js": {
@@ -169,7 +169,7 @@
     },
     "lifecycle-model.js": {
       "source": "public/lifecycle-model.js",
-      "sha256": "fe74ea072a48536e1c391247a803c920409e77c4d57b148bcc82f47de9620e41",
+      "sha256": "1f03cc70c5c5c195538a8f023bdf3ae7837ba448639dbc79bff3f0262156b2ec",
       "transform": null
     },
     "lifecycle-validation.js": {
@@ -179,12 +179,12 @@
     },
     "project-lifecycle.js": {
       "source": "public/project-lifecycle.js",
-      "sha256": "ccb900073cf707f9631db5da3e69fb839715d77eabdb9fe44162995f96317c1b",
+      "sha256": "568c89113d8c00ab2874fb712dfd2fbd44888786ac8e3a4a77d9075cfbfad45d",
       "transform": null
     },
     "finance-pack.js": {
       "source": "public/finance-pack.js",
-      "sha256": "a24e8587437101cf4c0cbc4f1c58a8ec3eb111ee30e0af04efee30a8ce9f2b75",
+      "sha256": "dfcc9526716bdd109969bd27de6930feea7cebe8b8696f788694b96a270db04e",
       "transform": null
     },
     "technician-credentials.js": {
@@ -204,12 +204,12 @@
     },
     "report-model.js": {
       "source": "public/report-model.js",
-      "sha256": "c90ff9b7ca28ab8f6dbbb1ca08314866692a5e1384e79f8f659115a527e833e3",
+      "sha256": "20ba88eb88ce4cc72aec4871a5f8bd4bc1b87b5600cda34354c02aff4b328ef8",
       "transform": null
     },
     "report-builder.js": {
       "source": "public/report-builder.js",
-      "sha256": "8570147942e460afe62332990109d28fe7281281a213d67ce1382bfcc234bbf3",
+      "sha256": "714299fe28ade7744b086769d3d55ba47af79f063b73d66ca4d236c4da996253",
       "transform": null
     },
     "jpeg.js": {
@@ -219,7 +219,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "26e9f4ca6d870d6a4b6039e9d01ec49cfdf89b06349405de2870848265ed709b",
+      "sha256": "53d09ba64de7594f842aa0d68d6107d18e7e7da9a8c381c5eb0ec6121aeb3edc",
       "transform": null
     },
     "settings.js": {
@@ -239,7 +239,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "8da183ee4016a71e8cc3bf626d8293220d9a92fcc1ed37165c23e5ac1df5b691",
+      "sha256": "41cd9f111597069733322e128be4df98a9d46b4defb6e4a0ede38ff3c8f21dbb",
       "transform": null
     },
     "operations.js": {
@@ -249,7 +249,7 @@
     },
     "client-details.js": {
       "source": "public/client-details.js",
-      "sha256": "b8792b5f117553bf73194d2c576984477ae43ba050708332b31d5bb2ce6a5c49",
+      "sha256": "166792f9e88fb4acab654e69d4e2488dab69910f4e7ba29e552851e939f8a12c",
       "transform": null
     },
     "local-login.js": {
@@ -269,12 +269,12 @@
     },
     "technician-location-model.js": {
       "source": "public/technician-location-model.js",
-      "sha256": "eab235ef2d1716d26575a84bb68ec388f71d367fae8e103ffba0ad9b3ef21814",
+      "sha256": "e21568eb0b67ad63dc49d1426d3c0fdcadd2cfcf4a40708df9b96c5b85c72d64",
       "transform": null
     },
     "project-care.js": {
       "source": "public/project-care.js",
-      "sha256": "28ab8fe20de6e5ce07416ca9194aef41e51d3cf9287c4800a70cf1ec2d863a3d",
+      "sha256": "f778d66474b8e2a099b93fa9a3d1e07eac0013fceeb86a0b04a8fc015d3291ca",
       "transform": null
     },
     "styles.css": {
@@ -310,5 +310,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "46034aa3531fd78ce30379951dcdbdb6b510e62ea2d6e1cc292395d43d96b01e"
+  "shellHash": "7da61dd504877c08900af8b9eed702b4d8abd1e3af81adb3966fcc4646cf81d1"
 }

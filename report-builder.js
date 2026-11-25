@@ -72,7 +72,7 @@ export function renderReportBuilder(view){
    const choices=select(savedBox,'Saved reports',[['','Choose a saved report'],...saved.map(s=>[s.name,s.name])],selectedName,value=>{
     if(!value){selectedName='';modified=false;drawSaved();return;}
     const report=savedReports().find(s=>s.name===value);if(!report){selectedName='';drawSaved();return;}
-    query=clone(report.query);selectedName=report.name;modified=false;invalidate(false);draw();drawSaved();
+    query=validateReportQuery(report.query);selectedName=report.name;modified=false;invalidate(false);draw();drawSaved();
    });
    const remove=action('Delete selected saved report',()=>{
     if(!selectedName)return;const deletedName=selectedName;

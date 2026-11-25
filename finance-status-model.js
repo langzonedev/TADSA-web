@@ -4,6 +4,17 @@ export const emptyFinanceStatus = Object.freeze({
   paidInFull: null, paidStatusOn: ''
 });
 
+export function awaitingInvoicePayment(facts){
+  return Boolean(facts && facts.paidInFull !== true && (facts.invoiceSentOn || facts.paidInFull === false));
+}
+export const outstandingInvoiceMessage = 'The invoice is awaiting payment. Record a dated Yes for Invoice Paid in Full in Finance status before finalising or closing this project.';
+
+// Older open projects could be finalised while an issued invoice still awaited payment.
+export function resolvesFinalisedInvoice(before,after){
+  return awaitingInvoicePayment(before) && after.paidInFull === true &&
+    ['invoiceNumber','invoiceSentOn','paymentNumber','reimbursedOn'].every(key=>after[key]===before[key]);
+}
+
 const fail = message => { throw Object.assign(new Error(message), {status: 422}); };
 
 export function validateFinanceStatus(details, now = new Date()) {
