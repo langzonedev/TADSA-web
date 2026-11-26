@@ -1,27 +1,6 @@
 import {node,field,editor,request} from './project-care.js';
 import {createProjectDetails,createFreedomWheelsDetails} from './project-details-model.js';
 import {referralRows} from './website-referral.js';
-export function renderReferralFollowUp(referral,openOriginal){
- const answers=referral.answers,section=node('section',null,'website-referral-follow-up');
- section.append(node('h3','Website referral for follow-up'));
- const rows=[
-  ['Referrer named on form',[answers.referrer,answers.referrerPhone,answers.referrerEmail].filter(Boolean).join(' · ')],
-  ['Client, carer or parent email',answers.contactEmail],
-  ['Quote requested before work',answers.quote],
-  ['NDIS funding reported',answers.ndis],
-  ['Authority or payment contact supplied',answers.authorityName],
-  ['Safety information reported',answers.safety],
-  ['Referrer or carer attendance',answers.attendance]
- ];
- const list=node('dl',null,'detail-pairs');
- for(const [label,value] of rows){
-  if(!value)continue;
-  const row=node('div');row.append(node('dt',label),node('dd',value));list.append(row);
- }
- if(list.children.length)section.append(list);
- const original=node('button','View original website answers','text-button');original.type='button';
- original.addEventListener('click',openOriginal);section.append(original);return section;
-}
 const payload=d=>Object.fromEntries(['requestId','version',...Object.keys(createProjectDetails())].map(k=>[k,d[k]]));
 const labelSave=(entry,label)=>{const button=entry.form.querySelector('button[type=submit]');button.dataset.label=label;if(!entry.d.pending)button.textContent=label;};
 export async function renderProjectDetails(view,id,context={}){

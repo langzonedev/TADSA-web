@@ -1,10 +1,10 @@
 {
-  "sourceRevision": "97823c93fdaf8faf20d710dc2f3e9e024105b4f1",
+  "sourceRevision": "a0d21df0d43f0500749655e15f91aaf5521e11d3",
   "note": "Content hashes are authoritative; source working tree may contain the current uncommitted integration.",
   "files": {
     "website-referral-matches.js": {
       "source": "public/website-referral-matches.js",
-      "sha256": "c131040fb1bce5f3862f11e95c57056a661c3fca3f31e6c30d51c5ef9fd48018",
+      "sha256": "28c73bc79a93986e3f4c63f2047679df27602aa2f932fac20ce6a09b7466a2f3",
       "transform": null
     },
     "assessment-pack-model.js": {
@@ -14,12 +14,12 @@
     },
     "assessment-workspace.js": {
       "source": "public/assessment-workspace.js",
-      "sha256": "0413f915374239904e76b61f8b628b4784331d65a6b0209fc45abb55e736cea6",
+      "sha256": "fd83dfb8aedcdf1b06fda0e17c351b4af2f92e6a04c0571cef6767541246a4e2",
       "transform": null
     },
     "website-referral.js": {
       "source": "public/website-referral.js",
-      "sha256": "0195ff9e33aa47c6f61edf109290813ee16fb292952f4041ea0033fe218f8ef6",
+      "sha256": "92814596b752d81eb9cc7962a1871ec51b4f78da59f38ac6de71a05b0cbbccbb",
       "transform": null
     },
     "assessment-word.js": {
@@ -49,7 +49,7 @@
     },
     "project-contacts.js": {
       "source": "public/project-contacts.js",
-      "sha256": "f7c5a723a1be9e93cd4083c1ae491fc7103a0fcfbf80cf87c4022ab8a0c4610d",
+      "sha256": "e8e9c74fb7b327b03a131eca70edbb5fdca544547512cfdc18294e1d3e233e55",
       "transform": null
     },
     "project-contacts-model.js": {
@@ -169,12 +169,12 @@
     },
     "profile-details-model.js": {
       "source": "public/profile-details-model.js",
-      "sha256": "f4c6d68a7c90f9ecd45997523522afc10aa2236b98f5b8ffd2f692824df482ce",
+      "sha256": "034d4395545aa3ad78dfa83a2c5a022c4ae38ff6c79f34117eb5247c7a839391",
       "transform": null
     },
     "project-details.js": {
       "source": "public/project-details.js",
-      "sha256": "410f3b6f4f3eed14b4013fc2d49c25bd7e20a3aab389be5d5f1a9070be5fc223",
+      "sha256": "d5b182865121959b6b962ec4a3fd6d4e3b358f65ba87e8e5e6a49f150831217d",
       "transform": null
     },
     "project-details-model.js": {
@@ -249,7 +249,7 @@
     },
     "app.js": {
       "source": "public/app.js",
-      "sha256": "8b5a5a0ba8320af72f977fcaa2a4e9f144fa8ac513878160bb280f7af1f62436",
+      "sha256": "32814b036354aed0ea19f8141abea00ec7341800744f301a8de42c144940810d",
       "transform": null
     },
     "settings.js": {
@@ -269,7 +269,7 @@
     },
     "workflows.js": {
       "source": "public/workflows.js",
-      "sha256": "d74b015c44407b3f7693da82e5a25c93638b20d5bfbf6099a933c42bbabf6d68",
+      "sha256": "324b450a2bf181973f13d56e5639e635cf760d541771a682a82d6c2bffb1e5ac",
       "transform": null
     },
     "operations.js": {
@@ -340,5 +340,5 @@
       "transform": "Replace boot entry with device adapter and PWA metadata; truthful device storage disclosure"
     }
   },
-  "shellHash": "f8b0ccd663804c0ebf64cb8fdf56cdffbe7cae5d27a0218ea667c0c8d9c0870a"
+  "shellHash": "91ff9c9fe946fe617772baa40f7e5653f75f903a4558b30550cf64b6940f966a"
 }

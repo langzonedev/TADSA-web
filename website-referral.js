@@ -1,3 +1,4 @@
+import {AUSTRALIAN_STATES} from './client-address.js';
 import {reviewDay} from './project-details-model.js';
 
 export const intakeChannelLabels={website:'Website form email',phone:'Phone call',other:'Other enquiry'};
@@ -25,11 +26,72 @@ export function referralBirthDate(value){
   return Number.isFinite(parsed.getTime())&&parsed.toISOString().startsWith(day)?day:'';
 }
 
+const stateNames={'australian capital territory':'ACT','new south wales':'NSW','northern territory':'NT',
+  queensland:'QLD','south australia':'SA',tasmania:'TAS',victoria:'VIC','western australia':'WA'};
+const postalState=new RegExp('(?:^|\\s)('+[...Object.keys(stateNames),...AUSTRALIAN_STATES].join('|')+')$','i');
+export function websiteResidence(text=''){
+  const empty={street:'',suburb:'',state:'',postcode:''};
+  const parts=text.split(/[\n,]+/).map(part=>part.trim()).filter(Boolean);
+  if(/^australia$/i.test(parts.at(-1)))parts.pop();
+  if(!parts.length||/^(?:n\s*\/?\s*a|none|unknown|not supplied)$/i.test(parts.join(' ')))return empty;
+  const freeText=parts.join(', ');
+  const unsplit=freeText.length<=250?{...empty,street:freeText}:empty;
+  const end=parts.at(-1),postal=/(?:^|\s)(\d{4})$/.exec(end);
+  if(!postal)return unsplit;
+  parts.pop();
+  let locality=end.slice(0,postal.index).trim();
+  if(!locality&&parts.length)locality=parts.pop();
+  const stateMatch=postalState.exec(locality);
+  const state=stateMatch?(stateNames[stateMatch[1].toLowerCase()]||stateMatch[1].toUpperCase()):'';
+  if(stateMatch){
+    locality=locality.slice(0,stateMatch.index).trim();
+    if(!locality&&parts.length)locality=parts.pop();
+  }
+  // A one-line street and locality can share a postal suffix. Retain their
+  // wording together unless the sender provided a street/locality boundary.
+  let street=parts.join(', '),suburb=locality;
+  if(!street&&/\d/.test(locality)){street=locality;suburb='';}
+  if(street.length>250||suburb.length>100)return unsplit;
+  return {street,suburb,state,postcode:postal[1]};
+}
+export function referralNdisNumber(answers){
+  const entries=(answers.additional||'').split('\n\n').map(entry=>entry.split('\n'))
+    .filter(([label])=>/^NDIS (?:participant )?number$/i.test(label.trim()));
+  if(entries.length!==1||entries[0].length!==2)return '';
+  const number=entries[0][1].trim();
+  return /^[0-9 ]{3,30}$/.test(number)&&/\d{3}/.test(number.replace(/ /g,''))?number:'';
+}
+
+function reportedNotes(rows,max){
+  const lines=rows.filter(([,value])=>value).map(([label,value])=>label+': '+value);
+  const notes=lines.join('\n');
+  if(notes.length<=max)return notes;
+  return 'See original website answers for '+lines.map(line=>line.split(':')[0].toLowerCase()).join(', ')+'.';
+}
+export function referralFundingNotes(answers){
+  return reportedNotes([['Quote requested before work (website)',answers.quote],
+    ['NDIS funding reported by client',answers.ndis],['Authority or payment contact supplied',answers.authorityName],
+    ['Authority or payment address supplied',answers.authorityAddress]],1000);
+}
+export function referralAssessmentInstructions(answers={}){
+  const informative=value=>value&&!/^(?:n\s*\/?\s*a|none|no|not applicable|nil)[.!]?$/i.test(value.trim())?value:'';
+  return reportedNotes([['Safety issues reported on website',informative(answers.safety)],
+    ['Referrer or carer attendance requested on website',informative(answers.attendance)]],2000);
+}
+export function reviewableClientDetails(answers){
+  const single=(value,max)=>value&&value.length<=max&&!/[\u0000-\u001f\u007f]/.test(value)?value:'';
+  const address=websiteResidence(answers.address);
+  return {phone:single(answers.phone||answers.mobile,40),mobilePhone:single(answers.mobile,40),
+    dateOfBirth:referralBirthDate(answers.birth),residence:address.street?answers.address:'',
+    disability:answers.disability?.length<=1000?answers.disability:'',
+    email:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(answers.contactEmail||'')?single(answers.contactEmail,254):'',
+    ndisNumber:referralNdisNumber(answers)};
+}
 export function reviewedContactAdditions(choices,answers,current){
-  const supplied={phone:answers.phone||answers.mobile,mobilePhone:answers.mobile,dateOfBirth:referralBirthDate(answers.birth)};
+  const supplied=reviewableClientDetails(answers);
   if(!choices||typeof choices!=='object'||Array.isArray(choices)||!Object.keys(choices).length)invalid('Choose the missing client details to add.');
   for(const [key,value] of Object.entries(choices)){
-    if(!Object.hasOwn(supplied,key)||typeof value!=='string'||!value||value!==supplied[key]||value.length>40||/[\u0000-\u001f\u007f]/.test(value))invalid('Only reviewed phone numbers and date of birth from this form can be added.');
+    if(!Object.hasOwn(supplied,key)||!value||value!==supplied[key])invalid('Choose a valid detail supplied on the reviewed client form.');
     if(current[key])throw Object.assign(Error('This client’s details changed. Check the client again before adding information.'),{status:409});
   }
   return {...choices};
@@ -81,7 +143,7 @@ function fieldKey(name,section){
 // without treating them as part of a preceding identity, funding or safety answer.
 const extraLabels = new Set([
   'If photos or diagrams are available, please attach them here','Is this request in the current NDIS plan',
-  'NDIS Number','Plan Start Date','Plan End Date','NDIS funding managed by','Authority to proceed and payment information - to be sent by',
+  'NDIS Number','NDIS participant number','Plan Start Date','Plan End Date','NDIS funding managed by','Authority to proceed and payment information - to be sent by',
   'Email','NDIS Plan - Start Date','NDIS Plan - End Date','Support Budget','Item Number','NDIS Support Category','NDIS Support Item',
   'Details','Business Name','Additonal Contact','Additional Contact','Contact Name','Contact Phone','Contact Mobile','Contact Email',
   'Relation to Client','Referee Organisation','Invoicing Details','Comments'

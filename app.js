@@ -9,8 +9,9 @@ import {residentialAddressText} from './client-address.js';
 import {auditReferenceIds,auditAction,auditChanges,formatValue as displayValue} from './record-values.js';
 import {renderProfileDetails} from './profile-details.js';
 import {recordDirectoryStatus,DIRECTORY_STATUSES} from './profile-details-model.js';
-import {renderProjectDetails,renderProjectCoordinator,renderProjectFeedback,renderReferralFollowUp} from './project-details.js';
+import {renderProjectDetails,renderProjectCoordinator,renderProjectFeedback} from './project-details.js';
 import {intakeChannelLabels} from './website-referral.js';
+import {needsManualReferrerReview,referrerIdentity} from './website-referral-matches.js';
 import {renderAccounts} from './accounts.js';
 import {renderReports} from './reports.js';
 import {renderSettings,configureSettings} from './settings.js';
@@ -477,21 +478,26 @@ async function project(view, id) {
     const source=[intakeChannelLabels[channel],adminDetails.websiteReferral?.receivedOn&&date(adminDetails.websiteReferral.receivedOn)].filter(Boolean).join(' · ');
     brief.append(details([['Enquiry received via',source]]));
   }
-  if(adminDetails.websiteReferral)brief.append(renderReferralFollowUp(adminDetails.websiteReferral,async()=>{
-    await navigate('Edit details');
-    const original=editPane.querySelector('.website-referral-readback');
-    if(original){original.open=true;original.querySelector('summary')?.focus();}
-  }));
   const payerNames=new Map([[`client:${p.clientId}`,p.clientName]]);if(projectOperations.fundingContributors.length){const kinds={person:'people',organisation:'organisations',client:'clients'},contributors=projectOperations.fundingContributors.filter(c=>!payerNames.has(c.type+':'+c.id));const selected=await Promise.allSettled(contributors.map(c=>api('selections/'+kinds[c.type]+'/'+encodeURIComponent(c.id))));selected.forEach((result,i)=>{if(result.status==='fulfilled'&&result.value.item?.name)payerNames.set(contributors[i].type+':'+contributors[i].id,result.value.item.name);});}
   const facts=el('div',undefined,'project-facts');const client=el('div');client.append(link('CLIENT',`client/${p.clientId}`,'summary-heading-link'),link(p.clientName,`client/${p.clientId}`));facts.append(client);
   for(const [label,roles] of [['CONTACTS',['Contact','Carer','OT','Occupational therapist','Allied-health contact']],['REFERRER',['Referrer']],['FUNDER / PAYER',['Funder']],['TECHNICAL TEAM',['Technician']]]){
     const group=el('div');group.append(button(label,()=>navigate(label==='TECHNICAL TEAM'?'Team':label==='FUNDER / PAYER'?'Funding':'Contacts'),'summary-heading-link'));const members=p.relationships.filter(r=>roles.includes(r.role));
     if(label==='FUNDER / PAYER'&&projectOperations.fundingContributors.length){for(const c of projectOperations.fundingContributors)group.append(link((payerNames.get(c.type+':'+c.id)||'Recorded payer · '+c.id)+' · '+new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(c.amountCents/100),c.type+'/'+c.id));group.append(el('small','Agreed contributions · not receipts','field-help'));facts.append(group);continue;}
     if(label==='FUNDER / PAYER'&&p.coordination?.fundingStatus==='self'){group.append(link(p.clientName+' · Client pays',`client/${p.clientId}`));facts.append(group);continue;}
-    if(!members.length)group.append(el('span',label==='TECHNICAL TEAM'?'Not assigned':'Not recorded','muted'));
+    if(!members.length){
+      if(label==='REFERRER'&&(referrerIdentity(adminDetails.websiteReferral?.answers).name||needsManualReferrerReview(adminDetails.websiteReferral?.answers))){
+        group.append(button('Review website referrer',()=>navigate('Contacts'),'text-button'));
+      }else group.append(el('span',label==='TECHNICAL TEAM'?'Not assigned':'Not recorded','muted'));
+    }
     for(const member of members)group.append(link(member.name+(label==='CONTACTS'?' · '+member.role:member.id===p.coordination?.technicianId?' · Lead':''),(member.type==='organisation'?'organisation/':'person/')+member.id));facts.append(group);
   }
-  brief.append(facts);const context=el('details',undefined,'project-context-details');context.append(el('summary','More project information'),details([['Programme',adminDetails.programme||'Not recorded'],['Coordinator',adminOptions.coordinators.find(a=>a.id===adminDetails.coordinatorAccountId)?.displayName||(adminDetails.coordinatorAccountId?'Previously assigned account':'Not assigned')],['Skills needed',p.coordination?.requiredSkills?.join(', ')||'Not specified'],...(p.status==='closed'?[]:[['Target date',date(p.dueDate)]]),['Work location',[projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded']]));brief.append(context);if(adminDetails.documentFolderUrl){const folder=el('a','Open project document folder','text-button');folder.href=adminDetails.documentFolderUrl;folder.target='_blank';folder.rel='noopener noreferrer';brief.append(folder);}
+  brief.append(facts);
+  if(adminDetails.websiteReferral)brief.append(button('View original website answers',async()=>{
+    await navigate('Edit details');
+    const original=editPane.querySelector('.website-referral-readback');
+    if(original){original.open=true;original.querySelector('summary')?.focus();}
+  },'text-button'));
+  const context=el('details',undefined,'project-context-details');context.append(el('summary','More project information'),details([['Programme',adminDetails.programme||'Not recorded'],['Coordinator',adminOptions.coordinators.find(a=>a.id===adminDetails.coordinatorAccountId)?.displayName||(adminDetails.coordinatorAccountId?'Previously assigned account':'Not assigned')],['Skills needed',p.coordination?.requiredSkills?.join(', ')||'Not specified'],...(p.status==='closed'?[]:[['Target date',date(p.dueDate)]]),['Work location',[projectLocation.address,projectLocation.suburb,projectLocation.postcode].filter(Boolean).join(', ')||'Not recorded']]));brief.append(context);if(adminDetails.documentFolderUrl){const folder=el('a','Open project document folder','text-button');folder.href=adminDetails.documentFolderUrl;folder.target='_blank';folder.rel='noopener noreferrer';brief.append(folder);}
   const quickActions=el('div',undefined,'project-overview-links');quickActions.append(button('Edit contacts & referrer',()=>navigate('Contacts'),'primary'),link('Edit team','coordination/'+id+'/team','text-button'),link('Edit funding','coordination/'+id+'/funding','text-button'),button('Edit project details',()=>{editMode=false;navigate('Edit details');},'text-button'));brief.append(quickActions);brief.classList.add('project-home-brief');
   const finance=panel('Finance status');finance.classList.add('project-finance-summary');
   const money=value=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(value/100),fullDate=value=>value?new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Adelaide',day:'numeric',month:'short',year:'numeric'}).format(new Date(value.includes('T')?value:value+'T12:00:00Z')):'Not recorded';

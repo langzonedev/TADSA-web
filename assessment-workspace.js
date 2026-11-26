@@ -2,6 +2,7 @@ import {node,action,field,editor,link,notice,request,downloadProjectFile} from '
 import {assessmentRequestDocument,assertStableDocumentSnapshot} from './finance-pack.js';
 import {assessmentWordFile,reportParagraphs,requestParagraphs} from './assessment-word.js';
 import {projectMatchLocation} from './technician-location-model.js';
+import {referralAssessmentInstructions} from './website-referral.js';
 import {residentialAddressText} from './client-address.js';
 
 const defaultInstructions='Where the referrer is arranging the visit, they will contact you to agree a time. Otherwise, confirm arrangements with the project manager. Please record your findings, risks and estimates in the assessment report and return it to the project manager.';
@@ -33,18 +34,11 @@ function previewRows(panel,rows,close){
 function renderPreparation(parent,project,current,admin,templates){
  const path='projects/'+project.id,pack=current.state.assessmentPack;
  const latest=templates.items[0];
- const initial={version:current.version,instructions:admin.assessmentInstructions||pack?.instructions||defaultInstructions,
+ const initial={version:current.version,instructions:admin.assessmentInstructions||pack?.instructions||referralAssessmentInstructions(admin.websiteReferral?.answers)||defaultInstructions,
   reportTemplateRevision:String(latest&&pack?.reportTemplateRevision?latest.revision:0)};
  const preview=node('article',null,'panel assessment-preview');preview.hidden=true;
  let previewContext;
  editor(parent,'assessment-pack/'+project.id,initial,'Prepare the assessment documents',(form,d)=>{
-  const answers=admin.websiteReferral?.answers;
-  if(answers?.safety||answers?.attendance){
-   const visit=node('div',null,'field-help');visit.append(node('strong','Website form information for this visit'));
-   if(answers.safety)visit.append(node('p','Reported safety issues: '+answers.safety));
-   if(answers.attendance)visit.append(node('p','Referrer or carer attendance: '+answers.attendance));
-   form.append(visit);
-  }
   const instructions=field(form,'Instructions to the technical member',d,'instructions','textarea');instructions.required=true;instructions.maxLength=2000;
   const choices=[['0','CRM report form · filled in with this client and project']];
   if(latest)choices.push([String(latest.revision),latest.name+' · TADSA blank, revision '+latest.revision]);

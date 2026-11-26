@@ -99,3 +99,73 @@ export function localReferralMatches(data,input){
   }
   return rankedReferralMatches(submitted,candidates);
 }
+
+const absentAnswer=/^(?:[^\p{L}\p{N}]+|n\s*[./]?\s*a\.?|none|no|nil|unknown|not (?:applicable|known|provided|recorded|supplied))$/iu;
+export function needsManualReferrerReview(answers){
+  const name=answers?.referrer?.trim();
+  return Boolean(name&&!absentAnswer.test(name)&&!referrerIdentity(answers).name);
+}
+function personAnswer(value,limit){
+  const answer=typeof value==='string'?value.trim():'';
+  return answer.length>limit||/[\u0000-\u001f\u007f]/.test(answer)||absentAnswer.test(answer)?'':answer;
+}
+export function referrerIdentity(answers){
+  const email=personAnswer(answers?.referrerEmail,254);
+  return {name:personAnswer(answers?.referrer,120),phone:personAnswer(answers?.referrerPhone,40),
+    email:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)?email:''};
+}
+export function validateReferrerIdentity(input){
+  if(!input||Object.keys(input).length!==3||!['name','phone','email'].every(k=>typeof input[k]==='string'))invalid('Supply the named referrer and their contact details.');
+  const identity=referrerIdentity({referrer:input.name,referrerPhone:input.phone,referrerEmail:input.email});
+  if(!identity.name||Object.keys(identity).some(k=>identity[k]!==input[k].trim()))invalid('Check the referrer’s name and contact details.');
+  return identity;
+}
+export function rankedReferrerMatches(identity,records){
+  const nameKey=referralName(identity.name),emailKey=identity.email.toLowerCase(),phones=referralPhoneVariants(identity.phone);
+  const matches=[];
+  for(const record of records){
+    const nameMatch=referralName(record.name)===nameKey;
+    const numbers=[record.phone,record.mobile,record.homePhone,record.workPhone].filter(Boolean);
+    const matchingNumber=numbers.find(value=>referralPhoneVariants(value).some(n=>phones.includes(n)));
+    const contactMatch=Boolean(matchingNumber||(emailKey&&emailKey===record.email?.trim().toLowerCase()));
+    if(nameMatch||contactMatch)matches.push({id:record.id,name:record.name,phone:matchingNumber||numbers[0]||'',email:record.email??'',
+      directoryStatus:record.directoryStatus??'current',nameMatch,contactMatch});
+  }
+  const score=r=>Number(r.nameMatch)*2+Number(r.contactMatch);
+  matches.sort((a,b)=>score(b)-score(a)||a.name.localeCompare(b.name,'en-AU')||a.id.localeCompare(b.id,'en-AU',{numeric:true}));
+  return {items:matches.slice(0,20),more:matches.length>20};
+}
+export function localReferrerMatches(data,input){
+  const identity=validateReferrerIdentity(input);
+  return rankedReferrerMatches(identity,data.people.map(p=>{
+    const contact=data.profileDetails?.[p.id]?.contact??{};
+    return {...p,mobile:contact.mobilePhone,homePhone:contact.homePhone,workPhone:contact.workPhone,
+      directoryStatus:p.active===false?'inactive':contact.directoryStatus??p.directoryStatus??'current'};
+  }));
+}
+export function reviewedReferrerChoice(choice,matches,identity){
+  const changed=()=>{throw Object.assign(Error('The referrer matches have changed. Check the directory again before saving.'),{status:409,code:'REFERRER_REVIEW_CHANGED'});};
+  if(!choice||typeof choice!=='object'||Array.isArray(choice))invalid('Review the named referrer before saving.');
+  if(Object.keys(choice).length===1&&choice.client===true)return {client:true};
+  if(typeof choice.personId==='string'&&Object.keys(choice).every(k=>['personId','additions'].includes(k))){
+    const match=matches.items.find(p=>p.id===choice.personId&&p.directoryStatus!=='inactive');
+    if(!match)changed();
+    if(!Object.hasOwn(choice,'additions'))return {personId:choice.personId};
+    const values=choice.additions;
+    if(!match.nameMatch||!values||typeof values!=='object'||Array.isArray(values)||!Object.keys(values).length)invalid('Only missing contact details for the named referrer can be added.');
+    for(const [key,value] of Object.entries(values)){
+      if(!['email','phone'].includes(key)||!value||value!==identity[key])invalid('Choose a phone or email supplied for this referrer.');
+      if(match[key])changed();
+    }
+    return {personId:choice.personId,additions:{...values}};
+  }
+  if(Object.keys(choice).length!==2||choice.create!==true||!Array.isArray(choice.reviewedIds)||choice.reviewedIds.some(id=>typeof id!=='string'))invalid('Choose a matching person or confirm that the referrer needs a new People record.');
+  if(isSelfReferralLabel(identity.name))invalid('Use the client record for a self-referral.');
+  const reviewed=new Set(choice.reviewedIds);
+  if(matches.more||reviewed.size!==choice.reviewedIds.length||reviewed.size!==matches.items.length||matches.items.some(p=>!reviewed.has(p.id)))changed();
+  return {create:true};
+}
+export const isSelfReferralLabel=name=>/^(?:self(?:[- ]referr(?:al|ed))?|myself|(?:the )?client)$/i.test(name?.trim()??'');
+export function checkSelfReferral(identity,clientName){
+  if(referralName(identity.name)!==referralName(clientName)&&!isSelfReferralLabel(identity.name))invalid('Choose the client as referrer only when the form names the client or says self-referral.');
+}

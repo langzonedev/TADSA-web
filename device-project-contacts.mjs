@@ -6,6 +6,15 @@ installModelExtensions(ctx=>{
  if(kind!=='projects'||parts.length!==3||sub!=='contacts')return;
  const project=find('projects',id),read=()=>({projectId:id,version:project.version,items:d.relationships.filter(r=>r.projectId===id&&PROJECT_CONTACT_ROLES.includes(r.role)).map(r=>({type:r.type,id:r.id,role:r.role,name:find(r.type==='person'?'people':'organisations',r.id).name})).sort((a,b)=>a.role.localeCompare(b.role)||a.name.localeCompare(b.name)||a.id.localeCompare(b.id))});
  if(method==='GET')return read();if(method!=='POST')fail('Project contacts action unavailable.',404);
+ if(input?.operation==='resolveWebsiteReferrer'){
+  if(Object.keys(input).length!==4||!Object.hasOwn(input,'requestId')||!Object.hasOwn(input,'websiteReferrer'))fail('Supply the referrer choice and current project version.');
+  version(project,input.version);
+  if(read().items.some(r=>r.role==='Referrer'))fail('Project contacts changed. Check the recorded referrer before saving.',409,{code:'VERSION_CONFLICT'});
+  const referrer=ctx.prepareWebsiteReferrer(d.projectAdminDetails?.[id]?.websiteReferral,input.websiteReferrer);
+  ctx.linkWebsiteReferrer(project,referrer);
+  project.version++;
+  return read();
+ }
  let command;try{command=validateProjectContact(input);}catch(error){fail(error.message);}version(project,command.version);
  const exists=d.relationships.some(r=>r.projectId===id&&sameProjectContact(r,command));if(exists===(command.operation==='add'))return read();
  if(command.operation==='add'){

@@ -53,10 +53,11 @@ export function initialLanguageDetails(language){
 // Only these reviewed fields can be written while creating a client from a referral.
 export function referralClientProfile(client, requestId){
  const optional=['homePhone','mobilePhone','dateOfBirth','disability'];
- const allowed=['name','email','phone','allowDuplicate','initialAddress',...optional];
+ const allowed=['name','email','phone','allowDuplicate','initialAddress','ndisNumber',...optional];
  if(!client||typeof client!=='object'||Array.isArray(client)||Object.keys(client).some(key=>!allowed.includes(key))||
     ['name','phone','email'].some(key=>typeof client[key]!=='string'||/[\u0000-\u001f\u007f]/.test(client[key]))||
     typeof client.allowDuplicate!=='boolean')throw Error('Check the reviewed new client details.');
+ if(Object.hasOwn(client,'ndisNumber')&&(typeof client.ndisNumber!=='string'||!/^[0-9 ]{3,30}$/.test(client.ndisNumber)||!/[0-9]{3}/.test(client.ndisNumber.replace(/ /g,''))))throw Error('Check the client NDIS participant number.');
  const details=createProfileDetails();
  for(const key of optional)if(Object.hasOwn(client,key))details.contact[key]=client[key];
  if(!optional.some(key=>details.contact[key]!==''))return null;

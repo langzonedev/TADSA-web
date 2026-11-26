@@ -4,8 +4,8 @@ import {organisationRoles,organisationContactDetails,ORGANISATION_CONTACT_FIELDS
 import {RESIDENTIAL_FIELDS,CLIENT_GEOCODE_FIELDS,residentialFields,clientGeocodes,initialPersonAddress,initialContactAddress,initialClientResidence} from './client-address.js';
 import {createLifecycle} from './lifecycle-model.js';
 import {normaliseProfileDetails} from './profile-details-model.js';
-import {intakeMetadata,reviewedContactAdditions,validateWebsiteReferral} from './website-referral.js';
-import {referralPhoneVariants} from './website-referral-matches.js';
+import {intakeMetadata,referralAssessmentInstructions,reviewedContactAdditions,validateWebsiteReferral,websiteResidence} from './website-referral.js';
+import {checkSelfReferral,localReferrerMatches,referrerIdentity,referralPhoneVariants,reviewedReferrerChoice} from './website-referral-matches.js';
 import {createProjectDetails,validateReviewDate,projectNeedsReview} from './project-details-model.js';
 import {invoiceDetails} from './device-business.mjs';
 import {deviceDirectoryQuery} from './device-directory-queries.mjs';
@@ -86,6 +86,29 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   d.people.push(p);event('people',p.id,'Person created',{...value,...(address?{address}:{})});let c;
   if(isClient){c={id:next('client'),personId:p.id};if(address)c.details=initialClientResidence(address);d.clients.push(c);event('clients',c.id,'Client created',{personId:p.id,...(address?{address}:{})});}
   return clientRecord?client(c):person(p);}
+ function prepareWebsiteReferrer(referral,decision){
+  const identity=referrerIdentity(referral?.answers);
+  const choice=reviewedReferrerChoice(decision,localReferrerMatches(d,identity),identity);
+  return {identity,choice};
+ }
+ function linkWebsiteReferrer(p,{identity,choice}){
+  let personId=choice.personId;
+  if(choice.client){
+   const party=find('people',find('clients',p.clientId).personId);
+   if(party.active===false||directoryStatus(party)==='inactive')fail('Choose a current client for a self-referral.');
+   checkSelfReferral(identity,party.name);
+   personId=party.id;
+  }
+  if(choice.create)personId=createDirectoryRecord({...identity,roles:['Referrer'],technician:null,allowDuplicate:true},false).id;
+  if(choice.additions){
+   const person=find('people',personId);
+   for(const [key,value] of Object.entries(choice.additions))if(person[key]&&person[key]!==value)fail('The referrer contact details changed. Review the person before saving.',409,{code:'REFERRER_REVIEW_CHANGED'});
+   Object.assign(person,choice.additions);person.version++;
+   event('people',personId,'Missing details added from website referrer',{fields:Object.keys(choice.additions)});
+  }
+  d.relationships.push({projectId:p.id,type:'person',id:personId,role:'Referrer'});
+  event('projects',p.id,'Project contact linked',{type:'person',id:personId,role:'Referrer',before:false,after:true});
+ }
  function saveClientFields(c,input,allowIncomplete){
   const p=find('people',c.personId);version(p,input.version);
   const before=client(c).details;
@@ -146,7 +169,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   if(kind==='availability'&&sub==='entries'&&Object.hasOwn(input,'calendarVersion'))keys.push('calendarVersion');
   if(keys&&!id&&['clients','people'].includes(kind))keys.push(...['language','initialAddress'].filter(k=>Object.hasOwn(input,k)));
   if(keys&&kind==='people'&&keys.includes('roles'))keys.push(...['membershipStatus','cohorts'].filter(k=>Object.hasOwn(input,k)));
-  if(keys&&kind==='projects'&&!id)keys.push(...['followUpOn','websiteReferral','intakeChannel','clientAdditions'].filter(key=>Object.hasOwn(input,key)));
+  if(keys&&kind==='projects'&&!id)keys.push(...['followUpOn','websiteReferral','intakeChannel','clientAdditions','websiteReferrer'].filter(key=>Object.hasOwn(input,key)));
   if(keys&&Object.hasOwn(input,'technicianIds')&&kind==='projects'&&(!id||sub==='coordination'))keys.push('technicianIds');
   if(keys&&(Object.keys(input).length!==keys.length||keys.some(k=>!Object.hasOwn(input,k))))fail('Supply exactly the required fields.');
   if(keys?.includes('requestId')&&!input.requestId)fail('Supply a valid request identifier.');
@@ -217,16 +240,33 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   const nextSequence=Math.max(d.projectSequence,5999,...d.projects.map(p=>Number(/^(?:P-\d{4}-)?(\d+)$/.exec(p.reference)?.[1]??0)));if(!Number.isSafeInteger(nextSequence)||nextSequence>=Number.MAX_SAFE_INTEGER)fail('Project reference range is exhausted. Review existing numeric references before creating a project.');
   const value=coordination(input);if(!['Assessment','Technical'].includes(input.kind))fail('Select a project type.');const title=str(input.title,120,true),summary=str(input.summary,2000);
   const followUpOn=input.followUpOn??today();validateReviewDate(followUpOn);
+  const referrer=Object.hasOwn(input,'websiteReferrer')?prepareWebsiteReferrer(referral,input.websiteReferrer):null;
   const clientId=isNew?createDirectoryRecord(input.newClient,true,reviewed).id:find('clients',input.clientId).id;
+  if(isNew&&input.newClient.ndisNumber){
+   d.clientNdis[clientId]={number:input.newClient.ndisNumber,version:1};event('clients',clientId,'NDIS number updated',{numberChanged:true});
+  }
   if(referral&&!isNew){
-   const person=find('people',find('clients',clientId).personId);
+   const selected=find('clients',clientId),person=find('people',selected.personId);
    const saved=d.profileDetails?.[person.id];
    const profile=normaliseProfileDetails(saved);
    if(profile.contact.directoryStatus==='inactive'||person.active===false)fail('This client is inactive. Review the client record before linking this enquiry.',409,{code:'INACTIVE_CLIENT'});
    if(Object.hasOwn(input,'clientAdditions')){
-    const additions=reviewedContactAdditions(input.clientAdditions,referral.answers,{...profile.contact,phone:person.phone});
-    const {phone,...contact}=additions;
-    if(phone){person.phone=phone;person.version++;}
+    const details=selected.details??{},oldNumber=d.clientNdis[clientId];
+    const current={...profile.contact,phone:person.phone,email:person.email,ndisNumber:oldNumber?.number,
+     residence:[details.residentialAddress,details.residentialSuburb,details.residentialState,details.residentialPostcode].some(Boolean)};
+    const additions=reviewedContactAdditions(input.clientAdditions,referral.answers,current);
+    const {phone,email,residence,ndisNumber,...contact}=additions;
+    if(phone)person.phone=phone;
+    if(email)person.email=email;
+    if(phone||email||residence)person.version++;
+    if(residence){
+     const address=initialPersonAddress(websiteResidence(residence));
+     selected.details={...details,residentialAddress:address.street,residentialSuburb:address.suburb,residentialState:address.state,
+      residentialPostcode:address.postcode,residentialGeocode:null,...(details.sameAsResidential===false?{}:{workAddress:address.street,workGeocode:null})};
+    }
+    if(ndisNumber){
+     d.clientNdis[clientId]={number:ndisNumber,version:(oldNumber?.version??0)+1};event('clients',clientId,'NDIS number updated',{numberChanged:true});
+    }
     if(Object.keys(contact).length){
      Object.assign(profile.contact,contact);
      d.profileDetails??={};d.profileDetails[person.id]={personId:person.id,version:(saved?.version??0)+1,...profile};
@@ -237,14 +277,14 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
    }
   }
   d.projectSequence=nextSequence;
-  const p={labourRateCents:d.applicationSettings.labourRateCents,id:next('project'),reference:String(++d.projectSequence),clientId,title,summary,kind:input.kind,status:'open',version:1,openedAt:today(),dueDate:null,feedbackRequired:false,invoiceRequired:false};d.projects.push(p);d.projectAdminDetails??={};d.projectAdminDetails[p.id]={...createProjectDetails(),followUpOn,coordinatorAccountId:actorContext?.id??'',...metadata,...(referral?{enquirySource:(referral.answers.heard??'').slice(0,500)}:{})};d.lifecycles[p.id]=createLifecycle();d.statusEvents.push({id:p.id,fromStatus:null,toStatus:p.status,at:new Date().toISOString()});setCoord(p,value);event('projects',p.id,'Project created',{title,createdByAccountId:actorContext?.id??null});event('clients',clientId,'Project created',{projectId:p.id});return project(p);}
+  const p={labourRateCents:d.applicationSettings.labourRateCents,id:next('project'),reference:String(++d.projectSequence),clientId,title,summary,kind:input.kind,status:'open',version:1,openedAt:today(),dueDate:null,feedbackRequired:false,invoiceRequired:false};d.projects.push(p);d.projectAdminDetails??={};d.projectAdminDetails[p.id]={...createProjectDetails(),followUpOn,coordinatorAccountId:actorContext?.id??'',...metadata,...(referral?{enquirySource:(referral.answers.heard??'').slice(0,500),assessmentInstructions:referralAssessmentInstructions(referral.answers)}:{})};d.lifecycles[p.id]=createLifecycle();d.statusEvents.push({id:p.id,fromStatus:null,toStatus:p.status,at:new Date().toISOString()});setCoord(p,value);if(referrer)linkWebsiteReferrer(p,referrer);event('projects',p.id,'Project created',{title,createdByAccountId:actorContext?.id??null});event('clients',clientId,'Project created',{projectId:p.id});return project(p);}
  if(kind==='projects'&&method==='PATCH'&&!sub){const p=find('projects',id);version(p,input.version);if(!['open','review','closed'].includes(input.status)||typeof input.feedbackRequired!=='boolean'||typeof input.invoiceRequired!=='boolean')fail('Complete the project status fields.');if(p.status==='closed'&&input.status!=='closed'){for(const id of p.coordination.technicianIds){const tech=find('people',id);if(tech.active===false||!tech.roles.includes('Technician')||!tech.roles.every(r=>roles.includes(r)))fail('Choose active technicians or clear their assignment before reopening this project.');}}const value={title:str(input.title,120,true),status:input.status,feedbackRequired:input.feedbackRequired,invoiceRequired:input.invoiceRequired};if(Object.entries(value).some(([k,v])=>p[k]!==v)){if(p.status!==value.status)d.statusEvents.push({id:p.id,fromStatus:p.status,toStatus:value.status,at:new Date().toISOString()});Object.assign(p,value);bump(p,'Project updated',value);}return project(p);}
  if(kind==='projects'&&sub==='coordination'&&method==='PUT'){const p=find('projects',id);version(p,input.version);const value=coordination(input,p.coordination);if(canonical(value)!==canonical(p.coordination)){setCoord(p,value);bump(p,'Project coordination updated',value);}return project(p);}
  if(kind==='projects'&&sub==='operations'&&method==='GET')return ops(id);
  if(kind==='projects'&&sub==='operations'&&method==='PUT'){const p=find('projects',id);version(p,input.version);const old=ops(id),value={};if(input.workEstimateRecorded!==undefined&&typeof input.workEstimateRecorded!=='boolean')fail('Work estimate recording state must be true or false.');for(const key of Object.keys(operationDefaults)){if(typeof operationDefaults[key]==='boolean'){if(typeof input[key]!=='boolean')fail('Complete every operational choice.');value[key]=input[key];}else if(typeof operationDefaults[key]==='number')value[key]=integer(input[key],600000);else if(typeof operationDefaults[key]==='string')value[key]=str(input[key],key==='fundingExceptionReason'?1000:120);}if(input.workEstimateRecorded===false&&value.remainingMinutes!==0)fail('An unrecorded estimate cannot contain hours.');if(value.approvedOn&&(value.approvedOn.startsWith('0000-')||!/^\d{4}-\d{2}-\d{2}$/.test(value.approvedOn)||!Number.isFinite(Date.parse(value.approvedOn))||new Date(value.approvedOn).toISOString().slice(0,10)!==value.approvedOn))fail('Enter a valid approval date.');if(!d.lifecycles?.[id]&&value.workApproved&&(!value.assessmentComplete||!value.approvedBy||!value.approvedOn))fail('Work approval needs assessment, approver and date.');if(!d.lifecycles?.[id]&&value.fundingExceptionReason&&!(value.clientStopped&&(!old.clientStopped||value.fundingExceptionReason===old.fundingExceptionReason))&&(!value.approvedBy||!value.approvedOn))fail('A funding exception needs approval.');if(value.clientStopped&&!value.onHold)fail('A client stop must place work on hold.');if(value.clientStopped&&!old.clientStopped){value.workApproved=false;value.resumeClientConsent=false;value.approvedBy='';value.approvedOn='';}if(!d.lifecycles?.[id]&&old.clientStopped&&(!value.clientStopped||!value.onHold)&&(!value.resumeClientConsent||!value.approvedBy||!value.approvedOn))fail('Resuming needs client agreement and approval.');if(!Array.isArray(input.fundingContributors)||input.fundingContributors.length>10)fail('Record up to ten contributors.');const seen=new Set();value.fundingContributors=input.fundingContributors.map(x=>{payer(x.type,x.id);integer(x.amountCents,1000000000,1);const key=x.type==='client'?'person:'+find('clients',x.id).personId:x.type+':'+x.id;if(seen.has(key))fail('Record each contributor once.');seen.add(key);return {...x};});value.fundingContributors.sort((a,b)=>(a.type+':'+a.id).localeCompare(b.type+':'+b.id));if(!d.lifecycles?.[id]&&canonical(value.fundingContributors)!==canonical(old.fundingContributors))value.reviewRequired=true;for(const i of old.invoices){const s=i.snapshot,billed=old.invoices.filter(x=>s.billingMode==='nominated'||(x.snapshot.payerType===s.payerType&&x.snapshot.payerId===s.payerId)).reduce((n,x)=>n+x.snapshot.totalCents,0),limit=s.billingMode==='nominated'?value.fundingContributors.reduce((n,x)=>n+x.amountCents,0):value.fundingContributors.find(x=>x.type===s.payerType&&x.id===s.payerId)?.amountCents??0;if((old.fundingContributors.length&&!value.fundingContributors.length)||(value.fundingContributors.length&&billed>limit))fail('Funding cannot be reduced below recorded draft invoices.');}if((input.workEstimateRecorded??true)===old.workEstimateRecorded&&canonical(value)===canonical(Object.fromEntries(Object.keys(operationDefaults).map(k=>[k,old[k]]))))return old;d.operations[id]={...old,...value,workEstimateRecorded:input.workEstimateRecorded??true};bump(p,'Case operations updated',value);return ops(id);}
  if(kind==='projects'&&sub==='notes'&&method==='POST'){const p=find('projects',id),o=ops(id),note={id:crypto.randomUUID(),at:new Date().toISOString(),actor:actorContext?.displayName??'Device demonstration operator',actorAccountId:actorContext?.id??null,actorPersonId:actorContext?.personId??null,actorMode:'device-demo',text:str(input.text,2000,true)};o.notes.unshift(note);d.operations[id]=o;bump(p,'Case note added',{noteId:note.id});return ops(id);}
  if(kind==='projects'&&sub==='invoices'&&!subid&&method==='POST'){const p=find('projects',id);version(p,input.version);const o=ops(id);if(!['deposit','progress','final'].includes(input.milestone)||!['separate','nominated'].includes(input.billingMode)||input.milestoneReached!==true)fail('Confirm a valid billing milestone.');const payerName=payer(input.payerType,input.payerId);if(!Array.isArray(input.lines)||!input.lines.length||input.lines.length>10)fail('Add one to ten invoice lines.');const invoiceFields=invoiceDetails(d,input,{str,integer}),{lines,totalCents}=invoiceFields;if(input.billingMode==='separate'&&!o.fundingContributors.some(x=>x.type===input.payerType&&x.id===input.payerId))fail('Choose a recorded funding contributor.');if(o.invoices.some(i=>i.snapshot.billingMode!==input.billingMode||(input.billingMode==='nominated'&&(i.snapshot.payerId!==input.payerId||i.snapshot.payerType!==input.payerType))))fail('Keep the established billing mode and nominated payer.');const billed=o.invoices.filter(i=>input.billingMode==='nominated'||(i.snapshot.payerId===input.payerId&&i.snapshot.payerType===input.payerType)).reduce((n,i)=>n+i.snapshot.totalCents,0),limit=input.billingMode==='nominated'?o.fundingContributors.reduce((n,x)=>n+x.amountCents,0):o.fundingContributors.find(x=>x.type===input.payerType&&x.id===input.payerId)?.amountCents??0;if(o.fundingContributors.length&&billed+totalCents>limit)fail('Draft invoices exceed the recorded funding contribution.');const pr=project(p),invoice={id:crypto.randomUUID(),number:'TADSA-DRAFT-'+(++d.sequence),at:new Date().toISOString(),snapshot:{...invoiceFields,projectReference:p.reference,projectTitle:p.title,clientName:pr.clientName,payerType:input.payerType,payerId:input.payerId,payerName,milestone:input.milestone,billingMode:input.billingMode,milestoneReached:true,lines,totalCents,currency:'AUD',status:'draft',fundingContributors:structuredClone(o.fundingContributors)}};o.invoices.unshift(invoice);o.workApproved=false;if(!d.lifecycles?.[id])o.reviewRequired=true;d.operations[id]=o;bump(p,'Draft invoice recorded',{invoiceId:invoice.id,totalCents});return ops(id);}
- if(extensionHandler){const result=extensionHandler({d,parts,method,input,query,find,version,bump,project,ops,event,next,payer,str,integer,actorContext,saveContactIdentity});if(result!==undefined)return result;}
+ if(extensionHandler){const result=extensionHandler({d,parts,method,input,query,find,version,bump,project,ops,event,next,payer,str,integer,actorContext,saveContactIdentity,prepareWebsiteReferrer,linkWebsiteReferrer});if(result!==undefined)return result;}
  fail('This device workflow endpoint is not available.',404);
  };
  const result=run();if(replayKey)d.replays[input.requestId]={key:replayKey,result:structuredClone(result)};return result;
