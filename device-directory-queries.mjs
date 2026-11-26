@@ -1,6 +1,7 @@
 // Pure reads over fictional device records. No graph hydration or storage writes.
 import {lifecycleEffectiveStage,projectLifecycleStatus} from './lifecycle-model.js';
 import {profileContactPhone,matchingPersonRoles,directoryPhoneDigits,matchesDirectoryPhone} from './profile-details-model.js';
+import {localReferralMatches} from './website-referral-matches.js';
 const kinds={clients:['client','client'],people:['person','person'],organisations:['org','organisation']};
 const knownRoles=['Client','Technician','Occupational therapist','Administrator','Carer','Referrer','Allied-health contact','Funder','General contact'];
 const fail=(message,status=422)=>{throw Object.assign(Error(message),{status});};
@@ -62,10 +63,16 @@ async function projectRegister(d,params){
   return {...row,workflowStage:life?.stage?lifecycleEffectiveStage(life,{programme}):null,projectStatus:projectLifecycleStatus(life,{projectStatus:row.status,programme})};
  }),total,statuses,limit:Number(limit),nextAfter:filtered.length>Number(limit)?encode({v:1,scope,sortKey:last.sortKey,id:last.id}):null};
 }
-export function deviceDirectoryQuery(d,path,method,params,actor){
- const parts=path.split('/');if(!['selections','registers'].includes(parts[0]))return undefined;
+export function deviceDirectoryQuery(d,path,method,params,actor,input){
+ const parts=path.split('/');if(!['selections','registers','website-referral-matches'].includes(parts[0]))return undefined;
  if(!actor?.id)fail('Sign in to the device demonstration first.',401);
  if(!['administrator','coordinator'].includes(actor.role))fail('A workspace account is required.',403);
+ if(parts[0]==='website-referral-matches'){
+  if(parts.length!==1)fail('Record not found.',404);
+  if(method!=='POST')fail('Submit one referral identity to check the directory.',405);
+  if(params.size)fail('Supply the client details in the request body.');
+  return localReferralMatches(d,input);
+ }
  if(method!=='GET')fail('Directory lookup only supports reading.',405);
  if(parts[0]==='registers'){if(parts.length!==1)fail('Record not found.',404);return params.get('kind')==='projects'?projectRegister(d,params):registers(d,params);}
   if(parts.length===3){

@@ -215,3 +215,19 @@ main:has(> .project-workspace) { padding-top: 4px; }
 .assessment-workspace .assessment-preview{grid-column:1/-1;min-width:0}
 .assessment-workspace .assessment-preview p,.assessment-workspace .assessment-mail-draft p{white-space:pre-line;overflow-wrap:anywhere}
 .assessment-workspace .assessment-mail-draft{margin-block:12px}
+
+.intake-source-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px;margin:16px 0 24px}
+.intake-source-choices button{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:8px;text-align:left;padding:16px;white-space:normal}
+.intake-source-choices button strong{font-size:1rem}
+.intake-source-choices button span{font-weight:400;line-height:1.5}
+.intake-source-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:0 0 16px}
+.intake-source-bar[hidden],.workflow-steps[hidden]{display:none}
+.referral-comparison{border:1px solid var(--line);border-radius:6px;padding:12px;margin:12px 0}
+.referral-comparison h3{margin:0 0 10px;font-size:1rem}
+.referral-comparison table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:.9rem}
+.referral-comparison th,.referral-comparison td{text-align:left;white-space:pre-line;overflow-wrap:anywhere;padding:6px;border-bottom:1px solid var(--line);vertical-align:top}
+.referral-comparison thead th{background:#f4f6fb}
+.referral-comparison .referral-different{color:#823c1f;font-weight:600}
+.referral-comparison .referral-match{color:#28613c}
+.referral-comparison button{margin:12px 0 0}
+@media(max-width:600px){.referral-comparison{padding:8px}.referral-comparison th,.referral-comparison td{padding:5px 3px}}

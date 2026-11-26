@@ -2,7 +2,7 @@ import {node,link,field,editor,request} from './project-care.js';
 import {createRecordPicker} from './record-picker.js';
 import {PROJECT_CONTACT_ROLES} from './project-contacts-model.js';
 const openRemovals=new Set();
-export async function renderProjectContacts(view,id){
+export async function renderProjectContacts(view,id,referral){
  const path=`projects/${id}/contacts`,saved=await request(path);
  const heading=node('section',null,'panel');heading.append(node('h2','Project contacts and referrers'),node('p','Link the people or organisations involved in this project. These links apply to this project only. Use Team for technicians and Funding for the payer.'));view.append(heading);
  const conflict=async d=>{const latest=await request(path);return {message:'The project changed while you were editing. Review its current contacts below before keeping your choice.',comparison:[['Current project contacts',latest.items.map(r=>`${r.name} — ${r.role} (${r.type})`).join('; ')||'No contacts linked'],['Your unsaved choice',`${d.operation==='remove'?'Remove':'Link'} ${d.selectedName||d.id} — ${d.role} (${d.type})`]],version:latest.version};};
@@ -19,7 +19,18 @@ export async function renderProjectContacts(view,id){
   const type=field(form,'Record type',d,'type','text',[['person','Person'],['organisation','Organisation']]),pickerHost=node('div',null,'workflow-field');form.append(pickerHost);let picker;
   const mount=()=>{picker?.destroy();picker=createRecordPicker({label:d.type==='person'?'Contact person':'Contact organisation',kind:d.type==='person'?'people':'organisations',selectedId:d.id,required:true,onChange:(identity,item)=>{d.id=identity;d.selectedName=item?.name||'';form.dispatchEvent(new Event('change',{bubbles:true}));}});pickerHost.replaceChildren(picker.element);};mount();
   type.addEventListener('change',()=>{d.id='';d.selectedName='';mount();});
-  field(form,'Role on this project',d,'role','text',PROJECT_CONTACT_ROLES.map(role=>[role,role==='OT'?'OT (occupational therapist)':role]));
+  const role=field(form,'Role on this project',d,'role','text',PROJECT_CONTACT_ROLES.map(role=>[role,role==='OT'?'OT (occupational therapist)':role]));
+  if(referral?.answers.referrer){
+   const {referrer,referrerPhone,referrerEmail}=referral.answers;
+   form.append(node('p','Referrer on the website form: '+[referrer,referrerPhone,referrerEmail].filter(Boolean).join(' · '),'field-help'));
+   const search=node('button','Find the supplied referrer','secondary');search.type='button';
+   search.addEventListener('click',()=>{
+    type.value='person';type.dispatchEvent(new Event('change',{bubbles:true}));
+    role.value='Referrer';role.dispatchEvent(new Event('change',{bubbles:true}));
+    picker.search.focus();picker.search.value=referrer.slice(0,100);picker.search.dispatchEvent(new Event('input',{bubbles:true}));
+   });
+   form.append(search);
+  }
   form.append(node('p','Choose the role this record has on this project. This does not change their directory roles or give them access to the application.','field-help'));
  },path,'POST',d=>({requestId:d.requestId,version:d.version,operation:'add',type:d.type,id:d.id,role:d.role}),{saveLabel:'Add project contact',reviewConflict:conflict});
 }

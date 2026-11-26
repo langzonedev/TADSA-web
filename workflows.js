@@ -7,7 +7,8 @@ import {attachAddressLookup,renderTravelComparison} from './address-lookup.js';
 import {AUSTRALIAN_STATES} from './client-address.js';
 import {reviewDay} from './project-details-model.js';
 import {createRecordPicker,selectionLabel} from './record-picker.js';
-import {readReferralHtml,readReferralText,referralRows,resolveReferralMapping,validateWebsiteReferral} from './website-referral.js';
+import {intakeChannelLabels,readReferralHtml,readReferralText,referralBirthDate,referralRows,resolveReferralMapping,validateWebsiteReferral} from './website-referral.js';
+import {compareReferralIdentity,referralPhoneVariants} from './website-referral-matches.js';
 // Call-intake workflows. All records in this development workspace are fictional.
 const drafts = new Map();
 registerDraftSource('workflow',()=>[...drafts].filter(([,d])=>d.dirty||d.pending).map(([key,d])=>({key,pending:Boolean(d.pending)})));
@@ -18,7 +19,7 @@ export function renderProjectDraftReturn(view,route){
   const d=drafts.get('new-project');
   if(route==='new-project'||!d||(!d.dirty&&!d.pending&&d.step===1))return;
   const banner=el('aside',null,'project-draft-return');banner.setAttribute('aria-label','Project in progress');
-  const context=el('div');context.append(el('strong',d.title.trim()||'New enquiry in progress'),el('span',d.websiteReferral?'Website enquiry review · Unsaved draft kept in this tab.':`Step ${d.step} of 4 · Unsaved draft kept in this tab.`));
+  const context=el('div');context.append(el('strong',d.title.trim()||'New enquiry in progress'),el('span',d.intakeChannel==='website'?'Website enquiry · Unsaved draft kept in this tab.':`Step ${d.step} of 4 · Unsaved draft kept in this tab.`));
   banner.append(context,link('← Return to project draft','new-project','button secondary'));view.prepend(banner);
 }
 const el = (tag, text, cls) => { const n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; };
@@ -120,7 +121,7 @@ async function newClient(view, arg) {
       const project = drafts.get('new-project');
       if(project){
         project.clientId=result.id;
-        if(project.websiteReferral){project.referralClientMode='existing';project.referralClientLabel=result.person.name;}
+        if(project.websiteReferral){project.clientId='';project.chooseReferralClient=true;delete project.referralClientMode;delete project.referralCandidate;delete project.clientAdditions;}
         else project.step=2;
       }
       location.hash='new-project/'+result.id;
@@ -262,43 +263,31 @@ function focusEnquiryHeading(){
   if(heading){heading.tabIndex=-1;heading.focus();}
 }
 function websiteDraftDefaults(answers){
-  return {clientId:'',title:answers.need.split('\n')[0].slice(0,120),summary:answers.need.slice(0,2000),followUpOn:reviewDay(),
+  return {step:1,clientId:'',title:answers.need.split('\n')[0].slice(0,120),summary:answers.need.slice(0,2000),followUpOn:reviewDay(),
     fundingStatus:'unknown',fundingNotes:'',payerId:'',payerLabel:'',technicianId:'',technicianIds:[],requiredSkills:[],
     assignmentAcknowledged:false,needsAcknowledgement:false};
 }
 function websiteEmailIntake(form,d,draw){
-  const box=el('details');box.append(el('summary','Use website enquiry email'));
-  box.append(el('p','Copy the form table from the office email, or choose a saved HTML copy. Keep the original PDF and any supplied photos for Project files.','field-help'));
+  const box=el('div',null,'form-grid');
+  box.append(el('p','Copy the form table from the office email and paste it below. We’ll look for the client and prepare an enquiry for you to review.','field-help'));
   const fileLabel=el('label','Saved website email','workflow-field'),file=el('input');file.type='file';file.accept='.html,.htm,text/html';fileLabel.append(file);
-  const copyLabel=el('label','Paste website form','workflow-field'),paste=el('textarea');paste.rows=4;paste.maxLength=1000000;copyLabel.append(paste);
-  const dateLabel=el('label','Date office received enquiry','workflow-field'),date=el('input');date.type='date';date.value=reviewDay();date.max=date.value;dateLabel.append(date,el('small','Starts at today. Change this for an earlier notification.','field-help'));
-  const preview=el('div'),message=el('div');let answers=null,revision=0;
-  function reset(){++revision;answers=null;preview.replaceChildren();message.replaceChildren();}
+  const copyLabel=el('label','Paste website form','workflow-field'),paste=el('textarea');paste.rows=4;paste.maxLength=1000000;paste.value=d.websitePaste??'';copyLabel.append(paste);
+  const preview=el('div'),message=el('div');let revision=0;
+  function reset(){++revision;delete d.websiteMapping;preview.replaceChildren();message.replaceChildren();}
   function show(parsed){
-    answers=parsed;
-    const use=button('Use reviewed details',()=>{
-      try{
-        const imported=validateWebsiteReferral({receivedOn:date.value,answers});
-        const replacement=websiteDraftDefaults(imported.answers);
-        d.beforeWebsite=Object.fromEntries(Object.keys(replacement).map(key=>[key,d[key]]));
-        Object.assign(d,replacement);
-        d.websiteReferral=imported;
-        d.referralClient=websiteClientDraft(imported.answers);
-        delete d.referralClientLabel;
-        delete d.referralClientMode;
-        touch(d);draw();focusEnquiryHeading();
-      }catch(error){message.replaceChildren(note(error.message,true));}
-    });
-    const all=el('details');all.append(el('summary','All website answers'),reviewList(referralRows(parsed)));
-    preview.replaceChildren(el('h3','Review website answers'),reviewList([['Client',parsed.client],['Request',parsed.need]]),all);
-    if(d.clientId||d.title||d.summary||d.fundingStatus!=='unknown'||d.fundingNotes||d.requiredSkills?.length||d.technicianIds?.length){
-      preview.append(el('p','Using this form replaces the draft client, request, review date, funding and team details. Removing the website form restores your earlier draft.','field-help'));
-    }
-    preview.append(use);
+    const imported=validateWebsiteReferral({receivedOn:reviewDay(),answers:parsed});
+    const replacement=websiteDraftDefaults(imported.answers);
+    d.beforeWebsite=Object.fromEntries(Object.keys(replacement).map(key=>[key,d[key]]));
+    Object.assign(d,replacement);
+    d.websiteReferral=imported;
+    d.referralClient=websiteClientDraft(imported.answers);
+    delete d.websiteMapping;delete d.websitePaste;
+    touch(d);draw();focusEnquiryHeading();
   }
   function showProblem(error){
     const mapping=error.referralMapping;
     if(!mapping){message.replaceChildren(note(error.message,true));return;}
+    d.websiteMapping=mapping;
     const group=el('fieldset');group.append(el('legend','Match the website questions'),el('p','Choose the answer for each field below. The other answers will also stay with the enquiry.','field-help'));
     const choices={};
     for(const key of mapping.missing){
@@ -310,27 +299,29 @@ function websiteEmailIntake(form,d,draw){
     group.append(button('Preview matched answers',()=>{try{show(resolveReferralMapping(mapping,choices));message.replaceChildren();}catch(problem){message.replaceChildren(note(problem.message,true));}}));
     preview.replaceChildren(group);
   }
-  paste.addEventListener('input',()=>{file.value='';reset();});
+  paste.addEventListener('input',()=>{file.value='';reset();d.websitePaste=paste.value;touch(d);});
   paste.addEventListener('paste',event=>{
     const html=event.clipboardData?.getData('text/html'),plain=event.clipboardData?.getData('text/plain');
     if(!html&&!plain)return;
-    event.preventDefault();file.value='';paste.value=plain||'';reset();
+    event.preventDefault();file.value='';paste.value=plain||'';reset();d.websitePaste=paste.value;touch(d);
     if(html){try{show(readReferralHtml(html));return;}catch(error){if(error.noPlainFallback||error.referralMapping||!plain){showProblem(error);return;}}}
     try{show(readReferralText(plain));}catch(error){showProblem(error);}
   });
   file.addEventListener('change',async()=>{
-    reset();paste.value='';const version=revision,chosen=file.files[0];if(!chosen)return;
+    reset();paste.value='';delete d.websitePaste;const version=revision,chosen=file.files[0];if(!chosen)return;
     try{if(chosen.size>1000000)throw Error('Choose one HTML notification under 1 MB.');const html=await chosen.text();if(version===revision&&box.isConnected)show(readReferralHtml(html));}
     catch(error){if(version===revision)showProblem(error);}
   });
   const read=button('Preview pasted form',()=>{
     reset();try{show(readReferralText(paste.value));}catch(error){showProblem(error);}
   });
-  const controls=el('div',null,'form-grid');controls.append(fileLabel,copyLabel,read,dateLabel,preview,message);
-  box.append(controls);form.append(box);
+  const alternate=el('details');alternate.append(el('summary','Use a saved HTML email'),fileLabel);
+  const actions=el('div',null,'actions');actions.append(read);
+  box.append(copyLabel,actions,preview,message,alternate);form.append(box);
+  if(d.websiteMapping)showProblem({referralMapping:d.websiteMapping});
 }
 function projectPayload(d){
-  return {requestId:d.requestId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,
+  return {requestId:d.requestId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,intakeChannel:d.intakeChannel,
     followUpOn:d.followUpOn??reviewDay(),...coordinationValues(d),
     ...(d.websiteReferral?{websiteReferral:d.websiteReferral}:{})};
 }
@@ -355,11 +346,7 @@ function websiteResidence(text=''){
 }
 function websiteClientDraft(answers){
   const supplied=(value,max)=>value&&value.length<=max?value:'';
-  const birth=answers.birth||'';
-  const au=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(birth);
-  const iso=au?[au[3],au[2].padStart(2,'0'),au[1].padStart(2,'0')].join('-'):birth;
-  const day=new Date(iso+'T00:00:00Z');
-  const dateOfBirth=/^\d{4}-\d{2}-\d{2}$/.test(iso)&&Number.isFinite(day.getTime())&&day.toISOString().slice(0,10)===iso&&iso<=reviewDay()?iso:'';
+  const dateOfBirth=referralBirthDate(answers.birth);
   return {name:supplied(answers.client,120),phone:supplied(answers.phone||answers.mobile,40),mobilePhone:supplied(answers.mobile,40),
     email:'',dateOfBirth,disability:supplied(answers.disability,1000),...websiteResidence(answers.address),allowDuplicate:false};
 }
@@ -408,40 +395,138 @@ function websiteClientReview(group,d){
   fields.addEventListener('input',()=>{client.allowDuplicate=false;updateOverview();});
   fields.addEventListener('invalid',()=>{edit.open=true;},true);
 }
+function referralMatchInput(answers,crmName){
+  const draft=websiteClientDraft(answers);
+  return {name:crmName||draft.name,phone:answers.phone?.length<=40?answers.phone:'',mobile:draft.mobilePhone,dateOfBirth:draft.dateOfBirth,postcode:draft.postcode};
+}
+function referralComparison(answers,item,crmName){
+  const section=el('section',null,'referral-comparison'),heading=item.name+' · '+(item.reference||item.id);
+  section.setAttribute('aria-label',heading);section.append(el('h3',heading));
+  const table=el('table'),head=table.createTHead().insertRow(),body=table.createTBody();
+  table.setAttribute('aria-label','Submitted details and client record for '+heading);
+  for(const text of ['Detail','Website form','Client record','Comparison'])head.append(el('th',text));
+  const date=value=>value?.replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$3/$2/$1')||'';
+  function telephoneRow(label,key){
+    const submitted=answers[key],recorded=item[key],state=item.comparison[key];
+    const wanted=referralPhoneVariants(submitted);
+    if(state==='match'&&!referralPhoneVariants(recorded).some(value=>wanted.includes(value))){
+      const channels=[['phone','primary phone'],['mobile','mobile'],['homePhone','home phone'],['workPhone','work phone']];
+      const match=channels.find(([field])=>referralPhoneVariants(item[field]).some(value=>wanted.includes(value)));
+      if(match)return [label,submitted,[recorded,item[match[0]]+' ('+match[1]+')'].filter(Boolean).join('\n'),state,'Matches '+match[1]];
+    }
+    return [label,submitted,recorded,recorded?state:'unknown'];
+  }
+  const location=[item.address,item.suburb,item.state,item.postcode].filter(Boolean).join(', ');
+  const values=[
+    ['Name',answers.client,item.name,item.comparison.name,crmName?({match:'Matches CRM name',partial:'Partial CRM name match',different:'Differs from CRM name',unknown:'Cannot compare CRM name'})[item.comparison.name]:undefined],
+    ['Date of birth',answers.birth,date(item.dateOfBirth),item.comparison.dateOfBirth],
+    telephoneRow('Phone','phone'),telephoneRow('Mobile','mobile'),
+    ['Address',answers.address,location,item.comparison.postcode]
+  ];
+  for(const [label,submitted,recorded,state,crossChannel] of values){
+    if(!submitted&&!recorded)continue;
+    const row=body.insertRow(),name=el('th',label);name.scope='row';row.append(name);
+    row.append(el('td',submitted||'Not supplied'),el('td',recorded||'Not recorded'));
+    const description=crossChannel||{match:'Matches',partial:'Partial match',different:'Differs',unknown:'Cannot compare'}[state]||'Cannot compare';
+    const comparison=el('td',label==='Address'&&['match','different'].includes(state)?(state==='match'?'Postcode matches':'Postcode differs'):description);
+    comparison.className='referral-'+state;row.append(comparison);
+  }
+  section.append(table);
+  if(item.directoryStatus==='inactive')section.append(el('p','Inactive client. Review the directory record before using it.', 'field-help'),link('View client record','client/'+item.id));
+  return section;
+}
+function selectReferralClient(d,item,draw){
+  if(item.directoryStatus==='inactive')return;
+  d.clientId=item.id;d.referralCandidate=item;d.referralClientMode='existing';d.clientAdditions={};
+  d.referralClient.allowDuplicate=false;touch(d);draw();focusEnquiryHeading();
+}
+async function reviewDirectoryClient(id,d,draw,notice){
+  notice.dataset.clientId=id;
+  notice.replaceChildren(el('p','Checking the selected client…','field-help'));
+  try{
+    const client=await request('clients/'+id),profile=await request('people/'+client.personId+'/profile-details');
+    if(!notice.isConnected||notice.dataset.clientId!==id)return;
+    const contact=profile.contact;
+    const item={id:client.id,reference:client.details.reference,name:client.person.name,phone:client.person.phone,
+      mobile:contact.mobilePhone,homePhone:contact.homePhone,workPhone:contact.workPhone,dateOfBirth:contact.dateOfBirth,
+      address:client.details.residentialAddress,suburb:client.details.residentialSuburb,state:client.details.residentialState,
+      postcode:client.details.residentialPostcode,directoryStatus:contact.directoryStatus||client.person.directoryStatus};
+    if(item.directoryStatus==='inactive'){notice.replaceChildren(note('This client is inactive. Check the directory record before continuing.',true));return;}
+    item.comparison=compareReferralIdentity(referralMatchInput(d.websiteReferral.answers,d.referralLookupName),item);
+    selectReferralClient(d,item,draw);
+  }catch{if(notice.isConnected&&notice.dataset.clientId===id)notice.replaceChildren(note('Could not check this client’s details.',true),button('Check this client again',()=>reviewDirectoryClient(id,d,draw,notice)));}
+}
 function websiteClientChoices(group,d,draw){
   const answers=d.websiteReferral.answers;
-  const choose=item=>{
-    d.clientId=item.id;d.referralClientMode='existing';d.referralClientLabel=selectionLabel(item);
-    d.referralClient.allowDuplicate=false;touch(d);draw();focusEnquiryHeading();
-  };
   const results=el('div');results.setAttribute('aria-live','polite');
-  const searchMore=el('details');searchMore.append(el('summary','Search for a different client'));
-  searchMore.addEventListener('toggle',()=>{
-    if(!searchMore.open||searchMore.querySelector('.record-picker'))return;
-    const picker=createRecordPicker({label:'Existing client',kind:'clients',onChange:(id,item)=>{if(id&&item)choose(item);}});
-    searchMore.append(picker.element);
-  });
-  const newClient=button('Create a new client',()=>{
-    d.clientId='';d.referralClientMode='new';d.referralClient.allowDuplicate=false;
+  const submitted=referralMatchInput(answers);
+  const needsName=!submitted.name&&!referralPhoneVariants(submitted.phone,submitted.mobile).length;
+  let searchRevision=0;
+  if(needsName){
+    const label=el('label','CRM client name','workflow-field'),name=el('input');name.maxLength=120;
+    name.value=d.referralLookupName||'';
+    label.append(name,el('small','Enter a name of up to 120 characters to check the directory and prepare the client record. The enquiry keeps the full name supplied on the form.','field-help'));
+    const apply=button('Check client name',()=>{
+      if(!name.value.trim()){name.setCustomValidity('Enter the name to check.');name.reportValidity();return;}
+      d.referralLookupName=name.value.trim();d.referralClient.name=d.referralLookupName;
+      d.referralClient.allowDuplicate=false;touch(d);checkMatches();
+    });
+    name.addEventListener('input',()=>{name.setCustomValidity('');searchRevision++;results.replaceChildren();});
+    name.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();apply.click();}});
+    group.append(label,apply);
+  }
+  group.append(results);
+  const useNew=auto=>{
+    d.clientId='';d.referralClientMode='new';d.noReferralMatches=auto;d.referralClient.allowDuplicate=false;
     touch(d);draw();focusEnquiryHeading();
-  });
-  group.append(results,searchMore,newClient);
+  };
   async function checkMatches(){
+    const revision=++searchRevision;
     results.replaceChildren(el('p','Checking the client directory…','field-help'));
     try{
-      const terms=[...new Set([answers.client,answers.phone,answers.mobile].filter(Boolean).map(v=>v.replace(/\s+/g,' ').trim().slice(0,100)))];
-      const pages=await Promise.all(terms.map(q=>request('selections?'+new URLSearchParams({kind:'clients',status:'active',q,limit:'8'}))));
-      if(!group.isConnected)return;
-      const matches=new Map(pages.flatMap(page=>page.items).map(item=>[item.id,item]));
-      results.replaceChildren(el('p',matches.size?'Check the contact details before choosing a client.':'No existing client matched the supplied name or phone.','field-help'));
-      for(const item of matches.values()){
-        const row=el('div',null,'actions');row.append(button('Use '+item.name,()=>choose(item)),el('span',selectionLabel(item),'field-help'));results.append(row);
+      const {items,more}=await request('website-referral-matches','POST',referralMatchInput(answers,d.referralLookupName));
+      if(!group.isConnected||revision!==searchRevision)return;
+      if(!items.length&&!more&&!d.chooseReferralClient){useNew(true);return;}
+      results.replaceChildren(el('p',items.length?'Choose the client after comparing the details below.':'No matching clients were found.','field-help'));
+      for(const item of items){
+        const card=referralComparison(answers,item,d.referralLookupName);
+        if(item.directoryStatus!=='inactive')card.append(button('Use '+item.name,()=>selectReferralClient(d,item,draw)));
+        results.append(card);
       }
+      if(more)results.append(el('p','More possible matches are in the directory. Search for a different client if the right record is missing.','field-help'));
+      const search=el('details');search.append(el('summary','Search for a different client'));
+      search.addEventListener('toggle',()=>{
+        if(!search.open||search.querySelector('.record-picker'))return;
+        const status=el('div');
+        const picker=createRecordPicker({label:'Existing client',kind:'clients',onChange:(id,item)=>{if(id&&item)reviewDirectoryClient(id,d,draw,status);}});
+        picker.element.recordPicker=picker;search.append(picker.element,status);
+      });
+      results.append(search,button('Create a new client',()=>useNew(false)));
     }catch{
-      if(group.isConnected)results.replaceChildren(note('The directory check could not finish.',true),button('Check for matching clients again',checkMatches));
+      if(group.isConnected&&revision===searchRevision)results.replaceChildren(note('The directory check could not finish. Check again before choosing a client.',true),button('Check for matching clients again',checkMatches));
     }
   }
-  void checkMatches();
+  if(!needsName||d.referralLookupName)void checkMatches();
+}
+function missingClientAdditions(group,d,item){
+  const answers=d.websiteReferral.answers;
+  const section=el('fieldset');
+  section.append(el('legend','Add missing details to this client'));
+  for(const [key,label,existing,supplied] of [
+    ['phone','Add missing phone number',item.phone,answers.phone||answers.mobile],
+    ['mobilePhone','Add missing mobile number',item.mobile,answers.mobile],
+    ['dateOfBirth','Add missing date of birth',item.dateOfBirth,referralBirthDate(answers.birth)]
+  ]){
+    if(existing||!supplied||supplied.length>40||/[\u0000-\u001f\u007f]/.test(supplied))continue;
+    const box=check(section,label+' · '+supplied,Boolean(d.clientAdditions?.[key]),checked=>{
+      d.clientAdditions??={};
+      if(checked)d.clientAdditions[key]=supplied;
+      else delete d.clientAdditions[key];
+      touch(d);
+    });
+    box.setAttribute('aria-label',label);
+  }
+  if(section.childElementCount>1)group.append(section);
 }
 
 function reviewedWebsiteEnquiry(slot,d,key,draw){
@@ -449,22 +534,26 @@ function reviewedWebsiteEnquiry(slot,d,key,draw){
   const box=panel('Review website enquiry');box.querySelector('h2').id='enquiry-step-heading';
   const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:'Website enquiry'});
   const source=el('details');
-  source.append(el('summary','Reviewed website enquiry'),reviewList([['Date received',original.receivedOn],...referralRows(original.answers)]));
+  source.append(el('summary','All website answers'),reviewList(referralRows(original.answers)));
   source.append(button('Remove website details from draft',()=>{
-    Object.assign(d,d.beforeWebsite);delete d.beforeWebsite;
-    delete d.websiteReferral;delete d.referralClient;delete d.referralClientLabel;delete d.referralClientMode;
+    leaveWebsiteReview(d,false);
     touch(d);draw();focusEnquiryHeading();
   }));
   const group=el('fieldset',null,'form-grid');group.append(el('legend','Client'),el('p','Website form names '+original.answers.client+'.','field-help'));
+  if(d.referralClientMode&&d.referralLookupName)group.append(el('p','Directory checked using '+d.referralLookupName+'.','field-help'));
   if(d.referralClientMode){
     const change=button('Change client choice',()=>{
-      d.clientId='';delete d.referralClientMode;delete d.referralClientLabel;
+      d.clientId='';delete d.referralClientMode;delete d.referralCandidate;delete d.clientAdditions;
+      d.chooseReferralClient=true;
       d.referralClient.allowDuplicate=false;touch(d);draw();focusEnquiryHeading();
     });
     if(d.referralClientMode==='new'){
+      if(d.noReferralMatches)group.append(el('p','No matching client was found. These details will create a new client when you save the enquiry.','field-help'));
       websiteClientReview(group,d);
     }else{
-      group.append(el('strong',d.referralClientLabel),el('p','The website answers stay with this enquiry. Existing client details are kept as recorded.','field-help'));
+      const item=d.referralCandidate;
+      group.append(referralComparison(original.answers,item,d.referralLookupName),el('p','This enquiry will be linked to the selected client. Any differences shown stay on the enquiry for follow-up.','field-help'));
+      missingClientAdditions(group,d,item);
       const related=el('details');related.append(el('summary','Check this client’s existing enquiries and projects'));group.append(related);
       related.addEventListener('toggle',async()=>{
         if(!related.open||related.childElementCount>1)return;
@@ -479,6 +568,7 @@ function reviewedWebsiteEnquiry(slot,d,key,draw){
     group.append(change);
   }else websiteClientChoices(group,d,draw);
   const details=el('fieldset',null,'form-grid');details.append(el('legend','Enquiry details'));
+  const receipt=field(details,'Date office received enquiry',original,'receivedOn',{type:'date',required:true,draft:d});receipt.max=reviewDay();
   field(details,'Project title',d,'title',{required:true});
   field(details,'What does the client need?',d,'summary',{type:'textarea',required:true,max:2000});
   field(details,'Review date',d,'followUpOn',{type:'date'});
@@ -487,15 +577,17 @@ function reviewedWebsiteEnquiry(slot,d,key,draw){
   const submit=saveButton(d.referralClientMode==='new'?'Create client and enquiry':'Save enquiry');
   submit.disabled=!d.referralClientMode;submit.dataset.keepDisabled=String(!d.referralClientMode);
   actions.append(submit,cancel(form,d,key,'projects','Cancel new enquiry'));
-  form.append(source,group,details,notice,actions);box.append(form);slot.append(box);
+  form.append(group,details,source,notice,actions);box.append(form);slot.append(box);
   function duplicates(rows){
     const matches=el('fieldset');matches.append(el('legend','Check possible duplicate clients'));
     const identity=()=>JSON.stringify([d.referralClient.name,d.referralClient.phone,d.referralClient.mobilePhone,d.referralClient.email]);
     const checkedIdentity=identity();
     for(const item of rows){
       const row=el('p');row.append(el('span',[item.name,item.phone,item.email].filter(Boolean).join(' · ')+' '));
-      if(item.type==='client'){
-        row.append(button('Use '+item.name,()=>{d.clientId=item.id;d.referralClientMode='existing';d.referralClientLabel=[item.name,item.phone,item.email].filter(Boolean).join(' · ');touch(d);draw();focusEnquiryHeading();}));
+      if(item.type==='client'&&item.directoryStatus!=='inactive'){
+        const status=el('span');row.append(button('Use '+item.name,()=>reviewDirectoryClient(item.id,d,draw,status)),status);
+      }else if(item.type==='client'){
+        row.append(link('Review inactive client','client/'+item.id));
       }else{
         row.append(link('Review person and client role','person/'+item.id));
       }
@@ -509,28 +601,76 @@ function reviewedWebsiteEnquiry(slot,d,key,draw){
   form.addEventListener('submit',event=>{
     event.preventDefault();if(!d.referralClientMode||!valid(form))return;
     const assignment=d.referralClientMode==='existing'?{clientId:d.clientId}:{newClient:websiteClientPayload(d.referralClient)};
+    if(d.referralClientMode==='existing'&&Object.keys(d.clientAdditions??{}).length)assignment.clientAdditions={...d.clientAdditions};
     save(form,d,notice,submit,'projects','POST',{...projectPayload(d),...assignment},result=>{
       drafts.delete(key);host.announce('Website enquiry saved. Add the original PDF and any supplied photos under Project files.');location.hash='project/'+result.id;
     },d.referralClientMode==='new'?duplicates:undefined);
   });
   if(d.pending){notice.append(note('A previous save was not confirmed. Retry the same request safely.'));lock(form,true,submit);submit.textContent='Retry save safely';}
 }
+// Switching channel keeps each unfinished intake in this tab until the operator saves or cancels it.
+const websiteDraftFields=['websiteReferral','referralClient','referralCandidate','referralClientMode','referralLookupName','chooseReferralClient','noReferralMatches','clientAdditions'];
+function leaveWebsiteReview(d,keep){
+  if(!d.websiteReferral)return;
+  const manual=d.beforeWebsite;
+  if(keep)d.suspendedWebsite=Object.fromEntries([...Object.keys(manual),...websiteDraftFields].filter(k=>Object.hasOwn(d,k)).map(k=>[k,d[k]]));
+  for(const key of websiteDraftFields)delete d[key];
+  Object.assign(d,manual);delete d.beforeWebsite;
+}
+function resumeWebsiteReview(d){
+  if(!d.suspendedWebsite)return;
+  const keys=Object.keys(websiteDraftDefaults(d.suspendedWebsite.websiteReferral.answers));
+  d.beforeWebsite=Object.fromEntries(keys.map(k=>[k,d[k]]));
+  Object.assign(d,d.suspendedWebsite);delete d.suspendedWebsite;
+}
 async function newProject(view, clientId) {
-  const key = 'new-project'; const d = getDraft(key, { step: clientId ? 2 : 1, clientId: clientId || '', title: '', summary: '', kind: 'Assessment', followUpOn:reviewDay(),fundingStatus:'unknown',payerId:'',fundingNotes:'',requiredSkills:[],technicianId:'' });
-  const dirs = await directories();
-  if (clientId && !d.clientId) { d.clientId = clientId; d.step = 2; }
-  let selected = d.clientId ? await request('clients/'+d.clientId) : null;
+  const key = 'new-project'; const d = getDraft(key, { step: clientId ? 2 : 1, clientId: clientId || '', intakeChannel:'',title: '', summary: '', kind: 'Assessment', followUpOn:reviewDay(),fundingStatus:'unknown',payerId:'',fundingNotes:'',requiredSkills:[],technicianId:'' });
+  let dirs,choosingSource=!d.intakeChannel;
+  if (clientId && !d.clientId && !d.websiteReferral) { d.clientId = clientId; d.step = 2; }
+  const manualClient=d.beforeWebsite?.clientId??d.clientId;
+  let selected = manualClient ? await request('clients/'+manualClient) : null;
   title(view, 'New enquiry', 'Record the request for review. If TADSA accepts it, the assessment and project keep this reference.');
+  const channelBar=el('div',null,'intake-source-bar');view.append(channelBar);
   const steps = el('ol', null, 'workflow-steps'); for (const [i,label] of ['Client','Project details','Funding & technical team','Review'].entries()) { const n = el('li', `${i+1}. ${label}`); if (i+1 === d.step) n.setAttribute('aria-current','step'); steps.append(n); } view.append(steps);
   const slot = el('div'); view.append(slot);
+  function useChannel(channel){
+    if(channel!==d.intakeChannel){
+      if(d.intakeChannel==='website')leaveWebsiteReview(d,true);
+      if(channel==='website')resumeWebsiteReview(d);
+      d.intakeChannel=channel;
+    }
+    choosingSource=false;draw();focusEnquiryHeading();
+  }
   function draw() {
     slot.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.destroy());slot.replaceChildren(); steps.querySelectorAll('li').forEach((n,i) => i+1 === d.step ? n.setAttribute('aria-current','step') : n.removeAttribute('aria-current'));
-    steps.hidden=Boolean(d.websiteReferral);
-    if(d.websiteReferral){reviewedWebsiteEnquiry(slot,d,key,draw);return;}
+    steps.hidden=choosingSource||d.intakeChannel==='website';channelBar.replaceChildren();channelBar.hidden=choosingSource;
+    if(choosingSource){
+      const box=panel('How did this enquiry arrive?');box.querySelector('h2').id='enquiry-step-heading';
+      if(selected?.person.name)box.append(el('p','Selected client for manual entry: '+selected.person.name,'field-help'));
+      const choices=el('div',null,'intake-source-choices');
+      for(const [channel,help] of [['phone','Record the request while speaking with the caller.'],['website','Paste the form from the office notification.'],['other','Enter an enquiry received another way.']]){
+        const label=intakeChannelLabels[channel],choice=button(label,()=>useChannel(channel),'secondary');
+        choice.setAttribute('aria-label',label);choice.replaceChildren(el('strong',label),el('span',help));choices.append(choice);
+      }
+      const form=el('form');form.append(choices,cancel(form,d,key,'projects','Cancel new enquiry'));box.append(form);slot.append(box);return;
+    }
+    const change=button('Change enquiry source',()=>{if(d.pending||host.isSaving())return;choosingSource=true;draw();focusEnquiryHeading();});
+    change.disabled=Boolean(d.pending);
+    channelBar.append(el('strong',intakeChannelLabels[d.intakeChannel]),change);
+    if(d.intakeChannel==='website'){
+      if(d.websiteReferral){reviewedWebsiteEnquiry(slot,d,key,draw);return;}
+      const box=panel('Paste the website enquiry');box.querySelector('h2').id='enquiry-step-heading';
+      const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:'Website enquiry'});
+      websiteEmailIntake(form,d,draw);form.append(cancel(form,d,key,'projects','Cancel new enquiry'));box.append(form);slot.append(box);return;
+    }
+    if(d.step>=3&&!dirs){
+      const wait=panel('Loading funding and team details…');wait.querySelector('h2').id='enquiry-step-heading';slot.append(wait);
+      directories().then(value=>{dirs=value;if(wait.parentNode===slot)draw();}).catch(()=>{if(wait.parentNode===slot)wait.append(note('Could not load funding and team details.',true),button('Try again',draw));});
+      return;
+    }
     const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technical team','Review'][d.step-1]}`); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New enquiry':key==='new-client'?'New client':'Person details'}); const notice = el('div');
     box.querySelector('h2').id='enquiry-step-heading';
     if (d.step === 1) {
-      websiteEmailIntake(form,d,draw);
       const picker=createRecordPicker({label:'Existing client',kind:'clients',selectedId:d.clientId,required:true,onChange:async(id,item)=>{d.clientId=id;selected=item?{person:{name:item.name},details:{residentialAddress:item.address}}:null;touch(d);if(id){try{const client=await request('clients/'+id);if(d.clientId===id){selected=client;if(d.step===3&&slot.isConnected)draw();}}catch{}}}});picker.element.recordPicker=picker;form.append(picker.element,link('Create new client','new-client/project','button secondary'),el('p','Search by name, reference, phone, email or address. Confirm the person’s details before choosing.','field-help'));
     } else if (d.step === 2) {
       form.append(note(`Client: ${selected?.person.name ?? 'Choose a client first'}`));

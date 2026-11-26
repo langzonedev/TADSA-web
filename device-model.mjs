@@ -1,9 +1,11 @@
-import {mailingDetails,initialLanguageDetails,matchingPersonRoles,referralClientProfile,directoryPhoneDigits,matchesDirectoryPhone} from './profile-details-model.js';
+import {mailingDetails,initialLanguageDetails,matchingPersonRoles,referralClientProfile,matchesDirectoryPhone} from './profile-details-model.js';
 import {technicianLocation} from './technician-location-model.js';
 import {organisationRoles,organisationContactDetails,ORGANISATION_CONTACT_FIELDS} from './organisation-model.js';
 import {RESIDENTIAL_FIELDS,CLIENT_GEOCODE_FIELDS,residentialFields,clientGeocodes,initialPersonAddress,initialContactAddress,initialClientResidence} from './client-address.js';
 import {createLifecycle} from './lifecycle-model.js';
-import {validateWebsiteReferral} from './website-referral.js';
+import {normaliseProfileDetails} from './profile-details-model.js';
+import {intakeMetadata,reviewedContactAdditions,validateWebsiteReferral} from './website-referral.js';
+import {referralPhoneVariants} from './website-referral-matches.js';
 import {createProjectDetails,validateReviewDate,projectNeedsReview} from './project-details-model.js';
 import {invoiceDetails} from './device-business.mjs';
 import {deviceDirectoryQuery} from './device-directory-queries.mjs';
@@ -34,7 +36,7 @@ export function deviceTechnicianLocation(d,id,calendar=d.calendars[id]) {
  return technicianLocation(calendar?{location_recorded:calendar.locationRecorded,base_address:calendar.baseAddress,suburb:calendar.suburb,postcode:calendar.postcode,geocode:calendar.geocode}:undefined,d.profileDetails?.[id]?.contact??{});
 }
 export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(),actorContext=null){
- const directoryResult=deviceDirectoryQuery(d,path,method,query,actorContext);if(directoryResult!==undefined)return directoryResult;
+ const directoryResult=deviceDirectoryQuery(d,path,method,query,actorContext,input);if(directoryResult!==undefined)return directoryResult;
  const parts=path.replace(/^\/+|\/+$/g,'').split('/'),[kind,id,sub,subid,action]=parts;
  if(kind==='people'&&sub==='credentials'&&actorContext&&actorContext.role!=='administrator'&&!actorContext.manageSensitiveDetails)fail('Sensitive technician details permission is required.',403);
  const find=(table,key)=>d[table].find(x=>x.id===key)??fail('Record not found.',404);
@@ -51,7 +53,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
  const ops=key=>({projectId:key,version:find('projects',key).version,...structuredClone(operationDefaults),...d.operations[key],workEstimateRecorded:estimateRecorded(key),approvedByName:d.people.find(p=>p.id===d.operations[key]?.approvedBy)?.name??d.operations[key]?.approvedBy??'',approvalLegacy:!!d.operations[key]?.approvedBy&&!d.people.some(p=>p.id===d.operations[key]?.approvedBy),notes:d.operations[key]?.notes??[],invoices:(d.operations[key]?.invoices??[]).map(i=>({...i,paidCents:(d.workPlans[key]?.payments??[]).filter(x=>x.invoiceId===i.id).reduce((n,x)=>n+x.amountCents,0)})),projectId:key,version:find('projects',key).version});
  const payer=(type,key)=>type==='client'?find('people',find('clients',key).personId).name:type==='person'?find('people',key).name:type==='organisation'?find('organisations',key).name:fail('Choose a recorded payer.');
  const duplicate=(exclude=null,identity=input,reviewedPhones=[])=>{if(identity.allowDuplicate)return;const normalize=(value,key)=>key==='phone'?String(value??'').replace(/\D/g,''):String(value??'').trim().toLowerCase();const matches=d.people.filter(p=>p.id!==exclude&&(['name','email','phone'].some(k=>normalize(identity[k],k)&&normalize(p[k],k)===normalize(identity[k],k))||
-   reviewedPhones.some(digits=>matchesDirectoryPhone(digits,p.phone,d.profileDetails?.[p.id]?.contact)))).map(p=>({id:d.clients.find(c=>c.personId===p.id)?.id??p.id,personId:p.id,type:d.clients.some(c=>c.personId===p.id)?'client':'person',name:p.name,email:p.email,phone:p.phone}));if(matches.length)fail('Possible matching records exist. Review before creating a separate person.',409,{code:'DUPLICATE_CANDIDATE',candidates:matches});};
+   reviewedPhones.some(digits=>matchesDirectoryPhone(digits,p.phone,d.profileDetails?.[p.id]?.contact)))).map(p=>({id:d.clients.find(c=>c.personId===p.id)?.id??p.id,personId:p.id,type:d.clients.some(c=>c.personId===p.id)?'client':'person',directoryStatus:p.active===false?'inactive':directoryStatus(p),name:p.name,email:p.email,phone:p.phone}));if(matches.length)fail('Possible matching records exist. Review before creating a separate person.',409,{code:'DUPLICATE_CANDIDATE',candidates:matches});};
  function orgDuplicate(value,allow=false,exclude=null){const norm=v=>String(v??'').trim().toLowerCase().replace(/\s+/g,' ');const candidates=d.organisations.filter(o=>o.id!==exclude&&(norm(o.name)===norm(value.name)||value.email&&norm(o.email)===norm(value.email))).map(({id,name,email})=>({id,name,email,type:'organisation'}));if(candidates.length&&!allow)fail('Possible duplicate organisations found. Reuse an existing record or confirm a distinct organisation.',409,{code:'DUPLICATE_CANDIDATE',candidates});}
  function coordination(x,before={}){const technicianIds=x.technicianIds??(x.technicianId?[x.technicianId]:[]);if(!Array.isArray(technicianIds)||technicianIds.length>20||new Set(technicianIds).size!==technicianIds.length||technicianIds.length&&(!x.technicianId||!technicianIds.includes(x.technicianId))||!technicianIds.length&&x.technicianId)fail('Select distinct team members including the lead technician.');for(const id of technicianIds){const p=find('people',id);if(p.active===false||directoryStatus(p)==='inactive'&&!(before.technicianIds??[]).includes(id)||!p.roles.includes('Technician')||!p.roles.every(r=>roles.includes(r)))fail('Select active technicians.');}if(!Array.isArray(x.requiredSkills)||x.requiredSkills.some(s=>!skills.includes(s))||new Set(x.requiredSkills).size!==x.requiredSkills.length)fail('Select known distinct skills.');if(x.technicianId!==null&&(!find('people',x.technicianId).roles.includes('Technician')||!find('people',x.technicianId).roles.every(r=>roles.includes(r))))fail('Select a technician.');if(!['unknown','self','organisation','person'].includes(x.fundingStatus))fail('Select a funding status.');if(['unknown','self'].includes(x.fundingStatus)){if(x.payerId!==null)fail('This funding status does not select another payer.');}else{payer(x.fundingStatus,x.payerId);if(x.fundingStatus==='person'&&directoryStatus(find('people',x.payerId))==='inactive'&&!(before.fundingStatus==='person'&&before.payerId===x.payerId))fail('Choose a current payer or update their directory status before assigning.');if(x.fundingStatus==='organisation'&&find('organisations',x.payerId).directoryStatus==='inactive'&&!(before.fundingStatus==='organisation'&&before.payerId===x.payerId))fail('Choose a current organisation or update its directory status before assigning.');}return {requiredSkills:[...x.requiredSkills],technicianId:x.technicianId,technicianIds:[...technicianIds],fundingStatus:x.fundingStatus,payerId:x.payerId,fundingNotes:str(x.fundingNotes)};}
  function setCoord(p,value){p.coordination=value;d.relationships=d.relationships.filter(r=>r.projectId!==p.id||!['Technician','Funder'].includes(r.role));for(const id of value.technicianIds)d.relationships.push({projectId:p.id,type:'person',id,role:'Technician'});if(value.payerId)d.relationships.push({projectId:p.id,type:value.fundingStatus,id:value.payerId,role:'Funder'});}
@@ -67,7 +69,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   }
   replayKey=canonical({path,method,input:receipt});const saved=d.replays[input.requestId];if(saved){if(saved.key!==replayKey)fail('This request identifier was already used for different changes.',409,{code:'IDEMPOTENCY_MISMATCH'});return replayProjection(saved.result);}}
  function createDirectoryRecord(input,clientRecord,reviewed=null){
-  const phones=clientRecord?[input.phone,reviewed?.contact.mobilePhone,reviewed?.contact.homePhone].map(directoryPhoneDigits).filter(Boolean):[];
+  const phones=clientRecord?referralPhoneVariants(input.phone,reviewed?.contact.mobilePhone,reviewed?.contact.homePhone):[];
   duplicate(null,input,phones);const value=profile(clientRecord?{...input,roles:['Client'],technician:null}:input);
   const isClient=value.roles.includes('Client');let address,details=reviewed;
   try{
@@ -144,7 +146,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   if(kind==='availability'&&sub==='entries'&&Object.hasOwn(input,'calendarVersion'))keys.push('calendarVersion');
   if(keys&&!id&&['clients','people'].includes(kind))keys.push(...['language','initialAddress'].filter(k=>Object.hasOwn(input,k)));
   if(keys&&kind==='people'&&keys.includes('roles'))keys.push(...['membershipStatus','cohorts'].filter(k=>Object.hasOwn(input,k)));
-  if(keys&&kind==='projects'&&!id)keys.push(...['followUpOn','websiteReferral'].filter(key=>Object.hasOwn(input,key)));
+  if(keys&&kind==='projects'&&!id)keys.push(...['followUpOn','websiteReferral','intakeChannel','clientAdditions'].filter(key=>Object.hasOwn(input,key)));
   if(keys&&Object.hasOwn(input,'technicianIds')&&kind==='projects'&&(!id||sub==='coordination'))keys.push('technicianIds');
   if(keys&&(Object.keys(input).length!==keys.length||keys.some(k=>!Object.hasOwn(input,k))))fail('Supply exactly the required fields.');
   if(keys?.includes('requestId')&&!input.requestId)fail('Supply a valid request identifier.');
@@ -206,6 +208,8 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
    const existing=!isNew&&d.projects.find(p=>p.clientId===input.clientId&&canonical(d.projectAdminDetails?.[p.id]?.websiteReferral)===canonical(referral));
    if(existing)fail('A matching website referral is already on enquiry '+existing.reference+'. Check that enquiry before creating another.',409);
   }
+  const metadata=intakeMetadata({...input,websiteReferral:referral});
+  if(Object.hasOwn(input,'clientAdditions')&&(isNew||!referral))fail('Additional client details require a reviewed website enquiry and an existing client.');
   if(isNew){
    if(!referral)fail('Review a website enquiry before creating its client here.');
    try{reviewed=referralClientProfile(input.newClient,input.requestId);}catch(error){fail(error.message);}
@@ -214,8 +218,26 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   const value=coordination(input);if(!['Assessment','Technical'].includes(input.kind))fail('Select a project type.');const title=str(input.title,120,true),summary=str(input.summary,2000);
   const followUpOn=input.followUpOn??today();validateReviewDate(followUpOn);
   const clientId=isNew?createDirectoryRecord(input.newClient,true,reviewed).id:find('clients',input.clientId).id;
+  if(referral&&!isNew){
+   const person=find('people',find('clients',clientId).personId);
+   const saved=d.profileDetails?.[person.id];
+   const profile=normaliseProfileDetails(saved);
+   if(profile.contact.directoryStatus==='inactive'||person.active===false)fail('This client is inactive. Review the client record before linking this enquiry.',409,{code:'INACTIVE_CLIENT'});
+   if(Object.hasOwn(input,'clientAdditions')){
+    const additions=reviewedContactAdditions(input.clientAdditions,referral.answers,{...profile.contact,phone:person.phone});
+    const {phone,...contact}=additions;
+    if(phone){person.phone=phone;person.version++;}
+    if(Object.keys(contact).length){
+     Object.assign(profile.contact,contact);
+     d.profileDetails??={};d.profileDetails[person.id]={personId:person.id,version:(saved?.version??0)+1,...profile};
+    }
+    const audit={fields:Object.keys(additions)};
+    event('people',person.id,'Missing details added from website enquiry',audit);
+    event('clients',clientId,'Missing details added from website enquiry',audit);
+   }
+  }
   d.projectSequence=nextSequence;
-  const p={labourRateCents:d.applicationSettings.labourRateCents,id:next('project'),reference:String(++d.projectSequence),clientId,title,summary,kind:input.kind,status:'open',version:1,openedAt:today(),dueDate:null,feedbackRequired:false,invoiceRequired:false};d.projects.push(p);d.projectAdminDetails??={};d.projectAdminDetails[p.id]={...createProjectDetails(),followUpOn,coordinatorAccountId:actorContext?.id??'',...(referral?{websiteReferral:referral,enquirySource:(referral.answers.heard??'').slice(0,500)}:{})};d.lifecycles[p.id]=createLifecycle();d.statusEvents.push({id:p.id,fromStatus:null,toStatus:p.status,at:new Date().toISOString()});setCoord(p,value);event('projects',p.id,'Project created',{title,createdByAccountId:actorContext?.id??null});event('clients',clientId,'Project created',{projectId:p.id});return project(p);}
+  const p={labourRateCents:d.applicationSettings.labourRateCents,id:next('project'),reference:String(++d.projectSequence),clientId,title,summary,kind:input.kind,status:'open',version:1,openedAt:today(),dueDate:null,feedbackRequired:false,invoiceRequired:false};d.projects.push(p);d.projectAdminDetails??={};d.projectAdminDetails[p.id]={...createProjectDetails(),followUpOn,coordinatorAccountId:actorContext?.id??'',...metadata,...(referral?{enquirySource:(referral.answers.heard??'').slice(0,500)}:{})};d.lifecycles[p.id]=createLifecycle();d.statusEvents.push({id:p.id,fromStatus:null,toStatus:p.status,at:new Date().toISOString()});setCoord(p,value);event('projects',p.id,'Project created',{title,createdByAccountId:actorContext?.id??null});event('clients',clientId,'Project created',{projectId:p.id});return project(p);}
  if(kind==='projects'&&method==='PATCH'&&!sub){const p=find('projects',id);version(p,input.version);if(!['open','review','closed'].includes(input.status)||typeof input.feedbackRequired!=='boolean'||typeof input.invoiceRequired!=='boolean')fail('Complete the project status fields.');if(p.status==='closed'&&input.status!=='closed'){for(const id of p.coordination.technicianIds){const tech=find('people',id);if(tech.active===false||!tech.roles.includes('Technician')||!tech.roles.every(r=>roles.includes(r)))fail('Choose active technicians or clear their assignment before reopening this project.');}}const value={title:str(input.title,120,true),status:input.status,feedbackRequired:input.feedbackRequired,invoiceRequired:input.invoiceRequired};if(Object.entries(value).some(([k,v])=>p[k]!==v)){if(p.status!==value.status)d.statusEvents.push({id:p.id,fromStatus:p.status,toStatus:value.status,at:new Date().toISOString()});Object.assign(p,value);bump(p,'Project updated',value);}return project(p);}
  if(kind==='projects'&&sub==='coordination'&&method==='PUT'){const p=find('projects',id);version(p,input.version);const value=coordination(input,p.coordination);if(canonical(value)!==canonical(p.coordination)){setCoord(p,value);bump(p,'Project coordination updated',value);}return project(p);}
  if(kind==='projects'&&sub==='operations'&&method==='GET')return ops(id);

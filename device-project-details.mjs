@@ -1,6 +1,6 @@
 import {assertProgrammeChangeAllowed} from './lifecycle-model.js';
 import {installModelExtensions,fail} from './device-model.mjs';
-import {validateWebsiteReferral} from './website-referral.js';
+import {intakeMetadata,validateWebsiteReferral} from './website-referral.js';
 import {createProjectDetails,validateProjectDetails,validateProjectFeedback} from './project-details-model.js';
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
@@ -9,7 +9,7 @@ export function validateProjectDetailsBackup(data){
  for(const key of ['projectAdminDetails','projectFeedback']){if(data[key]===undefined)continue;if(!object(data[key]))fail('Backup rejected: invalid '+key+' collection.');for(const [id,value]of Object.entries(data[key])){
   const p=data.projects.find(p=>p.id===id);if(!p)fail('Backup rejected: project details reference a missing project.');
   if(key==='projectAdminDetails'){
-   const {websiteReferral,...editable}=value??{};if(Object.hasOwn(value??{},'websiteReferral'))validateWebsiteReferral(websiteReferral);
+   const {websiteReferral,intakeChannel,...editable}=value??{};intakeMetadata(value??{});if(Object.hasOwn(value??{},'websiteReferral'))validateWebsiteReferral(websiteReferral);
    if(!exact(editable,['programme','coordinatorAccountId','followUpOn','enquirySource',...(Object.hasOwn(value??{},'assessmentInstructions')?['assessmentInstructions']:[]),...(Object.hasOwn(value??{},'documentFolderUrl')?['documentFolderUrl']:[]),...(Object.hasOwn(value??{},'freedomWheels')?['freedomWheels']:[])]))fail('Backup rejected: invalid project administration fields.');
    try{validateProjectDetails({requestId:'backup-validation',version:p.version,...editable});}catch(error){fail('Backup rejected: '+error.message);}
    if(value.coordinatorAccountId&&!uuid(value.coordinatorAccountId))fail('Backup rejected: invalid coordinator account identity.');
@@ -35,7 +35,7 @@ installModelExtensions(ctx=>{
   if(method==='GET')return read();if(method!=='PUT')fail('Project details action unavailable.',404);
   let details;try{details=validateProjectDetails(input);}catch(error){fail(error.message);}version(p,input.version);const before=read();try{assertProgrammeChangeAllowed(before.programme,d.lifecycles?.[id],details.programme);}catch(e){fail(e.message,e.status??422);}if(!Object.hasOwn(details,'assessmentInstructions'))details.assessmentInstructions=before.assessmentInstructions; if(!Object.hasOwn(details,'documentFolderUrl'))details.documentFolderUrl=before.documentFolderUrl; if(!Object.hasOwn(details,'freedomWheels'))details.freedomWheels=before.freedomWheels;else details.freedomWheels={...before.freedomWheels,...details.freedomWheels};
   if(details.coordinatorAccountId&&details.coordinatorAccountId!==before.coordinatorAccountId&&!accounts.some(a=>a.id===details.coordinatorAccountId&&a.active))fail('Choose an active application account as coordinator.');
-  d.projectAdminDetails??={};d.projectAdminDetails[id]=before.websiteReferral?{...details,websiteReferral:before.websiteReferral}:details;bump(p,'Project administration updated',{before:Object.fromEntries(Object.keys(createProjectDetails()).map(k=>[k,before[k]])),after:details});return read();
+  d.projectAdminDetails??={};d.projectAdminDetails[id]={...details,...intakeMetadata(before)};bump(p,'Project administration updated',{before:Object.fromEntries(Object.keys(createProjectDetails()).map(k=>[k,before[k]])),after:details});return read();
  }
  if(method==='GET')return feedback();if(method!=='POST')fail('Feedback action unavailable.',404);
  let details;try{details=validateProjectFeedback(input);}catch(error){fail(error.message);}version(p,input.version);

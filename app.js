@@ -9,7 +9,8 @@ import {residentialAddressText} from './client-address.js';
 import {auditReferenceIds,auditAction,auditChanges,formatValue as displayValue} from './record-values.js';
 import {renderProfileDetails} from './profile-details.js';
 import {recordDirectoryStatus,DIRECTORY_STATUSES} from './profile-details-model.js';
-import {renderProjectDetails,renderProjectCoordinator,renderProjectFeedback} from './project-details.js';
+import {renderProjectDetails,renderProjectCoordinator,renderProjectFeedback,renderReferralFollowUp} from './project-details.js';
+import {intakeChannelLabels} from './website-referral.js';
 import {renderAccounts} from './accounts.js';
 import {renderReports} from './reports.js';
 import {renderSettings,configureSettings} from './settings.js';
@@ -471,6 +472,16 @@ async function project(view, id) {
   }
   const quote=state?.quotes?.at(-1),quoteIssued=quote?state.history?.findLast(e=>e.action==='issueQuote'&&e.data.quoteVersion===quote.version):null;
   const brief=panel('The work');brief.append(el('p',p.summary||p.title,'record-summary'));
+  const channel=adminDetails.intakeChannel||(adminDetails.websiteReferral?'website':'');
+  if(channel){
+    const source=[intakeChannelLabels[channel],adminDetails.websiteReferral?.receivedOn&&date(adminDetails.websiteReferral.receivedOn)].filter(Boolean).join(' · ');
+    brief.append(details([['Enquiry received via',source]]));
+  }
+  if(adminDetails.websiteReferral)brief.append(renderReferralFollowUp(adminDetails.websiteReferral,async()=>{
+    await navigate('Edit details');
+    const original=editPane.querySelector('.website-referral-readback');
+    if(original){original.open=true;original.querySelector('summary')?.focus();}
+  }));
   const payerNames=new Map([[`client:${p.clientId}`,p.clientName]]);if(projectOperations.fundingContributors.length){const kinds={person:'people',organisation:'organisations',client:'clients'},contributors=projectOperations.fundingContributors.filter(c=>!payerNames.has(c.type+':'+c.id));const selected=await Promise.allSettled(contributors.map(c=>api('selections/'+kinds[c.type]+'/'+encodeURIComponent(c.id))));selected.forEach((result,i)=>{if(result.status==='fulfilled'&&result.value.item?.name)payerNames.set(contributors[i].type+':'+contributors[i].id,result.value.item.name);});}
   const facts=el('div',undefined,'project-facts');const client=el('div');client.append(link('CLIENT',`client/${p.clientId}`,'summary-heading-link'),link(p.clientName,`client/${p.clientId}`));facts.append(client);
   for(const [label,roles] of [['CONTACTS',['Contact','Carer','OT','Occupational therapist','Allied-health contact']],['REFERRER',['Referrer']],['FUNDER / PAYER',['Funder']],['TECHNICAL TEAM',['Technician']]]){
@@ -522,7 +533,7 @@ async function project(view, id) {
   const actionPanes=new Map();for(const [i,child] of [...actionSource.children].entries()){const title=child.querySelector(':scope > summary')?.textContent||child.querySelector('button[type=submit]')?.textContent||'Project action';const pane=el('section',undefined,'project-action-task');pane.append(button('← Project overview',()=>navigate('Overview'),'secondary'),el('h2',title),child);flatten(pane);actionPanes.set('Action:'+i,{title,pane});view.append(pane);if(pane.querySelector(':scope > .project-record-section > h2'))pane.querySelector(':scope > h2')?.remove();}
   const embedded=new Map([['Contacts',{route:'contacts'}],['Hold or resume work',{route:'operations',focus:'holds'}],['Record hours',{route:'operations',focus:'hours'}],['Prepare invoices',{route:'operations',focus:'invoices'}],['Print documents',{route:'documents'}],['Feedback',{route:'feedback'}],['Team',{route:'coordination',focus:'team'}],['Funding',{route:'coordination',focus:'funding'}]].map(([name,config])=>{const pane=el('section',undefined,'project-embedded-pane');pane.hidden=true;pane.tabIndex=-1;view.append(pane);return [name,{...config,pane,loaded:false,loading:null}];}));
   function returnNavigation(name){const navigation=el('nav',undefined,'project-task-navigation actions');navigation.setAttribute('aria-label',name+' navigation');navigation.append(button('← Return to current workflow',()=>navigate('Task'),'secondary'),button('Project overview',()=>navigate('Overview'),'text-button'));return navigation;}
-  async function loadEmbedded(name){const entry=embedded.get(name);if(!entry||entry.loaded)return;if(entry.loading)return entry.loading;if(!entry.pane.dataset.sectionLoading)entry.pane.replaceChildren(el('p','Opening '+name.toLowerCase()+'…','loading'));entry.loading=(async()=>{const body=el('div');try{if(entry.route==='coordination')await renderWorkflow(body,'coordination',id,{embedded:true,focus:entry.focus,onCancel:()=>{entry.loaded=false;navigate('Overview');}});else if(entry.route==='contacts')await renderProjectContacts(body,id);else if(entry.route==='feedback')await renderProjectFeedback(body,id);else await renderOperations(body,entry.route,id,{embedded:true,focus:entry.focus,openWorkflow:()=>navigate('Task')});if(name==='Team')await renderProjectCoordinator(body,id);entry.pane.replaceChildren(returnNavigation(name),el('h2',name),body);body.querySelectorAll('form').forEach(form=>form.startTechnicianCalendars?.());if(name==='Funding')entry.pane.append(fundingReference);entry.loaded=true;}catch(error){entry.pane.replaceChildren(message(error.status?error.message:'This section could not load. Your project is still open.',true),button('Try again',()=>loadEmbedded(name),'secondary'));}finally{entry.loading=null;}})();return entry.loading;}
+  async function loadEmbedded(name){const entry=embedded.get(name);if(!entry||entry.loaded)return;if(entry.loading)return entry.loading;if(!entry.pane.dataset.sectionLoading)entry.pane.replaceChildren(el('p','Opening '+name.toLowerCase()+'…','loading'));entry.loading=(async()=>{const body=el('div');try{if(entry.route==='coordination')await renderWorkflow(body,'coordination',id,{embedded:true,focus:entry.focus,onCancel:()=>{entry.loaded=false;navigate('Overview');}});else if(entry.route==='contacts')await renderProjectContacts(body,id,adminDetails.websiteReferral);else if(entry.route==='feedback')await renderProjectFeedback(body,id);else await renderOperations(body,entry.route,id,{embedded:true,focus:entry.focus,openWorkflow:()=>navigate('Task')});if(name==='Team')await renderProjectCoordinator(body,id);entry.pane.replaceChildren(returnNavigation(name),el('h2',name),body);body.querySelectorAll('form').forEach(form=>form.startTechnicianCalendars?.());if(name==='Funding')entry.pane.append(fundingReference);entry.loaded=true;}catch(error){entry.pane.replaceChildren(message(error.status?error.message:'This section could not load. Your project is still open.',true),button('Try again',()=>loadEmbedded(name),'secondary'));}finally{entry.loading=null;}})();return entry.loading;}
   const statusPane=panel('Project status');
   view.append(statusPane);
   const statusActions=[...actionPanes].filter(([,entry])=>['Cancel this enquiry','Cancel this project','Reopen for review'].includes(entry.title));

@@ -38,6 +38,13 @@ function renderPreparation(parent,project,current,admin,templates){
  const preview=node('article',null,'panel assessment-preview');preview.hidden=true;
  let previewContext;
  editor(parent,'assessment-pack/'+project.id,initial,'Prepare the assessment documents',(form,d)=>{
+  const answers=admin.websiteReferral?.answers;
+  if(answers?.safety||answers?.attendance){
+   const visit=node('div',null,'field-help');visit.append(node('strong','Website form information for this visit'));
+   if(answers.safety)visit.append(node('p','Reported safety issues: '+answers.safety));
+   if(answers.attendance)visit.append(node('p','Referrer or carer attendance: '+answers.attendance));
+   form.append(visit);
+  }
   const instructions=field(form,'Instructions to the technical member',d,'instructions','textarea');instructions.required=true;instructions.maxLength=2000;
   const choices=[['0','CRM report form · filled in with this client and project']];
   if(latest)choices.push([String(latest.revision),latest.name+' · TADSA blank, revision '+latest.revision]);

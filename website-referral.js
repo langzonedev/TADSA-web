@@ -1,4 +1,39 @@
 import {reviewDay} from './project-details-model.js';
+
+export const intakeChannelLabels={website:'Website form email',phone:'Phone call',other:'Other enquiry'};
+
+// Earlier projects may have no recorded channel. A saved website referral identifies its source.
+export function intakeMetadata(record){
+  const metadata={};
+  if(Object.hasOwn(record,'intakeChannel')){
+    const channel=record.intakeChannel;
+    if(typeof channel!=='string'||!Object.hasOwn(intakeChannelLabels,channel)||(channel==='website')!==Boolean(record.websiteReferral)){
+      throw Object.assign(Error('Choose the intake channel that matches this enquiry.'),{status:422});
+    }
+    metadata.intakeChannel=channel;
+  }
+  if(record.websiteReferral)metadata.websiteReferral=record.websiteReferral;
+  return metadata;
+}
+
+export function referralBirthDate(value){
+  if(typeof value!=='string')return '';
+  const au=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value);
+  const day=au?[au[3],au[2].padStart(2,'0'),au[1].padStart(2,'0')].join('-'):value;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||day.startsWith('0000')||day>reviewDay())return '';
+  const parsed=new Date(day+'T00:00:00Z');
+  return Number.isFinite(parsed.getTime())&&parsed.toISOString().startsWith(day)?day:'';
+}
+
+export function reviewedContactAdditions(choices,answers,current){
+  const supplied={phone:answers.phone||answers.mobile,mobilePhone:answers.mobile,dateOfBirth:referralBirthDate(answers.birth)};
+  if(!choices||typeof choices!=='object'||Array.isArray(choices)||!Object.keys(choices).length)invalid('Choose the missing client details to add.');
+  for(const [key,value] of Object.entries(choices)){
+    if(!Object.hasOwn(supplied,key)||typeof value!=='string'||!value||value!==supplied[key]||value.length>40||/[\u0000-\u001f\u007f]/.test(value))invalid('Only reviewed phone numbers and date of birth from this form can be added.');
+    if(current[key])throw Object.assign(Error('This client’s details changed. Check the client again before adding information.'),{status:409});
+  }
+  return {...choices};
+}
 // The office reviews the notification locally. Keep its answers separate from CRM identities and decisions.
 const fields = [
   ['need','Request','Please provide a brief description of the problem or enquire.','Please provide a brief description of the problem or enquiry.'],

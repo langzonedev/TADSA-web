@@ -4,6 +4,22 @@ import {createHash} from 'node:crypto';
 import {deviceDirectoryQuery} from '../device-directory-queries.mjs';
 import {dispatch} from '../device-model.mjs';
 const actor={id:'synthetic-account',displayName:'Synthetic coordinator',role:'coordinator'};
+test('enquiry identity comparison is a read-only workspace operation across recorded phone channels',()=>{
+ const d=fixture(),input={name:'Same name',phone:'',mobile:'+61 401 234 567',dateOfBirth:'1980-01-02',postcode:''};
+ d.profileDetails['person-2']={contact:{dateOfBirth:input.dateOfBirth,mobilePhone:'0401 234 567'}};
+ d.profileDetails['person-4']={contact:{dateOfBirth:input.dateOfBirth}};
+ const before=JSON.stringify(d);
+ const match=(body,who=actor)=>dispatch(d,'website-referral-matches','POST',body,new URLSearchParams(),who);
+ const {items}=match(input);
+ assert.equal(items[0].id,'client-2');assert.equal(items[0].comparison.mobile,'match');
+ assert.equal(items[0].comparison.dateOfBirth,'match');assert.equal(items.length,3);
+ assert.equal(items.some(row=>row.personId==='person-4'),false);
+ assert.equal(items.every(row=>!Object.hasOwn(row,'privateSecret')),true);
+ assert.throws(()=>match(input,null),error=>error.status===401);
+ assert.throws(()=>match(input,{...actor,role:'unknown'}),error=>error.status===403);
+ assert.throws(()=>match({...input,name:'',mobile:''}),error=>error.status===422);
+ assert.equal(JSON.stringify(d),before);
+});
 function fixture(){
  const d={people:[],clients:[],organisations:[],projects:[],relationships:[],profileDetails:{}};
  for(let i=1;i<=1037;i++){
