@@ -24,12 +24,12 @@ test('project finance evidence preserves explicit No, independent workflow, orig
  assert.equal(action('cancel',{reason:'Synthetic cancellation'}).state.stage,'finance_handoff');
  const addFile=id=>call('projects/'+id+'/attachments','POST',{requestId:crypto.randomUUID(),name:'synthetic.pdf',mime:'application/pdf',dataBase64:btoa('%PDF-1.4\n%%EOF')});
  const source=addFile('project-1'),wrongFile=addFile('project-2');
- const cost={receivedOn:'2025-10-05',lines:[],notes:'No charge on the synthetic return.'};
+ const cost={technicianId:call(life).assignedTechnicians[0].id,receivedOn:'2025-10-05',lines:[{type:'materials',description:'Synthetic item',quantityMilli:1000,unitPriceCents:100}],notes:'Actual cost.'};
  assert.throws(()=>action('costReturn',{...cost,sourceFileId:wrongFile.id}),error=>error.status===422);
  const revision=action('costReturn',{...cost,sourceFileId:source.id}).state.costReturns[0];
  assert.equal(revision.sourceFileName,source.name);
  assert.equal(revision.receivedOn,cost.receivedOn);
- action('costReturn',cost);
+ action('costReturn',{...cost,supersedesVersion:revision.version});
  assert.throws(()=>call('projects/project-1/attachments/'+source.id+'/remove','POST',{requestId:crypto.randomUUID(),version:1}),/retained/);
  assert.deepEqual((await validateBackup(data)).financeStatuses,data.financeStatuses);
  const bad=structuredClone(data);

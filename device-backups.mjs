@@ -103,6 +103,7 @@ export async function validateBackup(input){
  for(const [id,n]of Object.entries(raw.clientNdis??{})){ref('clients',id,'NDIS record');if(!object(n))invalid('invalid NDIS record.');amount(n.version,'NDIS version',0,2147483647);if(typeof n.number!=='string'||(n.number&&!/^[0-9 ]{3,30}$/.test(n.number)))invalid('invalid NDIS number.');}
  for(const [id,state]of Object.entries(raw.lifecycles??{})){ref('projects',id,'Lifecycle');validateLifecycleBackup(state);
   for(const {action,data} of state.history){
+   if(['costReturn','memberNoCosts'].includes(action)&&data.technicianId)ref('people',data.technicianId,'Cost return technician');
    if(action==='assessmentRequestSent')ref('people',data.technicianId,'Assessment dispatch recipient');
    if(action!=='assessmentPackPrepared')continue;
    const files=raw.attachments?.[id]??[],request=files.find(f=>f.id===data.requestFileId&&!f.removed),report=files.find(f=>f.id===data.reportFileId&&!f.removed);

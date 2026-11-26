@@ -1,9 +1,16 @@
 import {node,field,editor,request} from './project-care.js';
 import {createProjectDetails,createFreedomWheelsDetails} from './project-details-model.js';
+import {referralRows} from './website-referral.js';
 const payload=d=>Object.fromEntries(['requestId','version',...Object.keys(createProjectDetails())].map(k=>[k,d[k]]));
 const labelSave=(entry,label)=>{const button=entry.form.querySelector('button[type=submit]');button.dataset.label=label;if(!entry.d.pending)button.textContent=label;};
 export async function renderProjectDetails(view,id,context={}){
  const details=context.details??await request(`projects/${id}/admin-details`);
+ if(details.websiteReferral){
+  const referral=details.websiteReferral,section=node('details',null,'panel website-referral-readback'),list=node('dl',null,'review-list');
+  section.append(node('summary','Website enquiry as received'),node('p','Received '+referral.receivedOn+'. These are the answers supplied on the website. Confirm contacts, funding and work approval separately.','field-help'));
+  for(const [label,value] of referralRows(referral.answers))list.append(node('dt',label),node('dd',value));
+  section.append(list);view.append(section);
+ }
  const entry=editor(view,'project-admin/'+id,details,'Programme & follow-up',(form,d)=>{
   const programme=field(form,'Programme',d,'programme','text',[['','Not recorded'],['TAD','TAD'],['FW','Freedom Wheels (FW)']]);
   d.freedomWheels={...createFreedomWheelsDetails(),...d.freedomWheels};

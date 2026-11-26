@@ -1,6 +1,6 @@
 import {node,action,field,notice,request,downloadProjectFile} from './project-care.js';
 import {residentialAddressText} from './client-address.js';
-import {awaitingAssessmentReport,lifecycleGate,lifecycleCostLabels} from './lifecycle-model.js';
+import {awaitingAssessmentReport,hasMemberCosts,lifecycleGate,lifecycleCostLabels} from './lifecycle-model.js';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=c=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format((c??0)/100);
 export function storedZip(files){
@@ -80,7 +80,7 @@ export function decisionSummary(state,people=[]){
  section('Client quote acceptance',s.acceptance,[['Accepted by',s.acceptance?.acceptedBy],['Quote revision',s.acceptance?.quoteVersion],['Date',s.acceptance?.date],['Evidence reference',s.acceptance?.reference]])+
  (s.schema===2&&!s.financeClearance?'':section('Finance clearance',s.financeClearance,[['Decision',s.financeClearance?.status==='paid'?'External Finance confirms payment':'External Finance authorises work without prepayment'],['Quote revision',s.financeClearance?.quoteVersion],['Date',s.financeClearance?.confirmedOn],['Evidence reference',s.financeClearance?.reference],['Notes',s.financeClearance?.notes]]))+
  (s.schema===2?section('Work Request authorisation',s.workRequest,[['Quote revision',s.workRequest?.quoteVersion],['Request sent date',s.workRequest?.sentOn],['Evidence reference',s.workRequest?.reference],['Work and access instructions',s.workRequest?.instructions]]):'')+
- (s.schema===2?section('Cost summary sent to Finance',s.financeHandoff,[['Cost return revision',s.financeHandoff?.costReturnVersion],['Sent date',s.financeHandoff?.sentOn],['Evidence reference',s.financeHandoff?.reference],['Notes',s.financeHandoff?.notes]]):'')+
+ (s.schema===2?section('Cost summary sent to Finance',s.financeHandoff,[[s.financeHandoff?.costSummaryVersion?'Cost summary revision':'Cost return revision',s.financeHandoff?.costSummaryVersion??s.financeHandoff?.costReturnVersion],['Sent date',s.financeHandoff?.sentOn],['Evidence reference',s.financeHandoff?.reference],['Notes',s.financeHandoff?.notes]]):'')+
  section('Customer sign-off',s.signoff,[['Accepted by',s.signoff?.acceptedBy],['Date',s.signoff?.signedOn],['Evidence reference',s.signoff?.reference],['Handover notes',s.signoff?.notes]])+
  section('Finance finalisation',s.financeFinalisation,[['Date',s.financeFinalisation?.confirmedOn],['Evidence reference',s.financeFinalisation?.reference],['Notes',s.financeFinalisation?.notes],...(s.schema===2?[['Client payment resolved',s.financeFinalisation?.clientPaymentResolved?'Confirmed by Finance':'Not confirmed'],['Technician reimbursement resolved',s.financeFinalisation?.technicianPaymentResolved?'Confirmed by Finance':'Not confirmed']]:[])]);
 }
@@ -124,16 +124,23 @@ function savedCostReturn(current,revision){
 }
 function costReturnDetails(project,saved){
  return record('Project',project.title)+record('Client',project.clientName)+record('Cost return revision',saved.version)+
-  record('Cost return received on',saved.receivedOn)+record('Original technician return',saved.sourceFileName)+
+  (saved.technicianId?record('Technician',saved.technicianName):'')+record('Cost return received on',saved.receivedOn)+record('Original technician return',saved.sourceFileName)+
   record('Recorded at',saved.at)+record('Recorded by',saved.actor?.displayName);
 }
 export function costReturnDocument(project,current,revision){
  const saved=savedCostReturn(current,revision);
  const quote=current.state.quotes?.at(-1);
  return htmlDocument('Actual cost return — '+project.reference+' / revision '+saved.version,
-  '<p><strong>CRM copy of the technician’s return · Fictional development data · Saved cost evidence, not an invoice</strong></p>'+costReturnDetails(project,saved)+quoteTable(saved,'Actual cost total',false)+record('Cost return notes',saved.notes)+'<h2>Current project context</h2>'+workflowNotice(current)+record('Latest saved quote revision',quote?.version)+record('Latest saved quote total',quote?money(quote.totalCents):'Not recorded')+record('Difference from latest saved quote',quote?money(saved.totalCents-quote.totalCents):'Not recorded — no quote saved'));
+  '<p><strong>CRM copy of the technician’s return · Fictional development data · Saved cost evidence, not an invoice</strong></p>'+costReturnDetails(project,saved)+quoteTable(saved,'Actual cost total',false)+record('Cost return notes',saved.notes)+'<h2>Current project context</h2>'+workflowNotice(current)+record('Latest saved quote revision',quote?.version)+record('Latest saved quote total',quote?money(quote.totalCents):'Not recorded')+(saved.technicianId?'':record('Difference from latest saved quote',quote?money(saved.totalCents-quote.totalCents):'Not recorded — no quote saved')));
+}
+export function usesTeamCostSummary(current){
+ return hasMemberCosts(current.state)||Boolean(current.assignedTechnicians?.length&&!current.state?.financeHandoff?.costReturnVersion);
 }
 export function costSummaryDocument(project,current,revision){
+ if(usesTeamCostSummary(current))return teamSummaryDocument(project,current,revision);
+ return legacyCostSummary(project,current,revision);
+}
+function legacyCostSummary(project,current,revision){
  const saved=savedCostReturn(current,revision);
  const totals=new Map();
  for(const line of saved.lines)totals.set(line.type,(totals.get(line.type)??0)+line.amountCents);
@@ -143,6 +150,24 @@ export function costSummaryDocument(project,current,revision){
   '<h2>Cost summary</h2><table><thead><tr><th>Cost category</th><th>Amount</th></tr></thead><tbody>'+rows+
   '</tbody><tfoot><tr><th>Total actual cost</th><td>'+money(saved.totalCents)+'</td></tr></tfoot></table>'+
   '<h2>Supporting cost return</h2>'+quoteTable(saved,'Actual cost total',false)+record('Cost return notes',saved.notes));
+}
+function teamSummaryDocument(project,current,revision){
+ const state=current.state,number=revision??state.activeCostSummaryVersion;
+ const summary=state.costSummaries?.find(item=>item.version===number);
+ if(!summary)throw Error('Confirm All returns received before printing a project cost summary.');
+ const claims=summary.returnVersions.map(version=>savedCostReturn(current,version));
+ const rows=claims.map(claim=>{
+  const paid=summary.payments[claim.version],decision=summary.noPayments?.[claim.version];
+  const outcome=paid?'Paid '+paid.paidOn+' · '+paid.paymentNumber:decision?'No payment authorised · '+decision.reference+' · '+decision.reason:'No payment recorded at confirmation';
+  return '<tr><td>'+escape(claim.technicianName||'Earlier project-level return')+'</td><td>'+escape(claim.version)+'</td><td>'+escape(claim.receivedOn||'Unknown')+'</td><td>'+money(claim.totalCents)+'</td><td>'+escape(outcome)+'</td></tr>';
+ });
+ for(const nil of summary.noCosts)rows.push('<tr><td>'+escape(nil.technicianName)+'</td><td colspan="2">No costs confirmed '+escape(nil.confirmedOn)+'</td><td>'+money(0)+'</td><td>No reimbursement due</td></tr>');
+ const support=claims.map(claim=>'<h3>'+escape(claim.technicianName||'Earlier project-level return')+' · return '+escape(claim.version)+'</h3>'+quoteTable(claim,'Return total',false)+record('Original return',claim.sourceFileName)+record('Notes',claim.notes)).join('');
+ return htmlDocument('Cost summary for Finance — '+project.reference+' / revision '+summary.version,
+  record('Project',project.title)+record('Client',project.clientName)+record('All returns received',summary.confirmedOn)+record('Confirmed by',summary.actor?.displayName)+
+  record('Assigned technicians at confirmation',summary.members.map(member=>member.name).join(', '))+
+  '<table><thead><tr><th>Technician</th><th>Return</th><th>Received</th><th>Actual cost</th><th>Payment at confirmation</th></tr></thead><tbody>'+rows.join('')+'</tbody></table>'+
+  record('Total actual cost',money(summary.totalCents))+(support?'<h2>Supporting cost lines</h2>'+support:''));
 }
 function printCostDocument(html){
  const page=new DOMParser().parseFromString(html,'text/html');
@@ -219,25 +244,33 @@ export function renderWorkflowRequestDownloads(parent,project,{assessment=true,t
  if(assessment)buttons.append(action('Download Assessment Request',()=>prepare('assessment')));
  if(task)buttons.append(action('Download Work Request',()=>prepare('task')));
 }
-export function renderSavedDocumentDownloads(parent,project,{cover=true,costReturn=true,returns=[]}={}){
+export function renderSavedDocumentDownloads(parent,project,{cover=true,costReturn=true,returns=[],summaries=[],memberCosts=false}={}){
  const feedback=node('div',null,'report-toolbar'),buttons=node('div',null,'actions report-toolbar');parent.append(buttons,feedback);
- const selection={revision:returns.at(-1)?.version};
+ const aggregate=memberCosts||summaries.length>0||returns.some(item=>item.technicianId);
+ const selection={revision:returns.at(-1)?.version,summary:summaries.at(-1)?.version};
+ if(summaries.length>1)field(buttons,'Cost summary revision',selection,'summary','text',summaries.slice().reverse().map(s=>[s.version,'Revision '+s.version+' · '+s.confirmedOn]));
  const revisionPicker=costReturn&&returns.length>1?field(buttons,'Cost return revision',selection,'revision','text',returns.slice().reverse().map(r=>[r.version,'Revision '+r.version+(r.receivedOn?' · '+r.receivedOn:'')])):null;
  const prepare=async(kind,print=false)=>{try{
-  const revision=selection.revision==null?null:Number(selection.revision);
+  const selected=kind==='summary'&&aggregate?selection.summary:selection.revision;
+  const revision=selected==null?null:Number(selected);
   const read=async()=>{const p=await request('projects/'+project.id);return Promise.all([Promise.resolve(p),request(`projects/${p.id}/lifecycle`),...(kind==='cover'?[request('clients/'+p.clientId),request(`projects/${p.id}/admin-details`)]:[])]);};
   const before=await read(),[p,current,client,details]=before;
-  const renderer=kind==='summary'?costSummaryDocument:costReturnDocument;
+  const renderer=kind==='legacy-summary'?legacyCostSummary:kind==='summary'?costSummaryDocument:costReturnDocument;
   const html=kind==='cover'?projectCoverDocument(p,current,client,details):renderer(p,current,revision);
   assertStableDocumentSnapshot(before,await read());
   if(print){printCostDocument(html);return;}
-  const suffix=kind==='cover'?'cover-sheet':(kind==='summary'?'cost-summary-':'cost-return-')+savedCostReturn(current,revision).version;
+  const suffix=kind==='cover'?'cover-sheet':(kind==='legacy-summary'?'earlier-cost-summary-':kind==='summary'?'cost-summary-':'cost-return-')+(kind==='summary'&&aggregate?revision:savedCostReturn(current,revision).version);
   download(new Blob([html],{type:'text/html'}),safeName(p.reference)+'-'+suffix+'.html');
   feedback.replaceChildren(notice('Saved document downloaded. Open it to review, print or save as PDF.'));
  }catch(e){feedback.replaceChildren(notice(e.message,true));}};
  if(cover)buttons.append(action('Download enquiry / project cover sheet',()=>prepare('cover')));
- if(costReturn)buttons.append(action('Print cost return',()=>prepare('cost',true)),action('Print cost summary',()=>prepare('summary',true)),
-  action('Download saved cost return',()=>prepare('cost')),action('Download cost summary for Finance',()=>prepare('summary')));
+ if(costReturn&&returns.length)buttons.append(action('Print cost return',()=>prepare('cost',true)),action('Download saved cost return',()=>prepare('cost')));
+ if(aggregate?summaries.length:costReturn&&returns.length)buttons.append(action('Print cost summary',()=>prepare('summary',true)),action('Download cost summary for Finance',()=>prepare('summary')));
+ if(aggregate&&returns.some(item=>!item.technicianId)){
+  const historic=action('Print earlier project-level cost summary',()=>prepare('legacy-summary',true));
+  const show=()=>{historic.hidden=!!returns.find(item=>item.version===Number(selection.revision))?.technicianId;};
+  revisionPicker?.addEventListener('change',show);show();buttons.append(historic);
+ }
  if(costReturn&&returns.some(item=>item.sourceFileId)){
   const selectedReturn=()=>returns.find(item=>item.version===Number(selection.revision));
   const original=action('Download technician’s original',async()=>{try{
@@ -279,7 +312,7 @@ export function renderFinancePack(parent,project,lifecycle,options={}){
   assertStableDocumentSnapshot(before,await read());
   const a=node('a');a.href=draft.href;a.click();feedback.replaceChildren(notice('Email draft prepared. Review the recipient and quote revision, choose your sending mailbox, and attach the quote manually. Nothing was sent or recorded as sent.'));
  }catch(e){feedback.replaceChildren(notice(e.message,true));}}));
- if(!options.quoteOnly)renderSavedDocumentDownloads(section,project,{costReturn:Boolean(lifecycle.state?.costReturns?.length),returns:lifecycle.state?.costReturns});
+ if(!options.quoteOnly)renderSavedDocumentDownloads(section,project,{costReturn:Boolean(lifecycle.state?.costReturns?.length),returns:lifecycle.state?.costReturns,summaries:lifecycle.state?.costSummaries,memberCosts:usesTeamCostSummary(lifecycle)});
  if(!options.quoteOnly){
   if(options.openAssessment&&!availability?.assessment)section.append(action('Prepare assessment documents and emails',options.openAssessment));
   renderWorkflowRequestDownloads(section,project,{assessment:!options.openAssessment&&!availability?.assessment,task:!availability?.task});
@@ -288,10 +321,18 @@ export function renderFinancePack(parent,project,lifecycle,options={}){
   feedback.replaceChildren(notice('Preparing saved project details…'));
   const readSnapshot=()=>readFinanceSnapshot(project.id);
   const snapshot=await readSnapshot(),[p,current,ops,files,plan,business,people]=snapshot;assertStableFinanceSnapshot(snapshot,snapshot);
-  const state=current.state,quote=state?.quotes?.at(-1),rows=[workflowNotice(current),record('Project number',p.reference),record('Client',p.clientName),record('Work',p.summary),record('Purpose',d.purpose==='before_work'?'Approval and payment before work':'Final costs and reconciliation'),record('Prepared',new Date().toLocaleString('en-AU')),record('NDIS reference',plan.ndisNumber),record('Issuer',business.issuerName),record('ABN',business.abn),record('Office',business.address),'<h2>Current estimate</h2>',quoteTable(quote),'<h2>Recorded decisions</h2>',decisionSummary(state,people.items),'<h2>Actual cost return and summary</h2><p>Distinguish technical-member expenses and travel/work time from the reviewed service charge. Check the quantities and rates before sending to Finance; no reimbursement or fee is calculated from an assumed rate.</p>',(state?.costReturns?.length?quoteTable(state.costReturns.at(-1),'Actual cost total'):'<p>No actual cost return recorded yet.</p>'),record('Cost return notes',state?.costReturns?.at(-1)?.notes),record('Difference from quote',state?.costReturns?.length&&quote?money(state.costReturns.at(-1).totalCents-quote.totalCents):'Not recorded'),'<p>Differences require an explicit decision by the customer and Finance; they are not automatically billed.</p>','<h2>Hours and invoices</h2>',record('Recorded hours',String(ops.actualMinutes/60)),invoiceSummary(ops.invoices,plan.payments),'<h2>Files in this pack</h2>',`<ul>${files.items.map(f=>`<li>${escape(f.name)}</li>`).join('')}</ul>`,'<p>External Finance records remain authoritative for invoicing and payment. Recorded confirmations are operator-entered evidence, not a bank verification. Review this pack before sending.</p>'];
+  const state=current.state,quote=state?.quotes?.at(-1);
+  const named=usesTeamCostSummary(current);
+  const final=state?.costSummaries?.find(s=>s.version===state.activeCostSummaryVersion);
+  if(d.purpose==='completion'&&named&&!final)throw Error('Confirm All returns received before preparing the final Finance pack.');
+  const returnTotal=named?final?.totalCents:state?.costReturns?.at(-1)?.totalCents;
+  const rows=[workflowNotice(current),record('Project number',p.reference),record('Client',p.clientName),record('Work',p.summary),record('Purpose',d.purpose==='before_work'?'Approval and payment before work':'Final costs and reconciliation'),record('Prepared',new Date().toLocaleString('en-AU')),record('NDIS reference',plan.ndisNumber),record('Issuer',business.issuerName),record('ABN',business.abn),record('Office',business.address),'<h2>Current estimate</h2>',quoteTable(quote),'<h2>Recorded decisions</h2>',decisionSummary(state,people.items),'<h2>Actual cost return and summary</h2><p>Distinguish technical-member expenses and travel/work time from the reviewed service charge. Check the quantities and rates before sending to Finance; no reimbursement or fee is calculated from an assumed rate.</p>',(named?(final?record('Confirmed project cost total',money(final.totalCents)):record('Cost summary','Awaiting all returns')):state?.costReturns?.length?quoteTable(state.costReturns.at(-1),'Actual cost total'):'<p>No actual cost return recorded yet.</p>'),(named?'':record('Cost return notes',state?.costReturns?.at(-1)?.notes)),record('Difference from quote',returnTotal!=null&&quote?money(returnTotal-quote.totalCents):'Not recorded'),'<p>Differences require an explicit decision by the customer and Finance; they are not automatically billed.</p>','<h2>Hours and invoices</h2>',record('Recorded hours',String(ops.actualMinutes/60)),invoiceSummary(ops.invoices,plan.payments),'<h2>Files in this pack</h2>',`<ul>${files.items.map(f=>`<li>${escape(f.name)}</li>`).join('')}</ul>`,'<p>External Finance records remain authoritative for invoicing and payment. Recorded confirmations are operator-entered evidence, not a bank verification. Review this pack before sending.</p>'];
   if(files.items.reduce((n,f)=>n+f.size,0)>50*1024*1024)throw Error('Project files exceed the 50 MB email-pack limit. Download required files individually from Project files instead.');
   const entries=[{name:'Finance-summary.html',data:htmlDocument('Finance handoff — '+p.reference,rows.join(''))},{name:'Project-record.json',data:JSON.stringify({purpose:d.purpose,preparedAt:new Date().toISOString(),project:p,lifecycle:current,operations:ops,ndisReference:plan.ndisNumber,attachments:files.items},null,2)}];
-  if(d.purpose==='completion'&&state?.costReturns?.length){
+  if(d.purpose==='completion'&&final){
+   entries.push({name:'Cost-summary-'+final.version+'.html',data:teamSummaryDocument(p,current,final.version)});
+   for(const version of final.returnVersions)entries.push({name:'Cost-return-'+version+'.html',data:costReturnDocument(p,current,version)});
+  }else if(d.purpose==='completion'&&state?.costReturns?.length){
    const revision=state.costReturns.at(-1).version;
    entries.push({name:'Cost-return-'+revision+'.html',data:costReturnDocument(p,current,revision)},
     {name:'Cost-summary-'+revision+'.html',data:costSummaryDocument(p,current,revision)});

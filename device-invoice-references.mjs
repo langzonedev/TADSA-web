@@ -1,5 +1,6 @@
 import {installModelExtensions,fail} from './device-model.mjs';
 import {validateInvoiceReferences} from './invoice-references-model.js';
+import {hasMemberCosts} from './lifecycle-model.js';
 import {emptyFinanceStatus,financeStatusCommand,resolvesFinalisedInvoice} from './finance-status-model.js';
 installModelExtensions(ctx => {
  const {d,parts,method,input,find,version,bump,actorContext,phase} = ctx;
@@ -13,6 +14,7 @@ installModelExtensions(ctx => {
  const after=financeStatusCommand(input);
  version(project,input.version);
  const state=d.lifecycles?.[projectId];
+ if(hasMemberCosts(state)&&(before.reimbursedOn!==after.reimbursedOn||before.paymentNumber!==after.paymentNumber))fail('Record each technician reimbursement against their individual return.');
  if(project.status==='closed'||state?.closed||(state?.financeFinalisation&&!resolvesFinalisedInvoice(before,after)))fail('Reopen or revise the project before changing Finance confirmations.');
  if(Object.keys(after).every(key=>before[key]===after[key]))return read();
  d.financeStatuses??={};

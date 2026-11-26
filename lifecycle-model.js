@@ -8,6 +8,33 @@ const optionalExact=(v,required,optional)=>{if(!v||typeof v!=='object'||Array.is
 const bikeCount=(v,min=1)=>{if(!Number.isSafeInteger(v)||v<min||v>10000)fail(`Record a whole bike count between ${min} and 10,000.`);return v;};
 export const lifecycleCostLabels=Object.freeze({labour:'Labour / time',materials:'Materials / existing expenses',travel:'Travel',consumables:'Consumables',other:'Other costs'});
 export const lifecycleCostTypes=Object.freeze(Object.keys(lifecycleCostLabels));
+export function currentCostReturns(state){
+ const returns=state?.costReturns??[];
+ const superseded=new Set(returns.map(item=>item.supersedesVersion).filter(Boolean));
+ // Historical unnamed entries replaced the entire previous project return.
+ const legacy=returns.findLast(item=>!item.technicianId);
+ return returns.filter(item=>item===legacy||item.technicianId&&!superseded.has(item.version));
+}
+export function hasMemberCosts(state){
+ return Boolean(state?.costReturns?.some(item=>item.technicianId)||Object.keys(state?.memberNoCosts??{}).length||state?.costSummaries?.length);
+}
+export function currentCostHandoff(state){
+ const handoff=state?.financeHandoff;
+ if(!handoff?.sentOn)return false;
+ if(handoff.costSummaryVersion)return handoff.costSummaryVersion===state.activeCostSummaryVersion;
+ return Boolean(handoff.costReturnVersion&&handoff.costReturnVersion===state.costReturns?.at(-1)?.version);
+}
+export function assertCostTeamChange(state,memberIds){
+ const frozen=state?.costSummaries?.find(s=>s.version===state.activeCostSummaryVersion);
+ if(frozen&&(memberIds.length!==frozen.members.length||frozen.members.some(member=>!memberIds.includes(member.id)))){
+  fail('Reopen the cost summary before changing the technical team.');
+ }
+}
+function costMember(members,id){
+ const member=members?.find(member=>member.id===id);
+ if(!member||typeof id!=='string'||!/^person-[a-z\d-]{1,90}$/i.test(id))fail('Select a technician assigned to this project.');
+ return {id,name:text(member.name,120)};
+}
 const currentQuote=s=>s.quotes.at(-1);
 const readyAssessment=s=>s.assessmentDecision&&(!s.assessmentDecision.required||s.assessment);
 export function awaitingAssessmentReport(state){
@@ -31,8 +58,7 @@ export function canCancelEnquiryWithoutFinance(state,{actualMinutes,hasInvoice,i
   !actualMinutes && !hasInvoice && !invoiceRequired && !assessmentComplete && !workApproved);
 }
 export function projectLifecycleStatus(state,{projectStatus,programme}={}){
- const handoff=state?.financeHandoff;
- const sentToFinance=Boolean(handoff?.sentOn && handoff.costReturnVersion===state?.costReturns?.at(-1)?.version);
+ const sentToFinance=currentCostHandoff(state);
  if(state?.cancellation){
   if(state.cancellation.closedWithoutFinance===true)return 'Enquiry';
   if(state.closed||projectStatus==='closed')return 'Cancelled';
@@ -74,9 +100,14 @@ export function applyLifecycle(previous,action,data,context){
  const paymentPolicy=requiresFreedomWheelsPayment(previous,context)?{paymentPolicy:'fw-paid-v1'}:{};const quotePolicy=context.enforceQuotePolicy===true?{quotePolicy:'q22-v1'}:{};const programmeEvidence={...quotePolicy,...(Object.hasOwn(context,'programme')?{programme:context.programme}:{}),...paymentPolicy};if(Object.hasOwn(context,'programme')&&!['','TAD','FW'].includes(context.programme))fail('Invalid programme evidence.');
  if(action==='begin'){exact(data,[]);if(previous)fail('This project already uses the lifecycle.');if(context.projectStatus==='closed')fail('Reopen this historical project before adopting its lifecycle.');const s=createLifecycle(context.lifecycleSchema??2);s.history.push({action,data:{},actor,at,...programmeEvidence});return s;}
  if(!previous)fail('Start the project lifecycle first.');const s=structuredClone(previous);if(paymentPolicy.paymentPolicy&&(previous.acceptance||previous.workRequest||previous.work))s.freedomWheelsPaymentRequired=true;
- if(s.cancellation&&!['costReturn','financeHandoff','financeFinalise','close','reopen'].includes(action))fail('Cancellation requires finance finalisation and closure before reopening.');
+ if(s.cancellation&&!['costReturn','memberNoCosts','returnPayment','returnNoPayment','finaliseCostSummary','reviseCostSummary','financeHandoff','financeFinalise','close','reopen'].includes(action))fail('Cancellation requires finance finalisation and closure before reopening.');
  if(s.closed&&action!=='reopen')fail('Reopen the project before changing its lifecycle.');
  let value;
+ if(['costReturn','memberNoCosts','finaliseCostSummary'].includes(action)){
+  if(s.activeCostSummaryVersion||s.financeHandoff&&(hasMemberCosts(s)||data?.technicianId||action!=='costReturn'))fail('Reopen the cost summary before changing the returns included in it.');
+  if(s.financeFinalisation)fail('Finance is already finalised; reopen before changing actual costs.');
+  if(!s.work&&!s.cancellation&&!lifecycleGate(s,context).allowed)fail('Start or authorise work, or record cancellation, before returning actual costs.');
+ }
  if(action==='assessmentDecision'||action==='returnTo'&&['enquiry','assessment'].includes(data?.target)){
   delete s.assessmentPack;delete s.assessmentDispatch;
  }
@@ -129,13 +160,85 @@ export function applyLifecycle(previous,action,data,context){
   case 'work':optionalExact(data,['status','notes'],['deliveredOn','deliveredQuantity']);if(!['in_progress','complete'].includes(data.status))fail('Choose work in progress or completed.');if(!lifecycleGate(s,context).allowed)fail(lifecycleGate(s,context).reasons.join(' '));if(context.onHold||context.clientStopped)fail('Resolve the project hold and client stop before work continues.');if(s.signoff)fail('Customer sign-off is already recorded.');value={status:data.status,notes:text(data.notes),at,actor};if(Object.hasOwn(data,'deliveredOn')||Object.hasOwn(data,'deliveredQuantity')){if(data.status!=='complete')fail('Record final delivery with completed work.');if(context.programme!=='FW')fail('Bike delivery is only recorded for Freedom Wheels projects.');value.deliveredOn=occurredOn(data.deliveredOn);value.deliveredQuantity=bikeCount(data.deliveredQuantity);}s.work=value;break;
   case 'signoff':exact(data,['acceptedBy','reference','signedOn','notes']);if(s.work?.status!=='complete')fail('Complete work before recording customer sign-off.');if(s.signoff)fail('Customer sign-off is already recorded.');value={acceptedBy:text(data.acceptedBy,120),reference:text(data.reference,300),signedOn:s.schema===2?occurredOn(data.signedOn):day(data.signedOn),notes:text(data.notes,2000,false),at,actor};s.signoff=value;break;
   case 'costReturn':{
-   optionalExact(data,['lines','notes'],['receivedOn','sourceFileId']);if(s.financeFinalisation)fail('Finance is already finalised; reopen before changing actual costs.');if(!s.work&&!s.cancellation)fail('Start work or record cancellation before returning actual costs.');if(!Array.isArray(data.lines)||data.lines.length>20)fail('Record at most twenty actual-cost lines.');const lines=data.lines.map(l=>{exact(l,['type','description','quantityMilli','unitPriceCents']);if(!lifecycleCostTypes.includes(l.type)||!Number.isSafeInteger(l.quantityMilli)||l.quantityMilli<1||l.quantityMilli>1000000||!Number.isSafeInteger(l.unitPriceCents)||l.unitPriceCents<0||l.unitPriceCents>100000000)fail('Use valid quantities and integer-cent prices.');return {...l,description:text(l.description,300),amountCents:Math.round(l.quantityMilli*l.unitPriceCents/1000)};});const totalCents=lines.reduce((n,l)=>n+l.amountCents,0);if(totalCents>1000000000)fail('Actual-cost total is too large.');s.costReturns??=[];value={version:s.costReturns.length+1,lines,totalCents,notes:text(data.notes,2000,!lines.length),at,actor};if(Object.hasOwn(data,'receivedOn'))value.receivedOn=occurredOn(data.receivedOn);
+   optionalExact(data,['lines','notes'],['receivedOn','sourceFileId','technicianId','supersedesVersion']);
+   const named=Object.hasOwn(data,'technicianId');
+   const member=named?costMember(context.assignedTechnicians,data.technicianId):null;
+   if(!member&&(hasMemberCosts(s)||context.assignedTechnicians?.length))fail('Select the technician whose return you are recording.');
+   if(member&&!data.receivedOn)fail('Record when this technician’s return was received.');
+   if(Object.hasOwn(data,'supersedesVersion')){
+    const prior=currentCostReturns(s).find(item=>item.version===data.supersedesVersion);
+    if(!member||prior?.technicianId!==member.id||s.returnPayments?.[prior.version]||s.returnNoPayments?.[prior.version])fail('Only a current unpaid return for the same technician can be corrected.');
+   }
+   if(!Array.isArray(data.lines)||data.lines.length>20)fail('Record at most twenty actual-cost lines.');const lines=data.lines.map(l=>{exact(l,['type','description','quantityMilli','unitPriceCents']);if(!lifecycleCostTypes.includes(l.type)||!Number.isSafeInteger(l.quantityMilli)||l.quantityMilli<1||l.quantityMilli>1000000||!Number.isSafeInteger(l.unitPriceCents)||l.unitPriceCents<0||l.unitPriceCents>100000000)fail('Use valid quantities and integer-cent prices.');return {...l,description:text(l.description,300),amountCents:Math.round(l.quantityMilli*l.unitPriceCents/1000)};});const totalCents=lines.reduce((n,l)=>n+l.amountCents,0);if(totalCents>1000000000)fail('Actual-cost total is too large.');s.costReturns??=[];value={version:s.costReturns.length+1,lines,totalCents,notes:text(data.notes,2000,!lines.length),at,actor};if(Object.hasOwn(data,'receivedOn'))value.receivedOn=occurredOn(data.receivedOn);
    if(Object.hasOwn(data,'sourceFileId')){
     const file=context.costReturnFile;
     if(typeof data.sourceFileId!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(data.sourceFileId)||file?.id!==data.sourceFileId)fail('Choose an available original from this project.');
     value.sourceFileId=file.id;value.sourceFileName=text(file.name,180);
    }
+   if(member){
+    if(!totalCents)fail('Record a positive actual cost, or confirm that the technician has no costs.');
+    value.technicianId=member.id;value.technicianName=member.name;
+    if(Object.hasOwn(data,'supersedesVersion'))value.supersedesVersion=data.supersedesVersion;
+    if(s.memberNoCosts)delete s.memberNoCosts[member.id];
+   }
    s.costReturns.push(value);if(s.schema===2)s.financeHandoff=null;break;
+  }
+  case 'memberNoCosts':{
+   exact(data,['technicianId','confirmedOn']);
+   const member=costMember(context.assignedTechnicians,data.technicianId);
+   if(currentCostReturns(s).some(item=>item.technicianId===member.id))fail('This technician already has a cost return.');
+   if(s.memberNoCosts?.[member.id])fail('No costs have already been confirmed for this technician.');
+   value={technicianId:member.id,technicianName:member.name,confirmedOn:occurredOn(data.confirmedOn),at,actor};
+   (s.memberNoCosts??={})[member.id]=value;
+   break;
+  }
+  case 'returnPayment':
+  case 'returnNoPayment':{
+   const paid=action==='returnPayment';
+   exact(data,paid?['returnVersion','paidOn','paymentNumber']:['returnVersion','confirmedOn','reference','reason']);
+   if(actor.role!=='administrator')fail('An administrator must record a technician reimbursement.',403);
+   if(s.financeFinalisation)fail('Reopen Finance before recording another reimbursement.');
+   const claim=currentCostReturns(s).find(item=>item.version===data.returnVersion&&item.technicianId);
+   if(!claim)fail('Select a current technician return for reimbursement.');
+   if(s.returnPayments?.[claim.version]||s.returnNoPayments?.[claim.version])fail('This return already has a recorded reimbursement or authorised no-payment decision.');
+   if(!paid){
+    const confirmedOn=occurredOn(data.confirmedOn);
+    if(confirmedOn<claim.receivedOn)fail('A Finance decision cannot precede receipt of the return.');
+    value={returnVersion:claim.version,confirmedOn,reference:text(data.reference,120),reason:text(data.reason,1000),at,actor};
+    (s.returnNoPayments??={})[claim.version]=value;break;
+   }
+   const paidOn=occurredOn(data.paidOn);
+   if(paidOn<claim.receivedOn)fail('The reimbursement date cannot precede the return received date.');
+   value={returnVersion:claim.version,paidOn,paymentNumber:text(data.paymentNumber,120),at,actor};
+   if(/[\r\n\t]/.test(value.paymentNumber))fail('Use a payment number without line breaks or tabs.');
+   (s.returnPayments??={})[claim.version]=value;
+   break;
+  }
+  case 'finaliseCostSummary':{
+   exact(data,['confirmedOn']);
+   const team=context.assignedTechnicians;
+   if(!Array.isArray(team)||team.length>20||new Set(team.map(member=>member.id)).size!==team.length)fail('Review the assigned technical team.');
+   const members=team.map(member=>costMember(team,member.id)).sort((a,b)=>a.id.localeCompare(b.id));
+   const claims=currentCostReturns(s);
+   const noCosts=members.map(member=>s.memberNoCosts?.[member.id]).filter(Boolean);
+   if(!members.length&&!claims.length)fail('Assign the technical members or record the project cost return first.');
+   const missing=members.filter(member=>!claims.some(item=>item.technicianId===member.id)&&!s.memberNoCosts?.[member.id]);
+   if(missing.length)fail('Record a return or confirm no costs for '+missing.map(member=>member.name).join(', ')+'.');
+   const confirmedOn=occurredOn(data.confirmedOn);
+   if(claims.some(item=>item.receivedOn>confirmedOn)||noCosts.some(item=>item.confirmedOn>confirmedOn))fail('Confirm all returns on or after their receipt and no-cost confirmation dates.');
+   const returnVersions=claims.map(item=>item.version);
+   const payments=Object.fromEntries(claims.filter(item=>s.returnPayments?.[item.version]?.paidOn<=confirmedOn).map(item=>[item.version,s.returnPayments[item.version]]));
+   const noPayments=Object.fromEntries(claims.filter(item=>s.returnNoPayments?.[item.version]?.confirmedOn<=confirmedOn).map(item=>[item.version,s.returnNoPayments[item.version]]));
+   value={version:(s.costSummaries?.length??0)+1,confirmedOn,members,returnVersions,noCosts,payments,noPayments,totalCents:claims.reduce((total,item)=>total+item.totalCents,0),at,actor};
+   (s.costSummaries??=[]).push(value);s.activeCostSummaryVersion=value.version;
+   break;
+  }
+  case 'reviseCostSummary':{
+   exact(data,['reason']);
+   if(!s.activeCostSummaryVersion&&!s.financeHandoff)fail('There is no final cost summary to reopen.');
+   value={reason:text(data.reason),at,actor};
+   s.activeCostSummaryVersion=null;s.financeHandoff=null;s.financeFinalisation=null;
+   break;
   }
   case 'cancel':{
    optionalExact(data,['reason'],['cancelledQuantity']);if(s.cancellation)fail('Cancellation is already recorded.');
@@ -152,8 +255,32 @@ export function applyLifecycle(previous,action,data,context){
    }
    break;
   }
-  case 'financeHandoff':{if(s.schema!==2)fail('This workflow uses the earlier finance sequence.');exact(data,['costReturnVersion','reference','sentOn','notes']);if(!s.signoff&&!s.cancellation)fail('Record customer sign-off before the finance handoff.');if(!s.costReturns?.length||data.costReturnVersion!==s.costReturns.at(-1).version)fail('Send the current actual cost return and summary to Finance.');if(s.financeHandoff)fail('Finance handoff is already recorded for this cost return.');value={costReturnVersion:data.costReturnVersion,reference:text(data.reference,300),sentOn:occurredOn(data.sentOn),notes:text(data.notes,2000,false),at,actor};s.financeHandoff=value;break;}
-  case 'financeFinalise':exact(data,['reference','confirmedOn','notes',...(s.schema===2?['clientPaymentResolved','technicianPaymentResolved']:[])]);if(s.schema===2&&(!s.financeHandoff||s.financeHandoff.costReturnVersion!==s.costReturns?.at(-1)?.version))fail('Record the current cost summary handoff to Finance first.');if(s.schema===2&&(data.clientPaymentResolved!==true||data.technicianPaymentResolved!==true))fail('Finance must confirm client payment and technician reimbursement are resolved.');if(actor.role!=='administrator')fail('An administrator must record finance finalisation.',403);if(!s.signoff&&!s.cancellation)fail('Record customer sign-off before finance finalisation.');if(!s.costReturns?.length)fail('Record the actual cost return, including a no-cost explanation when appropriate.');if(s.financeFinalisation)fail('Finance finalisation is already recorded.');value={reference:text(data.reference,300),confirmedOn:s.schema===2?occurredOn(data.confirmedOn):day(data.confirmedOn),notes:text(data.notes,2000,false),costReturnVersion:s.costReturns.at(-1).version,verification:'operator-recorded-external',at,actor};if(s.schema===2)Object.assign(value,{clientPaymentResolved:true,technicianPaymentResolved:true});s.financeFinalisation=value;break;
+  case 'financeHandoff':{
+   if(s.schema!==2)fail('This workflow uses the earlier finance sequence.');
+   const summaryMode=hasMemberCosts(s)||context.assignedTechnicians?.length;
+   const key=summaryMode?'costSummaryVersion':'costReturnVersion';
+   exact(data,[key,'reference','sentOn','notes']);
+   if(!s.signoff&&!s.cancellation)fail('Record customer sign-off before the finance handoff.');
+   const version=summaryMode?s.activeCostSummaryVersion:s.costReturns?.at(-1)?.version;
+   if(!version||data[key]!==version)fail(summaryMode?'Confirm all returns and select the current final cost summary.':'Send the current actual cost return and summary to Finance.');
+   if(s.financeHandoff)fail('Finance handoff is already recorded for these costs.');
+   const sentOn=occurredOn(data.sentOn);
+   if(summaryMode&&sentOn<s.costSummaries.at(-1).confirmedOn)fail('The sent date cannot precede the cost summary confirmation.');
+   value={[key]:version,reference:text(data.reference,300),sentOn,notes:text(data.notes,2000,false),at,actor};s.financeHandoff=value;break;
+  }
+  case 'financeFinalise':{
+   exact(data,['reference','confirmedOn','notes',...(s.schema===2?['clientPaymentResolved','technicianPaymentResolved']:[])]);
+   if(s.schema===2&&!currentCostHandoff(s))fail('Record the current cost summary handoff to Finance first.');
+   if(hasMemberCosts(s)&&!s.activeCostSummaryVersion)fail('Confirm all returns and finalise the cost summary first.');
+   if(currentCostReturns(s).some(item=>item.technicianId&&!s.returnPayments?.[item.version]&&!s.returnNoPayments?.[item.version]))fail('Record reimbursement or an authorised no-payment decision for each technician cost return before finalising Finance.');
+   if(s.schema===2&&(data.clientPaymentResolved!==true||data.technicianPaymentResolved!==true))fail('Finance must confirm client payment and technician reimbursement are resolved.');
+   if(actor.role!=='administrator')fail('An administrator must record finance finalisation.',403);
+   if(!s.signoff&&!s.cancellation)fail('Record customer sign-off before finance finalisation.');
+   if(!s.costReturns?.length&&!s.activeCostSummaryVersion)fail('Record the actual cost return, including a no-cost explanation when appropriate.');
+   if(s.financeFinalisation)fail('Finance finalisation is already recorded.');
+   value={reference:text(data.reference,300),confirmedOn:s.schema===2?occurredOn(data.confirmedOn):day(data.confirmedOn),notes:text(data.notes,2000,false),...(s.activeCostSummaryVersion?{costSummaryVersion:s.activeCostSummaryVersion}:{costReturnVersion:s.costReturns.at(-1).version}),verification:'operator-recorded-external',at,actor};
+   if(s.schema===2)Object.assign(value,{clientPaymentResolved:true,technicianPaymentResolved:true});s.financeFinalisation=value;break;
+  }
   case 'close':exact(data,['reason']);if(!s.financeFinalisation||(!s.cancellation&&(!s.signoff||s.work?.status!=='complete')))fail('Finish work, customer sign-off and finance finalisation before closing.');if(context.onHold||context.clientStopped){if(!s.cancellation)fail('Resolve the hold before closing the project.');}value={reason:text(data.reason),at,actor};s.closed=value;break;
   case 'reopen':exact(data,['reason']);if(!s.closed)fail('This project is not closed.');value={reason:text(data.reason)};s.closed=null;s.signoff=null;s.financeFinalisation=null;if(s.schema===2){s.workRequest=null;s.financeHandoff=null;}if(s.cancellation){s.cancellation=null;clearFollowingQuote(s);s.work=null;if(s.quotes.length)s.revisionRequested={...value,at,actor};}else s.work={status:s.schema===2?'paused':'in_progress',notes:value.reason,at,actor};break;
   default:fail('Choose a supported lifecycle action.');

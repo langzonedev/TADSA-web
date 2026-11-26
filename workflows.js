@@ -7,6 +7,7 @@ import {attachAddressLookup,renderTravelComparison} from './address-lookup.js';
 import {AUSTRALIAN_STATES} from './client-address.js';
 import {reviewDay} from './project-details-model.js';
 import {createRecordPicker,selectionLabel} from './record-picker.js';
+import {readReferralHtml,readReferralText,referralRows,validateWebsiteReferral} from './website-referral.js';
 // Call-intake workflows. All records in this development workspace are fictional.
 const drafts = new Map();
 registerDraftSource('workflow',()=>[...drafts].filter(([,d])=>d.dirty||d.pending).map(([key,d])=>({key,pending:Boolean(d.pending)})));
@@ -94,7 +95,8 @@ function intakeAddressPayload(d){
 }
 
 async function newClient(view, arg) {
-  const key = 'new-client'; const d = getDraft(key, { name: '', email: '', phone: '', language: 'English', ...emptyIntakeAddress,allowDuplicate: false, forProject: arg === 'project' });
+  const referral=arg==='project'?drafts.get('new-project')?.websiteReferral?.answers:null;
+  const key = 'new-client'; const d = getDraft(key, { name: referral?.client??'', email: '', phone: referral?.mobile||referral?.phone||'', language: 'English', ...emptyIntakeAddress,allowDuplicate: false, forProject: arg === 'project' });
   if (arg === 'project') d.forProject = true;
   title(view, 'New client', 'Start with the details you know. A client can be saved before there is a project.');
   const box = panel('Client details'); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New enquiry':key==='new-client'?'New client':'Person details'});
@@ -246,6 +248,56 @@ async function directories(loadCalendars=true,source='technicians') {
 }
 function allocationValid(form, d, notice) { if (!valid(form)) return false; if (d.needsAcknowledgement && !d.assignmentAcknowledged) { notice.replaceChildren(note('Review the technician warning and tick the acknowledgement, or leave the request unassigned.', true)); notice.scrollIntoView({block:'nearest'}); return false; } return true; }
 function reviewList(items) { const dl = el('dl', null, 'review-list'); for (const [label,value] of items) { dl.append(el('dt',label),el('dd',value)); } return dl; }
+function websiteEmailIntake(form,d,draw){
+  if(d.websiteReferral){
+    const original=d.websiteReferral;
+    const source=el('details');source.append(el('summary','Reviewed website enquiry'),reviewList([['Received',original.receivedOn],...referralRows(original.answers)]));
+    source.append(button('Remove website details from draft',()=>{
+      if(d.title===original.answers.need.split('\n')[0].slice(0,120))d.title='';
+      if(d.summary===original.answers.need.slice(0,2000))d.summary='';
+      if(d.followUpOn===original.receivedOn)d.followUpOn=reviewDay();
+      delete d.websiteReferral;touch(d);draw();
+    }));
+    form.append(note('Website enquiry for '+d.websiteReferral.answers.client+'. Check the client and look for an existing enquiry before saving.'),source);
+    return;
+  }
+  const box=el('details');box.append(el('summary','Use website enquiry email'));
+  box.append(el('p','Copy the form table from the office email, or choose a saved HTML copy. Keep the original PDF and any supplied photos for Project files.','field-help'));
+  const fileLabel=el('label','Saved website email','workflow-field'),file=el('input');file.type='file';file.accept='.html,.htm,text/html';fileLabel.append(file);
+  const copyLabel=el('label','Paste website form','workflow-field'),paste=el('textarea');paste.rows=4;paste.maxLength=1000000;copyLabel.append(paste);
+  const dateLabel=el('label','Date office received enquiry','workflow-field'),date=el('input');date.type='date';date.max=reviewDay();dateLabel.append(date);
+  const preview=el('div'),message=el('div');let answers=null,revision=0;
+  function reset(){++revision;answers=null;preview.replaceChildren();message.replaceChildren();}
+  function show(parsed){
+    answers=parsed;
+    const use=button('Use reviewed details',()=>{
+      try{
+        const imported=validateWebsiteReferral({receivedOn:date.value,answers});
+        d.websiteReferral=imported;
+        d.clientId='';
+        if(!d.title)d.title=imported.answers.need.split('\n')[0].slice(0,120);
+        if(!d.summary)d.summary=imported.answers.need.slice(0,2000);
+        d.followUpOn=imported.receivedOn;touch(d);draw();
+      }catch(error){message.replaceChildren(note(error.message,true));}
+    });
+    preview.replaceChildren(el('h3','Review website answers'),reviewList(referralRows(parsed)),el('p','Check these answers against the original. The CRM retains the answers shown. You choose the client separately.','field-help'),use);
+  }
+  paste.addEventListener('input',()=>{file.value='';reset();});
+  paste.addEventListener('paste',event=>{
+    const html=event.clipboardData?.getData('text/html');if(!html)return;
+    try{const parsed=readReferralHtml(html);event.preventDefault();file.value='';paste.value=event.clipboardData.getData('text/plain');reset();show(parsed);}catch{}
+  });
+  file.addEventListener('change',async()=>{
+    reset();paste.value='';const version=revision,chosen=file.files[0];if(!chosen)return;
+    try{if(chosen.size>1000000)throw Error('Choose one HTML notification under 1 MB.');const html=await chosen.text();if(version===revision&&box.isConnected)show(readReferralHtml(html));}
+    catch(error){if(version===revision)message.replaceChildren(note(error.message,true));}
+  });
+  const read=button('Preview pasted form',()=>{
+    reset();try{show(readReferralText(paste.value));}catch(error){message.replaceChildren(note(error.message,true));}
+  });
+  const controls=el('div',null,'form-grid');controls.append(fileLabel,copyLabel,read,dateLabel,preview,message);
+  box.append(controls);form.append(box);
+}
 async function newProject(view, clientId) {
   const key = 'new-project'; const d = getDraft(key, { step: clientId ? 2 : 1, clientId: clientId || '', title: '', summary: '', kind: 'Assessment', followUpOn:reviewDay(),fundingStatus:'unknown',payerId:'',fundingNotes:'',requiredSkills:[],technicianId:'' });
   const dirs = await directories();
@@ -258,6 +310,7 @@ async function newProject(view, clientId) {
     slot.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.destroy());slot.replaceChildren(); steps.querySelectorAll('li').forEach((n,i) => i+1 === d.step ? n.setAttribute('aria-current','step') : n.removeAttribute('aria-current'));
     const box = panel(`Step ${d.step} of 4 — ${['Client','Project details','Funding & technical team','Review'][d.step-1]}`); const form = el('form', null, 'form-grid');trackDraftForm(form,'workflow',key,{label:key==='new-project'?'New enquiry':key==='new-client'?'New client':'Person details'}); const notice = el('div');
     if (d.step === 1) {
+      websiteEmailIntake(form,d,draw);
       const picker=createRecordPicker({label:'Existing client',kind:'clients',selectedId:d.clientId,required:true,onChange:async(id,item)=>{d.clientId=id;selected=item?{person:{name:item.name},details:{residentialAddress:item.address}}:null;touch(d);if(id){try{const client=await request('clients/'+id);if(d.clientId===id){selected=client;if(d.step===3&&slot.isConnected)draw();}}catch{}}}});picker.element.recordPicker=picker;form.append(picker.element,link('Create new client','new-client/project','button secondary'),el('p','Search by name, reference, phone, email or address. Confirm the person’s details before choosing.','field-help'));
     } else if (d.step === 2) {
       form.append(note(`Client: ${selected?.person.name ?? 'Choose a client first'}`));
@@ -272,6 +325,7 @@ async function newProject(view, clientId) {
     else {
       const payer = d.fundingStatus==='unknown' ? 'Not known yet — follow up' : d.fundingStatus==='self' ? `Client: ${selected?.person.name}` : d.payerLabel||d.payerId||'Choose a payer';
       form.append(reviewList([['Client',selected?.person.name],['Project',d.title],['Need',d.summary],['Expected payer',payer],['Funding notes',d.fundingNotes||'None recorded'],['Skills',d.requiredSkills.join(', ')||'Not specified'],['Technical team',dirs.technicians.filter(t=>(d.technicianIds??[]).includes(t.id)).map(t=>t.name+(t.id===d.technicianId?' (lead)':'')).join(', ')||'Not assigned yet']]));
+      if(d.websiteReferral)form.append(note('Website form names '+d.websiteReferral.answers.client+'. Check this against the selected CRM client. The original answers will be kept under Project details.'));
       form.append(note('Check the client and project details before saving. No emails, work instructions or invoices will be sent.'));
     }
     const actions=el('div',null,'actions');const next=saveButton(d.step===4?'Save enquiry':'Continue');
@@ -279,7 +333,7 @@ async function newProject(view, clientId) {
     actions.append(next,cancel(form,d,key,d.clientId?'client/'+d.clientId:'projects','Cancel new enquiry'));form.append(notice,actions);box.append(form);slot.append(box);
     form.addEventListener('submit',e=>{e.preventDefault();if(d.step===1&&!d.clientId){notice.replaceChildren(note('Choose the existing client or create a new client to continue.',true));return;}if(!allocationValid(form,d,notice))return;
       if(d.step<4){d.step++;draw();slot.querySelector('h2').tabIndex=-1;slot.querySelector('h2').focus({preventScroll:true});window.scrollTo(0,0);return;}
-      save(form,d,notice,next,'projects','POST',{requestId:d.requestId,clientId:d.clientId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,followUpOn:d.followUpOn??reviewDay(),...coordinationValues(d)},result=>{drafts.delete(key);host.announce('Enquiry saved.');location.hash='project/'+result.id;});
+      save(form,d,notice,next,'projects','POST',{requestId:d.requestId,clientId:d.clientId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,followUpOn:d.followUpOn??reviewDay(),...coordinationValues(d),...(d.websiteReferral?{websiteReferral:d.websiteReferral}:{})},result=>{drafts.delete(key);host.announce(d.websiteReferral?'Website enquiry saved. Add the original PDF and any supplied photos under Project files.':'Enquiry saved.');location.hash='project/'+result.id;});
     });
     if(d.pending){notice.append(note('A previous save was not confirmed. Retry the same request safely.'));lock(form,true,next);next.textContent='Retry save safely';}
   }

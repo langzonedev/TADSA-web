@@ -1,6 +1,6 @@
 import {node,request,field,editor,renderRetainedReferenceDraft} from './project-care.js';
 import {adelaideToday} from './credential-expiry.js';
-import {requiresBuildPayment} from './lifecycle-model.js';
+import {requiresBuildPayment,currentCostReturns,hasMemberCosts,currentCostHandoff} from './lifecycle-model.js';
 
 const notRecorded='Not recorded';
 const dollars=new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'});
@@ -11,7 +11,8 @@ export function financeStatusRows(lifecycle,finance){
  const state=lifecycle.state,quote=state?.quotes?.at(-1),costReturn=state?.costReturns?.at(-1);
  const sent=quote&&state.history.findLast(event=>event.action==='issueQuote'&&event.data.quoteVersion===quote.version);
  const approval=quote&&state.acceptance?.quoteVersion===quote.version?state.acceptance.date:null;
- const handoff=costReturn&&state.financeHandoff?.costReturnVersion===costReturn.version?state.financeHandoff.sentOn:null;
+ const handoff=currentCostHandoff(state)?state.financeHandoff.sentOn:null;
+ const named=currentCostReturns(state).filter(c=>c.technicianId),paid=named.filter(c=>state.returnPayments?.[c.version]);
  const beforeBuild=requiresBuildPayment(state,{programme:lifecycle.programme})?'Yes':quote?.pricing?.invoiceBeforeBuild===false?'No':notRecorded;
  return [
   ['Quote',quote?dollars.format(quote.totalCents/100):notRecorded],
@@ -21,12 +22,12 @@ export function financeStatusRows(lifecycle,finance){
   ['Cost Return Received',costReturn&&!costReturn.receivedOn?'Received date not recorded':recordedDate(costReturn?.receivedOn)],
   ['Cost Summary Sent to Finance',recordedDate(handoff)],
   ['Invoice Sent to Client',finance.invoiceSentOn?recordedDate(finance.invoiceSentOn)+' · Invoice '+finance.invoiceNumber:notRecorded],
-  ['Technician Reimbursed',finance.reimbursedOn?recordedDate(finance.reimbursedOn)+' · Payment '+finance.paymentNumber:notRecorded],
+  ['Technician Reimbursed',hasMemberCosts(state)?paid.length+' of '+named.length+' returns reimbursed'+(finance.reimbursedOn?' · Earlier payment '+finance.paymentNumber:''):finance.reimbursedOn?recordedDate(finance.reimbursedOn)+' · Payment '+finance.paymentNumber:notRecorded],
   ['Invoice Paid in Full',typeof finance.paidInFull==='boolean'?(finance.paidInFull?'Yes':'No')+' · '+recordedDate(finance.paidStatusOn):notRecorded]
  ];
 }
 
-export function renderFinanceStatusForm(parent,projectId,saved,paymentOnly=false){
+export function renderFinanceStatusForm(parent,projectId,saved,paymentOnly=false,memberMode=false){
  const initial={...saved,paidInFull:saved.paidInFull==null?'':saved.paidInFull?'yes':'no'};
  return editor(parent,'finance-status/'+projectId,initial,'Invoice and payment details',(form,draft)=>{
   const today=adelaideToday();
@@ -40,7 +41,8 @@ export function renderFinanceStatusForm(parent,projectId,saved,paymentOnly=false
    group.addEventListener('input',requirePair);group.addEventListener('change',requirePair);requirePair();
   }
   pair('Invoice Sent to Client','Invoice sent date','invoiceSentOn','Invoice number','invoiceNumber');
-  pair('Technician Reimbursed','Reimbursement date','reimbursedOn','Payment number','paymentNumber');
+  if(memberMode)form.append(node('p','Record each technician payment against its return under Costs → Cost returns.','field-help'));
+  else pair('Technician Reimbursed','Reimbursement date','reimbursedOn','Payment number','paymentNumber');
   pair('Invoice Paid in Full','Payment status date','paidStatusOn','Paid in full','paidInFull',[['',notRecorded],['yes','Yes'],['no','No']]);
  },'projects/'+projectId+'/finance-status','PUT',draft=>({
   requestId:draft.requestId,version:draft.version,
