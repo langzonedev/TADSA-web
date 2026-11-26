@@ -1,6 +1,6 @@
 // Pure reads over fictional device records. No graph hydration or storage writes.
 import {lifecycleEffectiveStage,projectLifecycleStatus} from './lifecycle-model.js';
-import {profileContactPhone,matchingPersonRoles} from './profile-details-model.js';
+import {profileContactPhone,matchingPersonRoles,directoryPhoneDigits,matchesDirectoryPhone} from './profile-details-model.js';
 const kinds={clients:['client','client'],people:['person','person'],organisations:['org','organisation']};
 const knownRoles=['Client','Technician','Occupational therapist','Administrator','Carer','Referrer','Allied-health contact','Funder','General contact'];
 const fail=(message,status=422)=>{throw Object.assign(Error(message),{status});};
@@ -79,6 +79,7 @@ export function deviceDirectoryQuery(d,path,method,params,actor){
   return {item};
  }
  if(parts.length!==1)fail('Record not found.',404);
- const value=fields(params,false),matching=rows(d,value.kind).filter(r=>(!value.q||[r.name,r.reference,r.id,r.email,r.phone,r.address,r.suburb,r.state,r.postcode].join(' ').toLowerCase().includes(value.q))&&(!value.role||r.filterRoles.includes(value.role))&&(value.role!=='Technician'||r.technicianEligible)&&statusMatch(r,value.status)&&(!value.after||compare(r.id,value.after)>0)).sort((a,b)=>compare(a.id,b.id));
+ const value=fields(params,false),phone=value.kind==='clients'?directoryPhoneDigits(value.q):'';
+ const matching=rows(d,value.kind).filter(r=>(!value.q||[r.name,r.reference,r.id,r.email,r.phone,r.address,r.suburb,r.state,r.postcode].join(' ').toLowerCase().includes(value.q)||matchesDirectoryPhone(phone,r.phone,d.profileDetails?.[r.personId]?.contact))&&(!value.role||r.filterRoles.includes(value.role))&&(value.role!=='Technician'||r.technicianEligible)&&statusMatch(r,value.status)&&(!value.after||compare(r.id,value.after)>0)).sort((a,b)=>compare(a.id,b.id));
  const page=matching.slice(0,value.limit);return {items:page.map(publicSelection),limit:value.limit,nextAfter:matching.length>value.limit?page.at(-1).id:null};
 }

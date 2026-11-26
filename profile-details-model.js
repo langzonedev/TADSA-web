@@ -3,6 +3,14 @@ export function profileContactPhone(primary, contact = {}) {
  const preferred=contact.preferredPhone&&contact[contact.preferredPhone+'Phone'];
  return {number:preferred||primary||contact.mobilePhone||contact.homePhone||contact.workPhone||'',preferredChannel:preferred?contact.preferredPhone:''};
 }
+export function directoryPhoneDigits(value){
+ if(typeof value!=='string'||!/^[+()\d\s.-]+$/.test(value))return '';
+ const digits=value.replace(/\D/g,'');
+ return digits.length>=6&&digits.length<=16?digits:'';
+}
+export function matchesDirectoryPhone(digits,primary,contact={}){
+ return Boolean(digits)&&[primary,contact.mobilePhone,contact.homePhone,contact.workPhone].some(number=>directoryPhoneDigits(number)===digits);
+}
 export const contactGeocodeValues=d=>[d.addressLine1,d.addressLine2,d.suburb,d.state,d.postcode];
 export const EQUIPMENT_OPTIONS=['Electric welding','MIG welding','Gas welding','Aluminium welding','Metal lathe','Wood lathe','Milling machine','Bandsaw','Guillotine','Bender','Tube bender','Saw bench'];
 const contactDefaults={homePhone:'',workPhone:'',mobilePhone:'',preferredPhone:'',language:'',addressLine1:'',addressLine2:'',suburb:'',state:'',postcode:'',organisationId:''};
@@ -40,6 +48,19 @@ export const createProfileDetails=()=>({contact:{...contactDefaults,...professio
 export function initialLanguageDetails(language){
  const details=createProfileDetails();
  details.contact.language=text(language,120);
+ return details;
+}
+// Only these reviewed fields can be written while creating a client from a referral.
+export function referralClientProfile(client, requestId){
+ const optional=['homePhone','mobilePhone','dateOfBirth','disability'];
+ const allowed=['name','email','phone','allowDuplicate','initialAddress',...optional];
+ if(!client||typeof client!=='object'||Array.isArray(client)||Object.keys(client).some(key=>!allowed.includes(key))||
+    ['name','phone','email'].some(key=>typeof client[key]!=='string'||/[\u0000-\u001f\u007f]/.test(client[key]))||
+    typeof client.allowDuplicate!=='boolean')throw Error('Check the reviewed new client details.');
+ const details=createProfileDetails();
+ for(const key of optional)if(Object.hasOwn(client,key))details.contact[key]=client[key];
+ if(!optional.some(key=>details.contact[key]!==''))return null;
+ details.contact=validateProfileDetails({requestId,section:'contact',version:0,details:details.contact}).details;
  return details;
 }
 export function normaliseProfileDetails(saved={}){const defaults=createProfileDetails();return {contact:{...defaults.contact,...saved.contact},capabilities:{...defaults.capabilities,...saved.capabilities}};}
