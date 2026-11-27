@@ -35,6 +35,15 @@ export function normalise(data){
 export function deviceTechnicianLocation(d,id,calendar=d.calendars[id]) {
  return technicianLocation(calendar?{location_recorded:calendar.locationRecorded,base_address:calendar.baseAddress,suburb:calendar.suburb,postcode:calendar.postcode,geocode:calendar.geocode}:undefined,d.profileDetails?.[id]?.contact??{});
 }
+export function addDeviceProjectFile(data,projectId,file,size,event){
+ const files=data.attachments[projectId]??[];
+ if(files.filter(item=>!item.removed).length>=20)fail('A project can hold up to twenty files.');
+ const stored={id:crypto.randomUUID(),version:1,name:file.name.trim(),mime:file.mime,size,createdAt:new Date().toISOString()};
+ files.push({...stored,dataBase64:file.dataBase64});
+ data.attachments[projectId]=files;
+ event('projects',projectId,'Attachment added',{attachmentId:stored.id,name:stored.name,size});
+ return stored;
+}
 export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(),actorContext=null){
  const directoryResult=deviceDirectoryQuery(d,path,method,query,actorContext,input);if(directoryResult!==undefined)return directoryResult;
  const parts=path.replace(/^\/+|\/+$/g,'').split('/'),[kind,id,sub,subid,action]=parts;
@@ -62,6 +71,11 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
  const mutating=method!=='GET';let replayKey;
  if(mutating&&kind==='projects'&&sub==='finance-status'&&actorContext&&actorContext.role!=='administrator')fail('An administrator must record Finance confirmations.',403);
  if(mutating&&Object.hasOwn(input,'requestId')){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId))fail('Supply a valid request identifier.');let receipt=input;
+  if(kind==='projects'&&!id&&Object.hasOwn(input,'websiteReferralPdf')){
+   if(!actorContext?.referralPdf)fail('Validate the website enquiry PDF before saving.');
+   const original=input.websiteReferralPdf;
+   receipt={...input,websiteReferralPdf:{name:original.name.trim(),mime:original.mime,sha256:actorContext.referralPdf.sha256}};
+  }
   if(kind==='projects'&&sub==='assessment-pack'){
    const hashes=actorContext?.assessmentHashes;if(!hashes)fail('Validate the assessment documents before saving.');
    const identity=(file,sha256)=>file&&({name:file.name,mime:file.mime,sha256});
@@ -169,7 +183,7 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
   if(kind==='availability'&&sub==='entries'&&Object.hasOwn(input,'calendarVersion'))keys.push('calendarVersion');
   if(keys&&!id&&['clients','people'].includes(kind))keys.push(...['language','initialAddress'].filter(k=>Object.hasOwn(input,k)));
   if(keys&&kind==='people'&&keys.includes('roles'))keys.push(...['membershipStatus','cohorts'].filter(k=>Object.hasOwn(input,k)));
-  if(keys&&kind==='projects'&&!id)keys.push(...['followUpOn','websiteReferral','intakeChannel','clientAdditions','websiteReferrer'].filter(key=>Object.hasOwn(input,key)));
+  if(keys&&kind==='projects'&&!id)keys.push(...['followUpOn','websiteReferral','intakeChannel','clientAdditions','websiteReferrer','websiteReferralPdf'].filter(key=>Object.hasOwn(input,key)));
   if(keys&&Object.hasOwn(input,'technicianIds')&&kind==='projects'&&(!id||sub==='coordination'))keys.push('technicianIds');
   if(keys&&(Object.keys(input).length!==keys.length||keys.some(k=>!Object.hasOwn(input,k))))fail('Supply exactly the required fields.');
   if(keys?.includes('requestId')&&!input.requestId)fail('Supply a valid request identifier.');
@@ -232,6 +246,12 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
    if(existing)fail('A matching website referral is already on enquiry '+existing.reference+'. Check that enquiry before creating another.',409);
   }
   const metadata=intakeMetadata({...input,websiteReferral:referral});
+  if(Object.hasOwn(input,'websiteReferralPdf')){
+   if(!referral||input.intakeChannel!=='website')fail('Review the website enquiry before filing its original PDF.');
+   const prior=d.projects.find(project=>d.projectAdminDetails?.[project.id]?.websiteReferral&&
+    d.attachments[project.id]?.some(file=>file.mime==='application/pdf'&&file.dataBase64===input.websiteReferralPdf.dataBase64));
+   if(prior)fail('This website enquiry PDF is already filed on enquiry '+prior.reference+'. Open that enquiry to review it.',409);
+  }
   if(Object.hasOwn(input,'clientAdditions')&&(isNew||!referral))fail('Additional client details require a reviewed website enquiry and an existing client.');
   if(isNew){
    if(!referral)fail('Review a website enquiry before creating its client here.');
@@ -277,7 +297,10 @@ export function dispatch(d,path,method='GET',input={},query=new URLSearchParams(
    }
   }
   d.projectSequence=nextSequence;
-  const p={labourRateCents:d.applicationSettings.labourRateCents,id:next('project'),reference:String(++d.projectSequence),clientId,title,summary,kind:input.kind,status:'open',version:1,openedAt:today(),dueDate:null,feedbackRequired:false,invoiceRequired:false};d.projects.push(p);d.projectAdminDetails??={};d.projectAdminDetails[p.id]={...createProjectDetails(),followUpOn,coordinatorAccountId:actorContext?.id??'',...metadata,...(referral?{enquirySource:(referral.answers.heard??'').slice(0,500),assessmentInstructions:referralAssessmentInstructions(referral.answers)}:{})};d.lifecycles[p.id]=createLifecycle();d.statusEvents.push({id:p.id,fromStatus:null,toStatus:p.status,at:new Date().toISOString()});setCoord(p,value);if(referrer)linkWebsiteReferrer(p,referrer);event('projects',p.id,'Project created',{title,createdByAccountId:actorContext?.id??null});event('clients',clientId,'Project created',{projectId:p.id});return project(p);}
+  const p={labourRateCents:d.applicationSettings.labourRateCents,id:next('project'),reference:String(++d.projectSequence),clientId,title,summary,kind:input.kind,status:'open',version:1,openedAt:today(),dueDate:null,feedbackRequired:false,invoiceRequired:false};d.projects.push(p);d.projectAdminDetails??={};d.projectAdminDetails[p.id]={...createProjectDetails(),followUpOn,coordinatorAccountId:actorContext?.id??'',...metadata,...(referral?{enquirySource:(referral.answers.heard??'').slice(0,500),assessmentInstructions:referralAssessmentInstructions(referral.answers)}:{})};d.lifecycles[p.id]=createLifecycle();d.statusEvents.push({id:p.id,fromStatus:null,toStatus:p.status,at:new Date().toISOString()});setCoord(p,value);if(referrer)linkWebsiteReferrer(p,referrer);event('projects',p.id,'Project created',{title,createdByAccountId:actorContext?.id??null});event('clients',clientId,'Project created',{projectId:p.id});
+  if(input.websiteReferralPdf)addDeviceProjectFile(d,p.id,input.websiteReferralPdf,actorContext.referralPdf.size,event);
+  return project(p);
+ }
  if(kind==='projects'&&method==='PATCH'&&!sub){const p=find('projects',id);version(p,input.version);if(!['open','review','closed'].includes(input.status)||typeof input.feedbackRequired!=='boolean'||typeof input.invoiceRequired!=='boolean')fail('Complete the project status fields.');if(p.status==='closed'&&input.status!=='closed'){for(const id of p.coordination.technicianIds){const tech=find('people',id);if(tech.active===false||!tech.roles.includes('Technician')||!tech.roles.every(r=>roles.includes(r)))fail('Choose active technicians or clear their assignment before reopening this project.');}}const value={title:str(input.title,120,true),status:input.status,feedbackRequired:input.feedbackRequired,invoiceRequired:input.invoiceRequired};if(Object.entries(value).some(([k,v])=>p[k]!==v)){if(p.status!==value.status)d.statusEvents.push({id:p.id,fromStatus:p.status,toStatus:value.status,at:new Date().toISOString()});Object.assign(p,value);bump(p,'Project updated',value);}return project(p);}
  if(kind==='projects'&&sub==='coordination'&&method==='PUT'){const p=find('projects',id);version(p,input.version);const value=coordination(input,p.coordination);if(canonical(value)!==canonical(p.coordination)){setCoord(p,value);bump(p,'Project coordination updated',value);}return project(p);}
  if(kind==='projects'&&sub==='operations'&&method==='GET')return ops(id);

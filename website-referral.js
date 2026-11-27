@@ -149,6 +149,16 @@ const extraLabels = new Set([
   'Relation to Client','Referee Organisation','Invoicing Details','Comments'
 ].map(normal));
 const fundingChoices = new Set(['self','agency','plan manager']);
+export function referralLabelKind(label){
+  const name=normal(label);
+  if(sections.has(name))return 'section';
+  return labels.has(name)||extraLabels.has(name)||scopedLabels.has(name)?'field':'';
+}
+export function isReferralChoice(label,value){
+  const question=normal(label),answer=normal(value);
+  return question==='ndis funding managed by'&&fundingChoices.has(answer)||
+    question==='authority to proceed and payment information to be sent by'&&answer==='email';
+}
 const singleLineFields = new Set(['client','phone','mobile','birth','contactEmail','referrer','referrerPhone','referrerEmail','ndis','quote','safety','attendance']);
 const invalid = message => { throw Object.assign(new Error(message),{status:422}); };
 const clean = value => value.replace(/\u00a0/g,' ').replace(/\r/g,'').split('\n').map(line=>line.trim()).filter(line=>line && !/^map it$/i.test(line)).join('\n');
@@ -178,13 +188,13 @@ export function referralRows(answers) {
   return fields.filter(([key])=>answers[key]).map(([key,label])=>[label,answers[key]]);
 }
 
-function readAnswers(rows) {
+export function readReferralRows(rows) {
   const answers={},additional=[],candidates=[];let section='';
   for(const [label,value] of rows){
     const name=normal(label);
     const text=clean(value);
     if(!text){
-      section=sections.get(name)??'';
+      if(!referralLabelKind(label)||sections.has(name))section=sections.get(name)??'';
       continue;
     }
     const key=fieldKey(name,section);
@@ -249,8 +259,7 @@ export function readReferralText(source) {
     if(pair){current=pair;rows.push(current);continue;}
     const name=normal(line);
     const previous=current&&normal(current[0]);
-    if(current&&!current[1]&&((previous==='ndis funding managed by'&&fundingChoices.has(name))||
-        (previous==='authority to proceed and payment information to be sent by'&&name==='email'))){
+    if(current&&!current[1]&&isReferralChoice(current[0],line)){
       current[1]=line;continue;
     }
     if(recognised(line)){
@@ -260,7 +269,7 @@ export function readReferralText(source) {
       current[1]+=(current[1]?'\n':'')+line;
     }
   }
-  return readAnswers(rows);
+  return readReferralRows(rows);
 }
 
 export function readReferralHtml(source) {
@@ -287,7 +296,7 @@ export function readReferralHtml(source) {
   }
   if(!candidates.length)invalid('Choose one original website notification containing the enquiry table.');
   if(candidates.length>1)throw Object.assign(new Error('Choose one website notification at a time.'),{status:422,noPlainFallback:true});
-  try{return readAnswers(candidates[0]);}
+  try{return readReferralRows(candidates[0]);}
   catch(error){error.noPlainFallback=true;throw error;}
 }
 

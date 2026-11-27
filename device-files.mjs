@@ -3,6 +3,15 @@ import {fail} from './device-model.mjs';
 const invalid=()=>fail('The file format is unsupported or damaged. Choose a JPEG, PNG, PDF or a DOCX without active content.');
 const crc32=bytes=>{let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;};
 async function inflate(bytes,limit){const reader=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader(),chunks=[];let size=0;try{for(;;){const {value,done}=await reader.read();if(done)break;size+=value.length;if(size>limit){await reader.cancel();invalid();}chunks.push(value);}}catch{invalid();}const result=new Uint8Array(size);let at=0;for(const chunk of chunks){result.set(chunk,at);at+=chunk.length;}return result;}
+export async function validateWebsiteReferralPdf(file){
+ if(!file||typeof file!=='object'||Array.isArray(file)||Object.keys(file).length!==3||
+    !['name','mime','dataBase64'].every(key=>Object.hasOwn(file,key))||file.mime!=='application/pdf'){
+  fail('Choose the original website enquiry PDF.');
+ }
+ const {sha256}=await validateDeviceFile(file);
+ const padding=file.dataBase64.endsWith('==')?2:file.dataBase64.endsWith('=')?1:0;
+ return {sha256,size:file.dataBase64.length*3/4-padding};
+}
 export async function validateDeviceFile(input){
  if(input.mime==='image/jpg')input.mime='image/jpeg';
  if(typeof input.name!=='string'||!input.name.trim()||input.name.length>180||/[\\/<>:"|?*\u0000-\u001f\u007f]/.test(input.name)||/[. ]$/.test(input.name)||input.name.startsWith('.'))invalid();

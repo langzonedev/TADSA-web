@@ -10,6 +10,7 @@ import {createRecordPicker,selectionLabel} from './record-picker.js';
 import {intakeChannelLabels,readReferralHtml,readReferralText,referralBirthDate,referralRows,referralNdisNumber,referralFundingNotes,reviewableClientDetails,websiteResidence,resolveReferralMapping,validateWebsiteReferral} from './website-referral.js';
 import {compareReferralIdentity,referralPhoneVariants} from './website-referral-matches.js';
 import {reviewWebsiteReferrer} from './project-contacts.js';
+import {readFileBase64} from './project-care.js';
 // Call-intake workflows. All records in this development workspace are fictional.
 const drafts = new Map();
 registerDraftSource('workflow',()=>[...drafts].filter(([,d])=>d.dirty||d.pending).map(([key,d])=>({key,pending:Boolean(d.pending)})));
@@ -50,7 +51,8 @@ function check(form, label, checked, change) {
 }
 function lock(form, locked, retry) { form.querySelectorAll('.record-picker').forEach(n=>n.recordPicker?.setDisabled(locked));form.querySelectorAll('input,textarea,select,button').forEach(n => { n.disabled = n.dataset.keepDisabled === 'true' || (locked && n !== retry); }); }
 async function request(path, method = 'GET', body) {
-  const response = await fetch('/api/' + path, { method, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(12000) });
+  const fileUpload=method==='POST'&&path==='projects'&&body?.websiteReferralPdf;
+  const response = await fetch('/api/' + path, { method, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}), ...(fileUpload?{}:{signal:AbortSignal.timeout(12000)}) });
   let data;
   try { data = await response.json(); } catch { throw new Error('The save result could not be confirmed.'); }
   if (!response.ok) { const e = new Error(data.error || 'Could not save.'); e.status = response.status; e.data = data; throw e; }
@@ -58,10 +60,14 @@ async function request(path, method = 'GET', body) {
 }
 async function save(form, d, notice, saveButton, path, method, payload, done, duplicate, recheckReferrer) {
   if (host.isSaving()) return;
-  const body = d.pending ?? payload; d.pending = body; d.dirty = true; host.setSaving(true); lock(form, true); notice.replaceChildren(note('Saving… Please wait.'));
-  try { const result = await request(path, method, body); d.pending = null; host.setSaving(false); await done(result); }
+  let body = d.pending;
+  d.dirty = true; host.setSaving(true); lock(form, true); notice.replaceChildren(note('Saving… Please wait.'));
+  try {
+    if(!body){body=typeof payload==='function'?await payload():payload;d.pending=body;}
+    const result=await request(path,method,body);d.pending=null;host.setSaving(false);await done(result);
+  }
   catch (error) {
-    const uncertain=!error.status||(method==='POST'&&path==='projects'&&body.websiteReferral&&(error.status===408||error.status>=500));
+    const uncertain=Boolean(body)&&(!error.status||(method==='POST'&&path==='projects'&&body.websiteReferral&&(error.status===408||error.status>=500)));
     if (!uncertain) { d.pending = null; d.requestId = crypto.randomUUID(); }
     notice.replaceChildren(note(uncertain ? 'The save result is not confirmed. Your details are kept. Retry the same save to check safely without creating a duplicate.' : error.message, true));
     if(error.data?.code==='REFERRER_REVIEW_CHANGED'&&recheckReferrer)notice.append(button('Review referrer matches',recheckReferrer));
@@ -269,27 +275,33 @@ function websiteDraftDefaults(answers){
     fundingStatus:'unknown',fundingNotes:referralFundingNotes(answers),payerId:'',payerLabel:'',technicianId:'',technicianIds:[],requiredSkills:[],
     assignmentAcknowledged:false,needsAcknowledgement:false};
 }
-function websiteEmailIntake(form,d,draw){
+function websiteIntake(form,d,draw){
   const box=el('div',null,'form-grid');
-  box.append(el('p','Copy the form table from the office email and paste it below. We’ll look for the client and prepare an enquiry for you to review.','field-help'));
+  const pdfLabel=el('label','Import enquiry PDF','workflow-field website-pdf-drop');
+  const pdf=el('input');pdf.type='file';pdf.accept='.pdf,application/pdf';pdf.setAttribute('aria-label','Import enquiry PDF');
+  pdfLabel.append(pdf,el('small','Choose or drop the referral PDF from the office email (up to 10 MB).','field-help'));
   const fileLabel=el('label','Saved website email','workflow-field'),file=el('input');file.type='file';file.accept='.html,.htm,text/html';fileLabel.append(file);
   const copyLabel=el('label','Paste website form','workflow-field'),paste=el('textarea');paste.rows=4;paste.maxLength=1000000;paste.value=d.websitePaste??'';copyLabel.append(paste);
   const preview=el('div'),message=el('div');let revision=0;
-  function reset(){++revision;delete d.websiteMapping;preview.replaceChildren();message.replaceChildren();}
-  function show(parsed){
+  function reset(){++revision;delete d.websiteMapping;delete d.websiteMappingPdf;preview.replaceChildren();message.replaceChildren();}
+  function show(parsed,originalPdf){
     const imported=validateWebsiteReferral({receivedOn:reviewDay(),answers:parsed});
     const replacement=websiteDraftDefaults(imported.answers);
     d.beforeWebsite=Object.fromEntries(Object.keys(replacement).map(key=>[key,d[key]]));
     Object.assign(d,replacement);
     d.websiteReferral=imported;
+    if(originalPdf)d.websitePdfFile=originalPdf;
+    else delete d.websitePdfFile;
     d.referralClient=websiteClientDraft(imported.answers);
-    delete d.websiteMapping;delete d.websitePaste;
+    delete d.websiteMapping;delete d.websiteMappingPdf;delete d.websitePaste;
     touch(d);draw();focusEnquiryHeading();
   }
-  function showProblem(error){
+  function showProblem(error,originalPdf){
     const mapping=error.referralMapping;
     if(!mapping){message.replaceChildren(note(error.message,true));return;}
+    message.replaceChildren();
     d.websiteMapping=mapping;
+    if(originalPdf)d.websiteMappingPdf=originalPdf;
     const group=el('fieldset');group.append(el('legend','Match the website questions'),el('p','Choose the answer for each field below. The other answers will also stay with the enquiry.','field-help'));
     const choices={};
     for(const key of mapping.missing){
@@ -298,10 +310,25 @@ function websiteEmailIntake(form,d,draw){
       select.onchange=()=>{choices[key]=select.value;message.replaceChildren();};
       label.append(select);group.append(label);
     }
-    group.append(button('Preview matched answers',()=>{try{show(resolveReferralMapping(mapping,choices));message.replaceChildren();}catch(problem){message.replaceChildren(note(problem.message,true));}}));
+    group.append(button('Preview matched answers',()=>{try{show(resolveReferralMapping(mapping,choices),originalPdf);message.replaceChildren();}catch(problem){message.replaceChildren(note(problem.message,true));}}));
     preview.replaceChildren(group);
   }
-  paste.addEventListener('input',()=>{file.value='';reset();d.websitePaste=paste.value;touch(d);});
+  async function importPdf(files){
+    if(!files?.length)return;
+    reset();file.value='';pdf.value='';paste.value='';delete d.websitePaste;
+    if(files.length!==1){message.replaceChildren(note('Choose one referral PDF at a time.',true));return;}
+    const selected=files[0],version=revision;
+    message.replaceChildren(note('Reading the PDF…'));
+    try{
+      const {readReferralPdf}=await import('./website-referral-pdf.js');
+      const answers=await readReferralPdf(selected);
+      if(version===revision&&box.isConnected)show(answers,selected);
+    }catch(error){if(version===revision&&box.isConnected)showProblem(error,selected);}
+  }
+  pdf.addEventListener('change',()=>importPdf(Array.from(pdf.files)));
+  pdfLabel.addEventListener('dragover',event=>{event.preventDefault();event.dataTransfer.dropEffect='copy';});
+  pdfLabel.addEventListener('drop',event=>{event.preventDefault();importPdf(Array.from(event.dataTransfer.files));});
+  paste.addEventListener('input',()=>{file.value='';pdf.value='';reset();d.websitePaste=paste.value;touch(d);});
   paste.addEventListener('paste',event=>{
     const html=event.clipboardData?.getData('text/html'),plain=event.clipboardData?.getData('text/plain');
     if(!html&&!plain)return;
@@ -312,15 +339,15 @@ function websiteEmailIntake(form,d,draw){
   file.addEventListener('change',async()=>{
     reset();paste.value='';delete d.websitePaste;const version=revision,chosen=file.files[0];if(!chosen)return;
     try{if(chosen.size>1000000)throw Error('Choose one HTML notification under 1 MB.');const html=await chosen.text();if(version===revision&&box.isConnected)show(readReferralHtml(html));}
-    catch(error){if(version===revision)showProblem(error);}
+    catch(error){if(version===revision&&box.isConnected)showProblem(error);}
   });
   const read=button('Preview pasted form',()=>{
     reset();try{show(readReferralText(paste.value));}catch(error){showProblem(error);}
   });
   const alternate=el('details');alternate.append(el('summary','Use a saved HTML email'),fileLabel);
   const actions=el('div',null,'actions');actions.append(read);
-  box.append(copyLabel,actions,preview,message,alternate);form.append(box);
-  if(d.websiteMapping)showProblem({referralMapping:d.websiteMapping});
+  box.append(pdfLabel,copyLabel,actions,preview,message,alternate);form.append(box);
+  if(d.websiteMapping)showProblem({referralMapping:d.websiteMapping},d.websiteMappingPdf);
 }
 function projectPayload(d){
   return {requestId:d.requestId,title:d.title.trim(),summary:d.summary.trim(),kind:d.kind,intakeChannel:d.intakeChannel,
@@ -528,6 +555,12 @@ function reviewedWebsiteEnquiry(slot,d,key,draw){
   const original=d.websiteReferral;
   const box=panel('Review website enquiry');box.querySelector('h2').id='enquiry-step-heading';
   const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:'Website enquiry'});
+  if(d.websitePdfFile){
+    const fileInfo=el('div',null,'website-pdf-review');
+    fileInfo.append(el('strong',d.websitePdfFile.name),el('p','The original PDF will be saved in Project files with this enquiry.','field-help'),
+      button('Choose a different PDF or paste an email',()=>{leaveWebsiteReview(d,false);touch(d);draw();focusEnquiryHeading();}));
+    form.append(fileInfo);
+  }
   const source=el('details');
   source.append(el('summary','All website answers'),reviewList(referralRows(original.answers)));
   source.append(button('Remove website details from draft',()=>{
@@ -612,14 +645,21 @@ function reviewedWebsiteEnquiry(slot,d,key,draw){
     const assignment=d.referralClientMode==='existing'?{clientId:d.clientId}:{newClient:websiteClientPayload(d.referralClient)};
     if(d.referralClientMode==='existing'&&Object.keys(d.clientAdditions??{}).length)assignment.clientAdditions={...d.clientAdditions};
     if(d.referrerChoice&&!d.referrerChoice.defer)assignment.websiteReferrer=d.referrerChoice;
-    save(form,d,notice,submit,'projects','POST',{...projectPayload(d),...assignment},result=>{
-      drafts.delete(key);host.announce('Website enquiry saved. Add the original PDF and any supplied photos under Project files.');location.hash='project/'+result.id;
+    save(form,d,notice,submit,'projects','POST',async()=>{
+      const payload={...projectPayload(d),...assignment};
+      if(d.websitePdfFile){
+        const file=d.websitePdfFile;
+        payload.websiteReferralPdf={name:file.name,mime:'application/pdf',dataBase64:await readFileBase64(file)};
+      }
+      return payload;
+    },result=>{
+      drafts.delete(key);host.announce(d.websitePdfFile?'Website enquiry saved with its original PDF in Project files.':'Website enquiry saved. Add the original PDF and any supplied photos under Project files.');location.hash='project/'+result.id;
     },d.referralClientMode==='new'?duplicates:undefined,()=>referrer?.recheck());
   });
   if(d.pending){notice.append(note('A previous save was not confirmed. Retry the same request safely.'));lock(form,true,submit);submit.textContent='Retry save safely';}
 }
 // Switching channel keeps each unfinished intake in this tab until the operator saves or cancels it.
-const websiteDraftFields=['websiteReferral','referralClient','referralCandidate','referralClientMode','referralLookupName','chooseReferralClient','noReferralMatches','clientAdditions','referrerChoice'];
+const websiteDraftFields=['websiteReferral','websitePdfFile','referralClient','referralCandidate','referralClientMode','referralLookupName','chooseReferralClient','noReferralMatches','clientAdditions','referrerChoice'];
 function leaveWebsiteReview(d,keep){
   if(!d.websiteReferral)return;
   const manual=d.beforeWebsite;
@@ -658,7 +698,7 @@ async function newProject(view, clientId) {
       const box=panel('How did this enquiry arrive?');box.querySelector('h2').id='enquiry-step-heading';
       if(selected?.person.name)box.append(el('p','Selected client for manual entry: '+selected.person.name,'field-help'));
       const choices=el('div',null,'intake-source-choices');
-      for(const [channel,help] of [['phone','Record the request while speaking with the caller.'],['website','Paste the form from the office notification.'],['other','Enter an enquiry received another way.']]){
+      for(const [channel,help] of [['phone','Record the request while speaking with the caller.'],['website','Import the attached PDF or paste the form from the office email.'],['other','Enter an enquiry received another way.']]){
         const label=intakeChannelLabels[channel],choice=button(label,()=>useChannel(channel),'secondary');
         choice.setAttribute('aria-label',label);choice.replaceChildren(el('strong',label),el('span',help));choices.append(choice);
       }
@@ -669,9 +709,9 @@ async function newProject(view, clientId) {
     channelBar.append(el('strong',intakeChannelLabels[d.intakeChannel]),change);
     if(d.intakeChannel==='website'){
       if(d.websiteReferral){reviewedWebsiteEnquiry(slot,d,key,draw);return;}
-      const box=panel('Paste the website enquiry');box.querySelector('h2').id='enquiry-step-heading';
+      const box=panel('Import the website enquiry');box.querySelector('h2').id='enquiry-step-heading';
       const form=el('form',null,'form-grid');trackDraftForm(form,'workflow',key,{label:'Website enquiry'});
-      websiteEmailIntake(form,d,draw);form.append(cancel(form,d,key,'projects','Cancel new enquiry'));box.append(form);slot.append(box);return;
+      websiteIntake(form,d,draw);form.append(cancel(form,d,key,'projects','Cancel new enquiry'));box.append(form);slot.append(box);return;
     }
     if(d.step>=3&&!dirs){
       const wait=panel('Loading funding and team details…');wait.querySelector('h2').id='enquiry-step-heading';slot.append(wait);

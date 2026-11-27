@@ -126,5 +126,14 @@ export async function renderProjectCare(view,id,summaryTarget=view,context={}){
   }
   row.append(feedback);files.append(row);
  }
- editor(files,'upload/'+id,{},'Add image or document',(form,d)=>{const f=field(form,'Choose file (PNG, JPEG, PDF or DOCX)',{},'file','file');f.accept='.png,.jpg,.jpeg,.pdf,.docx';f.required=!d.pending&&!d.file;if(d.file)form.append(node('p','Selected file: '+d.file.name));f.onchange=()=>{d.file=f.files[0];};},`projects/${id}/attachments`,'POST',async d=>{if(!d.file)throw Error('Choose a file first.');if(d.file.size>attachments.maxBytes)throw Error('File exceeds the 10 MB limit.');const file=d.file,mime=(file.type==='image/jpg'?'image/jpeg':file.type)||({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}[file.name.split('.').pop().toLowerCase()]);const dataBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('Unable to read file.'));reader.readAsDataURL(file);});return {requestId:d.requestId,name:file.name,mime,dataBase64};});
+ editor(files,'upload/'+id,{},'Add image or document',(form,d)=>{const f=field(form,'Choose file (PNG, JPEG, PDF or DOCX)',{},'file','file');f.accept='.png,.jpg,.jpeg,.pdf,.docx';f.required=!d.pending&&!d.file;if(d.file)form.append(node('p','Selected file: '+d.file.name));f.onchange=()=>{d.file=f.files[0];};},`projects/${id}/attachments`,'POST',async d=>{if(!d.file)throw Error('Choose a file first.');if(d.file.size>attachments.maxBytes)throw Error('File exceeds the 10 MB limit.');const file=d.file,mime=(file.type==='image/jpg'?'image/jpeg':file.type)||({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}[file.name.split('.').pop().toLowerCase()]);const dataBase64=await readFileBase64(file);return {requestId:d.requestId,name:file.name,mime,dataBase64};});
+}
+
+export function readFileBase64(file){
+ return new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(String(reader.result).split(',')[1]);
+  reader.onerror=reader.onabort=()=>reject(Error('The selected file could not be read. Choose it again and retry.'));
+  reader.readAsDataURL(file);
+ });
 }
