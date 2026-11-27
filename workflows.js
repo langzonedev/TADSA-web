@@ -7,10 +7,11 @@ import {attachAddressLookup,renderTravelComparison} from './address-lookup.js';
 import {AUSTRALIAN_STATES} from './client-address.js';
 import {reviewDay} from './project-details-model.js';
 import {createRecordPicker,selectionLabel} from './record-picker.js';
-import {intakeChannelLabels,readReferralHtml,readReferralText,referralBirthDate,referralRows,referralNdisNumber,referralFundingNotes,reviewableClientDetails,websiteResidence,resolveReferralMapping,validateWebsiteReferral} from './website-referral.js';
-import {compareReferralIdentity,referralPhoneVariants} from './website-referral-matches.js';
+import {intakeChannelLabels,readReferralHtml,readReferralText,referralRows,referralNdisNumber,referralFundingNotes,reviewableClientDetails,websiteResidence,resolveReferralMapping,validateWebsiteReferral} from './website-referral.js';
+import {compareReferralIdentity,referralContactNumber,referralPersonName,referralPhoneVariants} from './website-referral-matches.js';
 import {reviewWebsiteReferrer} from './project-contacts.js';
 import {readFileBase64} from './project-care.js';
+import {validAttachmentName} from './attachment-name.js';
 // Call-intake workflows. All records in this development workspace are fictional.
 const drafts = new Map();
 registerDraftSource('workflow',()=>[...drafts].filter(([,d])=>d.dirty||d.pending).map(([key,d])=>({key,pending:Boolean(d.pending)})));
@@ -279,7 +280,7 @@ function websiteIntake(form,d,draw){
   const box=el('div',null,'form-grid');
   const pdfLabel=el('label','Import enquiry PDF','workflow-field website-pdf-drop');
   const pdf=el('input');pdf.type='file';pdf.accept='.pdf,application/pdf';pdf.setAttribute('aria-label','Import enquiry PDF');
-  pdfLabel.append(pdf,el('small','Choose or drop the referral PDF from the office email (up to 10 MB).','field-help'));
+  pdfLabel.append(pdf,el('small','Choose or drop the PDF from the office email (up to 10 MB). Saving the enquiry also files the original.','field-help'));
   const fileLabel=el('label','Saved website email','workflow-field'),file=el('input');file.type='file';file.accept='.html,.htm,text/html';fileLabel.append(file);
   const copyLabel=el('label','Paste website form','workflow-field'),paste=el('textarea');paste.rows=4;paste.maxLength=1000000;paste.value=d.websitePaste??'';copyLabel.append(paste);
   const preview=el('div'),message=el('div');let revision=0;
@@ -318,12 +319,21 @@ function websiteIntake(form,d,draw){
     reset();file.value='';pdf.value='';paste.value='';delete d.websitePaste;
     if(files.length!==1){message.replaceChildren(note('Choose one referral PDF at a time.',true));return;}
     const selected=files[0],version=revision;
+    if(!validAttachmentName(selected.name)||!selected.name.toLowerCase().endsWith('.pdf')){
+      message.replaceChildren(note('Rename the file with a plain .pdf filename of up to 180 characters, then choose it again.',true));
+      return;
+    }
     message.replaceChildren(note('Reading the PDF…'));
     try{
       const {readReferralPdf}=await import('./website-referral-pdf.js');
       const answers=await readReferralPdf(selected);
       if(version===revision&&box.isConnected)show(answers,selected);
-    }catch(error){if(version===revision&&box.isConnected)showProblem(error,selected);}
+    }catch(error){
+      if(version!==revision||!box.isConnected)return;
+      if(error instanceof TypeError||error instanceof SyntaxError){
+        message.replaceChildren(note('The PDF reader could not load. Reload the app and choose the PDF again, or paste the website email.',true));
+      }else showProblem(error,selected);
+    }
   }
   pdf.addEventListener('change',()=>importPdf(Array.from(pdf.files)));
   pdfLabel.addEventListener('dragover',event=>{event.preventDefault();event.dataTransfer.dropEffect='copy';});
@@ -356,10 +366,9 @@ function projectPayload(d){
 }
 
 function websiteClientDraft(answers){
-  const supplied=(value,max)=>value&&value.length<=max?value:'';
-  const dateOfBirth=referralBirthDate(answers.birth);
-  return {name:supplied(answers.client,120),phone:supplied(answers.phone||answers.mobile,40),mobilePhone:supplied(answers.mobile,40),
-    email:'',dateOfBirth,ndisNumber:referralNdisNumber(answers),disability:supplied(answers.disability,1000),...websiteResidence(answers.address),allowDuplicate:false};
+  const {phone,mobilePhone,dateOfBirth,ndisNumber,disability}=reviewableClientDetails(answers);
+  return {name:referralPersonName(answers.client),phone,mobilePhone,email:'',dateOfBirth,ndisNumber,disability,
+    ...websiteResidence(answers.address),allowDuplicate:false};
 }
 function websiteClientPayload(client){
   return {name:client.name.trim(),email:client.email.trim(),phone:client.phone.trim(),allowDuplicate:client.allowDuplicate,
@@ -412,7 +421,7 @@ function websiteClientReview(group,d){
 }
 function referralMatchInput(answers,crmName){
   const draft=websiteClientDraft(answers);
-  return {name:crmName||draft.name,phone:answers.phone?.length<=40?answers.phone:'',mobile:draft.mobilePhone,dateOfBirth:draft.dateOfBirth,postcode:draft.postcode};
+  return {name:crmName||draft.name,phone:referralContactNumber(answers.phone),mobile:draft.mobilePhone,dateOfBirth:draft.dateOfBirth,postcode:draft.postcode};
 }
 function referralComparison(answers,item,crmName){
   const section=el('section',null,'referral-comparison'),heading=item.name+' · '+(item.reference||item.id);

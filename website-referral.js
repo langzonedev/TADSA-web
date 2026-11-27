@@ -1,5 +1,6 @@
 import {AUSTRALIAN_STATES} from './client-address.js';
 import {reviewDay} from './project-details-model.js';
+import {referralContactNumber} from './website-referral-matches.js';
 
 export const intakeChannelLabels={website:'Website form email',phone:'Phone call',other:'Other enquiry'};
 
@@ -17,10 +18,19 @@ export function intakeMetadata(record){
   return metadata;
 }
 
+const months=['january','february','march','april','may','june','july','august','september','october','november','december'];
 export function referralBirthDate(value){
   if(typeof value!=='string')return '';
-  const au=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value);
-  const day=au?[au[3],au[2].padStart(2,'0'),au[1].padStart(2,'0')].join('-'):value;
+  let day=value.trim();
+  const numeric=/^(\d{1,2})([./-])(\d{1,2})\2(\d{4})$/.exec(day);
+  const words=/^(\d{1,2})\s+([a-z]+)\.?\s+(\d{4})$/i.exec(day);
+  if(numeric)day=[numeric[4],numeric[3].padStart(2,'0'),numeric[1].padStart(2,'0')].join('-');
+  if(words){
+    const token=words[2].toLowerCase();
+    const month=months.findIndex(name=>name===token||name.slice(0,3)===token||name==='september'&&token==='sept');
+    if(month===-1)return '';
+    day=[words[3],String(month+1).padStart(2,'0'),words[1].padStart(2,'0')].join('-');
+  }
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||day.startsWith('0000')||day>reviewDay())return '';
   const parsed=new Date(day+'T00:00:00Z');
   return Number.isFinite(parsed.getTime())&&parsed.toISOString().startsWith(day)?day:'';
@@ -81,7 +91,8 @@ export function referralAssessmentInstructions(answers={}){
 export function reviewableClientDetails(answers){
   const single=(value,max)=>value&&value.length<=max&&!/[\u0000-\u001f\u007f]/.test(value)?value:'';
   const address=websiteResidence(answers.address);
-  return {phone:single(answers.phone||answers.mobile,40),mobilePhone:single(answers.mobile,40),
+  const mobilePhone=referralContactNumber(answers.mobile);
+  return {phone:referralContactNumber(answers.phone)||mobilePhone,mobilePhone,
     dateOfBirth:referralBirthDate(answers.birth),residence:address.street?answers.address:'',
     disability:answers.disability?.length<=1000?answers.disability:'',
     email:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(answers.contactEmail||'')?single(answers.contactEmail,254):'',
@@ -160,6 +171,11 @@ export function isReferralChoice(label,value){
     question==='authority to proceed and payment information to be sent by'&&answer==='email';
 }
 const singleLineFields = new Set(['client','phone','mobile','birth','contactEmail','referrer','referrerPhone','referrerEmail','ndis','quote','safety','attendance']);
+export function referralIdentityField(label){
+  const question=normal(label),key=labels.get(question);
+  return ['name','full name','date of birth','dob'].includes(question)||
+    singleLineFields.has(key)&&!['quote','ndis','safety','attendance'].includes(key);
+}
 const invalid = message => { throw Object.assign(new Error(message),{status:422}); };
 const clean = value => value.replace(/\u00a0/g,' ').replace(/\r/g,'').split('\n').map(line=>line.trim()).filter(line=>line && !/^map it$/i.test(line)).join('\n');
 const record = value => value && typeof value === 'object' && !Array.isArray(value);

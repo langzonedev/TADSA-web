@@ -1,4 +1,5 @@
 import {validJpeg} from './jpeg.js';
+import {validAttachmentName} from './attachment-name.js';
 import {fail} from './device-model.mjs';
 const invalid=()=>fail('The file format is unsupported or damaged. Choose a JPEG, PNG, PDF or a DOCX without active content.');
 const crc32=bytes=>{let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;};
@@ -14,7 +15,7 @@ export async function validateWebsiteReferralPdf(file){
 }
 export async function validateDeviceFile(input){
  if(input.mime==='image/jpg')input.mime='image/jpeg';
- if(typeof input.name!=='string'||!input.name.trim()||input.name.length>180||/[\\/<>:"|?*\u0000-\u001f\u007f]/.test(input.name)||/[. ]$/.test(input.name)||input.name.startsWith('.'))invalid();
+ if(!validAttachmentName(input.name))invalid();
  const types={'image/png':['png'],'image/jpeg':['jpg','jpeg'],'application/pdf':['pdf'],'application/vnd.openxmlformats-officedocument.wordprocessingml.document':['docx']};if(!types[input.mime]?.includes(input.name.split('.').pop().toLowerCase()))invalid();
  if(typeof input.dataBase64!=='string'||input.dataBase64.length>13981016||!input.dataBase64.length||input.dataBase64.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(input.dataBase64))invalid();let raw;try{raw=atob(input.dataBase64);}catch{invalid();}if(!raw.length||raw.length>10485760||btoa(raw)!==input.dataBase64)invalid();const data=Uint8Array.from(raw,c=>c.charCodeAt(0));
  if(input.mime==='image/png'&&(raw.length<45||!raw.startsWith('\x89PNG\r\n\x1a\n')||raw.slice(12,16)!=='IHDR'||raw.slice(-8,-4)!=='IEND'))invalid();

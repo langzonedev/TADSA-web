@@ -109,9 +109,16 @@ function personAnswer(value,limit){
   const answer=typeof value==='string'?value.trim():'';
   return answer.length>limit||/[\u0000-\u001f\u007f]/.test(answer)||absentAnswer.test(answer)?'':answer;
 }
+export function referralPersonName(value){
+  return personAnswer(typeof value==='string'?value.replace(/\s*\r?\n\s*/g,' '):'',120);
+}
+export function referralContactNumber(value){
+  const number=personAnswer(value,40);
+  return /\d/.test(number)?number:'';
+}
 export function referrerIdentity(answers){
   const email=personAnswer(answers?.referrerEmail,254);
-  return {name:personAnswer(answers?.referrer,120),phone:personAnswer(answers?.referrerPhone,40),
+  return {name:referralPersonName(answers?.referrer),phone:referralContactNumber(answers?.referrerPhone),
     email:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)?email:''};
 }
 export function validateReferrerIdentity(input){
